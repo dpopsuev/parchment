@@ -1,7 +1,7 @@
 // Package parchment provides the domain model, business protocol, and
 // reference storage implementation for structured work graph artifacts.
 //
-// Parchment is the reusable artifact graph engine for the Aeon ecosystem.
+// Parchment is the reusable artifact graph engine for the Djinn ecosystem.
 // It contains all domain logic with zero dependency on transport packages
 // (MCP SDK, cobra, net/http). Any consumer can import parchment to create,
 // query, and manage artifacts with DAG support, lifecycle management, and

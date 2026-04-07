@@ -1,6 +1,6 @@
 # Parchment — Artifact Graph Engine
 
-Reusable domain library for structured work graph artifacts with DAG support, lifecycle management, and full-text search. Part of the Aeon ecosystem.
+Reusable domain library for structured work graph artifacts with DAG support, lifecycle management, and full-text search. Part of the Djinn ecosystem.
 
 ## What Parchment Provides
 

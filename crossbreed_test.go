@@ -185,3 +185,51 @@ func TestCascade_SpatialOverlap(t *testing.T) {
 		t.Errorf("B should be affected by spatial overlap with A on shared.go")
 	}
 }
+
+func TestCascadeAndInvalidate_SetsStatus(t *testing.T) {
+	t.Parallel()
+	path := t.TempDir() + "/invalidate.db"
+	s, err := OpenSQLite(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	p := New(s, DefaultSchema(), []string{"test"}, nil, ProtocolConfig{
+		IDFormat:  "scoped",
+		ScopeKeys: map[string]string{"test": "TST"},
+	})
+	ctx := context.Background()
+
+	// A → B → C chain, all active
+	a, _ := p.CreateArtifact(ctx, CreateInput{Kind: "task", Title: "A", Scope: "test", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}}})
+	b, _ := p.CreateArtifact(ctx, CreateInput{Kind: "task", Title: "B", Scope: "test", Priority: "medium", DependsOn: []string{a.ID}, Sections: []Section{{Name: "context", Text: "b"}}})
+	c, _ := p.CreateArtifact(ctx, CreateInput{Kind: "task", Title: "C", Scope: "test", Priority: "medium", DependsOn: []string{b.ID}, Sections: []Section{{Name: "context", Text: "c"}}})
+
+	// Activate all (force bypasses transition validation)
+	p.SetField(ctx, []string{a.ID, b.ID, c.ID}, "status", "active", SetFieldOptions{Force: true}) //nolint:errcheck // test seeding
+
+	// Cascade and invalidate from A
+	affected, err := p.CascadeAndInvalidate(ctx, a.ID, "dismissed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(affected) < 2 {
+		t.Fatalf("expected at least 2 affected, got %d", len(affected))
+	}
+
+	// B and C should be dismissed
+	bArt, _ := s.Get(ctx, b.ID)
+	if bArt.Status != "dismissed" {
+		t.Errorf("B status = %q, want dismissed", bArt.Status)
+	}
+	cArt, _ := s.Get(ctx, c.ID)
+	if cArt.Status != "dismissed" {
+		t.Errorf("C status = %q, want dismissed", cArt.Status)
+	}
+
+	// A should NOT be changed
+	aArt, _ := s.Get(ctx, a.ID)
+	if aArt.Status != "active" {
+		t.Errorf("A status = %q, want active (unchanged)", aArt.Status)
+	}
+}

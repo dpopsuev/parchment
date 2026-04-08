@@ -241,6 +241,104 @@ func TestDetectOverlaps_IncludesFiles(t *testing.T) {
 	}
 }
 
+func TestQualityGate_BlockingPreventsCompletion(t *testing.T) {
+	t.Parallel()
+	path := t.TempDir() + "/gate.db"
+	s, err := OpenSQLite(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	p := New(s, DefaultSchema(), []string{"test"}, nil, ProtocolConfig{
+		IDFormat:  "scoped",
+		ScopeKeys: map[string]string{"test": "TST"},
+	})
+	ctx := context.Background()
+
+	// Register a blocking gate
+	gate := NewStubQualityGate("test-gate", GateResult{
+		Passed:   false,
+		Severity: SeverityBlocking,
+		Message:  "tests not passing",
+	})
+	p.RegisterGate(gate)
+
+	// Create and activate an artifact
+	a, _ := p.CreateArtifact(ctx, CreateInput{Kind: "task", Title: "A", Scope: "test", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}}})
+	p.SetField(ctx, []string{a.ID}, "status", "active", SetFieldOptions{Force: true}) //nolint:errcheck // test seeding
+
+	// Try to complete — should fail due to blocking gate
+	results, err := p.SetField(ctx, []string{a.ID}, "status", "complete", SetFieldOptions{})
+	if err != nil {
+		t.Fatalf("SetField returned error: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected results")
+	}
+	if results[0].OK {
+		t.Fatal("expected blocking gate to prevent completion, got OK")
+	}
+	if results[0].Error == "" {
+		t.Fatal("expected error message from blocking gate")
+	}
+
+	// Gate should have been called
+	if gate.Calls == 0 {
+		t.Fatal("gate was not called")
+	}
+
+	// Artifact should still be active
+	art, _ := s.Get(ctx, a.ID)
+	if art.Status != "active" {
+		t.Errorf("status = %q, want active (gate blocked)", art.Status)
+	}
+}
+
+func TestQualityGate_WarningAllowsCompletion(t *testing.T) {
+	t.Parallel()
+	path := t.TempDir() + "/gatewarn.db"
+	s, err := OpenSQLite(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	p := New(s, DefaultSchema(), []string{"test"}, nil, ProtocolConfig{
+		IDFormat:  "scoped",
+		ScopeKeys: map[string]string{"test": "TST"},
+	})
+	ctx := context.Background()
+
+	// Register a warning gate (not blocking)
+	gate := NewStubQualityGate("warn-gate", GateResult{
+		Passed:   false,
+		Severity: SeverityWarning,
+		Message:  "minor lint issues",
+	})
+	p.RegisterGate(gate)
+
+	a, _ := p.CreateArtifact(ctx, CreateInput{Kind: "task", Title: "A", Scope: "test", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}}})
+	p.SetField(ctx, []string{a.ID}, "status", "active", SetFieldOptions{Force: true}) //nolint:errcheck // test seeding
+
+	// Complete should succeed despite warning
+	results, err := p.SetField(ctx, []string{a.ID}, "status", "complete", SetFieldOptions{})
+	if err != nil {
+		t.Fatalf("SetField returned error: %v", err)
+	}
+	if len(results) == 0 || !results[0].OK {
+		errMsg := ""
+		if len(results) > 0 {
+			errMsg = results[0].Error
+		}
+		t.Fatalf("warning gate should not block completion: %s", errMsg)
+	}
+
+	// Artifact should be complete
+	art, _ := s.Get(ctx, a.ID)
+	if art.Status != "complete" {
+		t.Errorf("status = %q, want complete", art.Status)
+	}
+}
+
 func TestCascadeAndInvalidate_SetsStatus(t *testing.T) {
 	t.Parallel()
 	path := t.TempDir() + "/invalidate.db"

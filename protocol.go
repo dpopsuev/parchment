@@ -1356,6 +1356,21 @@ func (p *Protocol) cascadeOverlaps(ctx context.Context, changed *Artifact, affec
 	}
 }
 
+// CascadeAndInvalidate finds all transitively affected artifacts and sets their
+// status to invalidStatus. Returns the list of affected IDs. The changed artifact
+// itself is NOT modified.
+func (p *Protocol) CascadeAndInvalidate(ctx context.Context, changedID, invalidStatus string) ([]string, error) {
+	affected := p.Cascade(ctx, changedID)
+	if len(affected) == 0 {
+		return nil, nil
+	}
+	_, err := p.SetField(ctx, affected, "status", invalidStatus, SetFieldOptions{Force: true})
+	if err != nil {
+		return affected, fmt.Errorf("cascade invalidate: %w", err)
+	}
+	return affected, nil
+}
+
 func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string, targetIDs []string) ([]Result, error) {
 	if sourceID == "" {
 		return nil, fmt.Errorf("source ID is required")

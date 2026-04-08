@@ -2385,6 +2385,11 @@ func (p *Protocol) DetectOverlaps(ctx context.Context, in OverlapInput) (*Overla
 		for _, l := range labels {
 			index[l] = append(index[l], ArtifactRef{ID: art.ID, Title: art.Title})
 		}
+		// Also index ComponentMap.Files for file-based overlap detection.
+		for _, f := range art.Components.Files {
+			key := "file:" + f
+			index[key] = append(index[key], ArtifactRef{ID: art.ID, Title: art.Title})
+		}
 	}
 
 	report := &OverlapReport{TotalScanned: len(arts)}

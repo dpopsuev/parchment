@@ -107,6 +107,7 @@ type Protocol struct {
 	defaults         DefaultsProvider
 	scopePolicies    map[string]ScopePolicy
 	stash            *StashStore
+	gates            []QualityGate
 }
 
 // New creates a Protocol with the given store, schema, home scopes,
@@ -137,6 +138,9 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 func (p *Protocol) Schema() *Schema    { return p.schema }
 func (p *Protocol) Store() Store       { return p.store }
 func (p *Protocol) Stash() *StashStore { return p.stash }
+
+// RegisterGate adds a quality gate checked during status transitions to terminal states.
+func (p *Protocol) RegisterGate(g QualityGate) { p.gates = append(p.gates, g) }
 
 // PromoteStash merges patch into a stashed artifact and creates it.
 func (p *Protocol) PromoteStash(ctx context.Context, stashID string, patch CreateInput) (*Artifact, error) { //nolint:gocritic // hugeParam: value semantics intentional, changing to pointer would require updating all callers including MCP handlers
@@ -874,6 +878,20 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 			if err := g.check(ctx, p, art); err != nil {
 				return Result{ID: art.ID, Error: err.Error()}
 			}
+		}
+	}
+
+	// Quality gates: check before terminal status transitions.
+	if p.schema.IsTerminal(status) && len(p.gates) > 0 {
+		for _, gate := range p.gates {
+			result, err := gate.Validate(ctx, art)
+			if err != nil {
+				return Result{ID: art.ID, Error: fmt.Sprintf("gate %s error: %v", gate.Name(), err)}
+			}
+			if !result.Passed && result.Severity == SeverityBlocking {
+				return Result{ID: art.ID, Error: fmt.Sprintf("gate %s blocked: %s", gate.Name(), result.Message)}
+			}
+			// Warning gates: allow transition, message captured in result info below.
 		}
 	}
 

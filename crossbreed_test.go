@@ -186,6 +186,61 @@ func TestCascade_SpatialOverlap(t *testing.T) {
 	}
 }
 
+func TestDetectOverlaps_IncludesFiles(t *testing.T) {
+	t.Parallel()
+	path := t.TempDir() + "/fileoverlap.db"
+	s, err := OpenSQLite(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	p := New(s, DefaultSchema(), []string{"test"}, nil, ProtocolConfig{
+		IDFormat:  "scoped",
+		ScopeKeys: map[string]string{"test": "TST"},
+	})
+	ctx := context.Background()
+
+	a, _ := p.CreateArtifact(ctx, CreateInput{
+		Kind: "task", Title: "A", Scope: "test", Priority: "medium",
+		Sections: []Section{{Name: "context", Text: "a"}},
+	})
+	b, _ := p.CreateArtifact(ctx, CreateInput{
+		Kind: "task", Title: "B", Scope: "test", Priority: "medium",
+		Sections: []Section{{Name: "context", Text: "b"}},
+	})
+
+	// Activate both
+	p.SetField(ctx, []string{a.ID, b.ID}, "status", "active", SetFieldOptions{Force: true}) //nolint:errcheck // test seeding
+
+	// Set overlapping files
+	artA, _ := s.Get(ctx, a.ID)
+	artA.Components = ComponentMap{Files: []string{"auth.go", "shared.go"}}
+	s.Put(ctx, artA) //nolint:errcheck // test seeding
+
+	artB, _ := s.Get(ctx, b.ID)
+	artB.Components = ComponentMap{Files: []string{"handler.go", "shared.go"}}
+	s.Put(ctx, artB) //nolint:errcheck // test seeding
+
+	report, err := p.DetectOverlaps(ctx, OverlapInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Should detect shared.go as an overlap
+	found := false
+	for _, o := range report.Overlaps {
+		if o.Label == "file:shared.go" {
+			found = true
+			if len(o.Artifacts) != 2 {
+				t.Errorf("expected 2 artifacts for shared.go, got %d", len(o.Artifacts))
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected file:shared.go overlap in report, got %v", report.Overlaps)
+	}
+}
+
 func TestCascadeAndInvalidate_SetsStatus(t *testing.T) {
 	t.Parallel()
 	path := t.TempDir() + "/invalidate.db"

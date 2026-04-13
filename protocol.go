@@ -917,10 +917,17 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 		}
 	}
 
+	oldStatus := art.Status
 	art.Status = status
 	if err := p.store.Put(ctx, art); err != nil {
 		return Result{ID: art.ID, Error: err.Error()}
 	}
+
+	slog.InfoContext(ctx, "lifecycle transition",
+		slog.String(LogKeyID, art.ID),
+		slog.String(LogKeyKind, art.Kind),
+		slog.String(LogKeyFrom, oldStatus),
+		slog.String(LogKeyTo, status))
 
 	triggerStatus := p.schema.TriggerStatusFor(art.Kind)
 	r := Result{ID: art.ID, OK: true}
@@ -1227,6 +1234,13 @@ func (p *Protocol) AttachSection(ctx context.Context, id, name, text string) (bo
 	if !replaced {
 		art.Sections = append(art.Sections, Section{Name: name, Text: text})
 	}
+
+	// Bidirectional code linking: when stamps section is attached,
+	// auto-extract file paths from evidence and merge into Components.Files.
+	if name == "stamps" {
+		mergeStampFiles(art, text)
+	}
+
 	if err := p.store.Put(ctx, art); err != nil {
 		return false, err
 	}
@@ -3180,3 +3194,40 @@ func (p *Protocol) checkTemplateConformance(ctx context.Context, art *Artifact) 
 }
 
 // --- helpers ---
+
+// stampEntry is the expected shape of a single stamp in the stamps section.
+type stampEntry struct {
+	Field    string `json:"field"`
+	Status   string `json:"status"`
+	Evidence string `json:"evidence"` // "file:line" or "file"
+}
+
+// mergeStampFiles extracts file paths from stamps section evidence and
+// merges them into Components.Files. This creates bidirectional linking:
+// stamps reference code, Components.Files references back.
+func mergeStampFiles(art *Artifact, stampsJSON string) {
+	var stamps []stampEntry
+	if err := json.Unmarshal([]byte(stampsJSON), &stamps); err != nil {
+		return // not valid JSON — skip silently
+	}
+
+	seen := make(map[string]bool)
+	for _, f := range art.Components.Files {
+		seen[f] = true
+	}
+
+	for _, s := range stamps {
+		if s.Evidence == "" {
+			continue
+		}
+		// Extract file path from "file:line" format.
+		file := s.Evidence
+		if idx := strings.LastIndex(file, ":"); idx > 0 {
+			file = file[:idx]
+		}
+		if file != "" && !seen[file] {
+			seen[file] = true
+			art.Components.Files = append(art.Components.Files, file)
+		}
+	}
+}

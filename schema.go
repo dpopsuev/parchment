@@ -706,6 +706,7 @@ func DefaultSchema() *Schema {
 		},
 		Statuses: []string{
 			"draft", "active", "current", "open",
+			"mature", "allocated", "in_progress", "in_review",
 			"complete", "cancelled", "dismissed", "promoted",
 			"retired", "archived",
 		},

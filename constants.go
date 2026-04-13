@@ -15,7 +15,11 @@ const (
 	StatusCancelled = "cancelled"
 	StatusDismissed = "dismissed"
 	StatusRetired   = "retired"
-	StatusArchived  = "archived"
+	StatusArchived   = "archived"
+	StatusMature     = "mature"
+	StatusAllocated  = "allocated"
+	StatusInProgress = "in_progress"
+	StatusInReview   = "in_review"
 )
 
 // Artifact kinds.

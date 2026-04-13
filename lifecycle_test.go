@@ -174,6 +174,66 @@ func TestTransition_WorkerIDRequiredForAllocation(t *testing.T) {
 	}
 }
 
+func TestAttachSection_StampsPopulatesComponentFiles(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	store := parchment.NewMemoryStore()
+	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
+
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
+		Kind: "task", Scope: "test", Title: "code link test", Priority: "medium",
+		Sections: []parchment.Section{{Name: "context", Text: "c"}},
+	})
+
+	// Attach stamps with evidence containing file:line references.
+	stamps := `[{"field":"title","status":"verified","evidence":"main.go:42"},{"field":"goal","status":"verified","evidence":"handler.go:10"}]`
+	proto.AttachSection(ctx, art.ID, "stamps", stamps)
+
+	got, _ := store.Get(ctx, art.ID)
+	if len(got.Components.Files) != 2 {
+		t.Fatalf("Components.Files = %v, want 2 entries", got.Components.Files)
+	}
+
+	// Verify file paths were extracted (without line numbers).
+	files := got.Components.Files
+	hasMain := false
+	hasHandler := false
+	for _, f := range files {
+		if f == "main.go" {
+			hasMain = true
+		}
+		if f == "handler.go" {
+			hasHandler = true
+		}
+	}
+	if !hasMain || !hasHandler {
+		t.Errorf("Components.Files = %v, want [main.go, handler.go]", files)
+	}
+}
+
+func TestAttachSection_StampsDeduplicatesFiles(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	store := parchment.NewMemoryStore()
+	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
+
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
+		Kind: "task", Scope: "test", Title: "dedup test", Priority: "medium",
+		Sections: []parchment.Section{{Name: "context", Text: "c"}},
+	})
+
+	// Two stamps referencing the same file.
+	stamps := `[{"field":"a","status":"verified","evidence":"main.go:1"},{"field":"b","status":"verified","evidence":"main.go:99"}]`
+	proto.AttachSection(ctx, art.ID, "stamps", stamps)
+
+	got, _ := store.Get(ctx, art.ID)
+	if len(got.Components.Files) != 1 {
+		t.Fatalf("Components.Files = %v, want 1 (deduplicated)", got.Components.Files)
+	}
+}
+
 func TestTransition_StampsRequiredForReview(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

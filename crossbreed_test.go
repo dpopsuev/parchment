@@ -265,7 +265,12 @@ func TestQualityGate_BlockingPreventsCompletion(t *testing.T) {
 
 	// Create and activate an artifact
 	a, _ := p.CreateArtifact(ctx, CreateInput{Kind: "task", Title: "A", Scope: "test", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}}})
-	p.SetField(ctx, []string{a.ID}, "status", "active", SetFieldOptions{Force: true}) //nolint:errcheck // test seeding
+	// Walk through lifecycle to in_review so complete is a valid transition.
+	p.SetField(ctx, []string{a.ID}, "status", "active", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
+	p.SetField(ctx, []string{a.ID}, "status", "mature", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
+	p.SetField(ctx, []string{a.ID}, "status", "allocated", SetFieldOptions{Force: true})   //nolint:errcheck // test seeding
+	p.SetField(ctx, []string{a.ID}, "status", "in_progress", SetFieldOptions{Force: true}) //nolint:errcheck // test seeding
+	p.SetField(ctx, []string{a.ID}, "status", "in_review", SetFieldOptions{Force: true})   //nolint:errcheck // test seeding
 
 	// Try to complete — should fail due to blocking gate
 	results, err := p.SetField(ctx, []string{a.ID}, "status", "complete", SetFieldOptions{})
@@ -287,10 +292,10 @@ func TestQualityGate_BlockingPreventsCompletion(t *testing.T) {
 		t.Fatal("gate was not called")
 	}
 
-	// Artifact should still be active
+	// Artifact should still be in_review
 	art, _ := s.Get(ctx, a.ID)
-	if art.Status != "active" {
-		t.Errorf("status = %q, want active (gate blocked)", art.Status)
+	if art.Status != "in_review" {
+		t.Errorf("status = %q, want in_review (gate blocked)", art.Status)
 	}
 }
 
@@ -317,7 +322,12 @@ func TestQualityGate_WarningAllowsCompletion(t *testing.T) {
 	p.RegisterGate(gate)
 
 	a, _ := p.CreateArtifact(ctx, CreateInput{Kind: "task", Title: "A", Scope: "test", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}}})
-	p.SetField(ctx, []string{a.ID}, "status", "active", SetFieldOptions{Force: true}) //nolint:errcheck // test seeding
+	// Walk through lifecycle to in_review so complete is a valid transition.
+	p.SetField(ctx, []string{a.ID}, "status", "active", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
+	p.SetField(ctx, []string{a.ID}, "status", "mature", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
+	p.SetField(ctx, []string{a.ID}, "status", "allocated", SetFieldOptions{Force: true})   //nolint:errcheck // test seeding
+	p.SetField(ctx, []string{a.ID}, "status", "in_progress", SetFieldOptions{Force: true}) //nolint:errcheck // test seeding
+	p.SetField(ctx, []string{a.ID}, "status", "in_review", SetFieldOptions{Force: true})   //nolint:errcheck // test seeding
 
 	// Complete should succeed despite warning
 	results, err := p.SetField(ctx, []string{a.ID}, "status", "complete", SetFieldOptions{})

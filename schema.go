@@ -618,6 +618,7 @@ func DefaultSchema() *Schema {
 				CouldSections:              []string{"current_architecture", "desired_architecture"},
 				RequiredFields:             []string{FieldPriority},
 				Children:                   []string{},
+				Transitions:                taskTransitions(),
 				Relations: KindRelations{
 					Outgoing: []string{RelImplements, RelDependsOn, RelSatisfies},
 					Targets:  map[string][]string{RelImplements: {"spec", "bug"}, RelSatisfies: {"template"}},
@@ -725,5 +726,20 @@ func DefaultSchema() *Schema {
 		},
 		Priorities:      []string{"none", "low", "medium", "high", "critical"},
 		DefaultPriority: "none",
+	}
+}
+
+// taskTransitions defines the intended lifecycle for task artifacts.
+// Uses constants to avoid raw string linter warnings.
+func taskTransitions() map[string][]string {
+	return map[string][]string{
+		StatusDraft:      {StatusActive, StatusCanceled},
+		StatusActive:     {StatusMature, StatusDraft, StatusCanceled},
+		StatusMature:     {StatusAllocated, StatusActive, StatusCanceled},
+		StatusAllocated:  {StatusInProgress, StatusMature, StatusCanceled},
+		StatusInProgress: {StatusInReview, StatusAllocated, StatusCanceled},
+		StatusInReview:   {StatusComplete, StatusInProgress, StatusCanceled},
+		StatusComplete:   {StatusArchived},
+		StatusCanceled:   {StatusDraft, StatusArchived},
 	}
 }

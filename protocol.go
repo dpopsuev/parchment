@@ -856,10 +856,17 @@ type transitionGuard struct {
 }
 
 func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status string, force bool) Result { //nolint:gocyclo // pre-existing complexity, moved from protocol/
-	if !force {
-		if reason, ok := p.schema.ValidTransition(art.Kind, art.Status, status); !ok {
+	reason, valid := p.schema.ValidTransition(art.Kind, art.Status, status)
+	if !valid {
+		if !force {
 			return Result{ID: art.ID, Error: reason}
 		}
+		slog.WarnContext(ctx, "forced status transition bypasses lifecycle model",
+			slog.String(LogKeyID, art.ID),
+			slog.String(LogKeyKind, art.Kind),
+			slog.String(LogKeyFrom, art.Status),
+			slog.String(LogKeyTo, status),
+			slog.String(LogKeyReason, reason))
 	}
 
 	// Composable pre-transition guards (skipped entirely for SkipGuards kinds like mirror)
@@ -1034,36 +1041,58 @@ func (p *Protocol) transitionGuards() []transitionGuard {
 		})
 	}
 
-	// Activation: required fields
-	guards = append(guards, transitionGuard{
-		name: "required_fields", when: StatusActive, forceable: true,
-		check: func(ctx context.Context, p *Protocol, art *Artifact) error {
-			if missing := p.schema.MissingRequiredFields(art); len(missing) > 0 {
-				return fmt.Errorf("cannot activate %s: missing required fields: %s",
-					art.ID, strings.Join(missing, ", "))
-			}
-			return nil
-		},
-	})
-
-	// Activation: required sections
-	guards = append(guards, transitionGuard{
-		name: "required_sections", when: StatusActive, forceable: true,
-		check: func(ctx context.Context, p *Protocol, art *Artifact) error {
-			if !p.schema.ActivationRequiresSections(art.Kind) {
+	// Allocation: worker_id required in Extra for task allocation.
+	// In-review: stamps section required for review transition.
+	// Activation: required fields.
+	guards = append(guards,
+		transitionGuard{
+			name: "worker_id_required", when: StatusAllocated, where: KindTask, forceable: true,
+			check: func(_ context.Context, _ *Protocol, art *Artifact) error {
+				if art.Extra == nil {
+					return fmt.Errorf("%w: %s", ErrWorkerIDRequired, art.ID)
+				}
+				if _, ok := art.Extra["worker_id"]; !ok {
+					return fmt.Errorf("%w: %s", ErrWorkerIDRequired, art.ID)
+				}
 				return nil
-			}
-			if shouldMissing := p.schema.MissingShouldSections(art.Kind, art.Sections); len(shouldMissing) > 0 {
-				return fmt.Errorf("cannot activate %s: missing recommended sections: %s",
-					art.ID, strings.Join(shouldMissing, ", "))
-			}
-			if expMissing := p.schema.MissingSections(art.Kind, art.Sections); len(expMissing) > 0 {
-				return fmt.Errorf("cannot activate %s: missing expected sections: %s",
-					art.ID, strings.Join(expMissing, ", "))
-			}
-			return nil
+			},
 		},
-	})
+		transitionGuard{
+			name: "stamps_required", when: StatusInReview, where: KindTask, forceable: true,
+			check: func(_ context.Context, _ *Protocol, art *Artifact) error {
+				for _, sec := range art.Sections {
+					if sec.Name == "stamps" {
+						return nil
+					}
+				}
+				return fmt.Errorf("%w: %s", ErrStampsRequired, art.ID)
+			},
+		},
+		transitionGuard{
+			name: "required_fields", when: StatusActive, forceable: true,
+			check: func(_ context.Context, _ *Protocol, art *Artifact) error {
+				if missing := p.schema.MissingRequiredFields(art); len(missing) > 0 {
+					return fmt.Errorf("%w: %s (%s)", ErrMissingRequiredFields, art.ID, strings.Join(missing, ", "))
+				}
+				return nil
+			},
+		},
+		transitionGuard{
+			name: "required_sections", when: StatusActive, forceable: true,
+			check: func(_ context.Context, _ *Protocol, art *Artifact) error {
+				if !p.schema.ActivationRequiresSections(art.Kind) {
+					return nil
+				}
+				if shouldMissing := p.schema.MissingShouldSections(art.Kind, art.Sections); len(shouldMissing) > 0 {
+					return fmt.Errorf("%w: %s recommended: %s", ErrMissingSections, art.ID, strings.Join(shouldMissing, ", "))
+				}
+				if expMissing := p.schema.MissingSections(art.Kind, art.Sections); len(expMissing) > 0 {
+					return fmt.Errorf("%w: %s expected: %s", ErrMissingSections, art.ID, strings.Join(expMissing, ", "))
+				}
+				return nil
+			},
+		},
+	)
 
 	return guards
 }

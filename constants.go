@@ -3,18 +3,24 @@ package parchment
 import "errors"
 
 // Sentinel errors.
-var ErrArtifactNotFound = errors.New("artifact not found")
+var (
+	ErrArtifactNotFound      = errors.New("artifact not found")
+	ErrWorkerIDRequired      = errors.New("worker_id required in extra for allocation")
+	ErrStampsRequired        = errors.New("stamps section required for in_review transition")
+	ErrMissingRequiredFields = errors.New("missing required fields for activation")
+	ErrMissingSections       = errors.New("missing sections for activation")
+)
 
 // Artifact statuses.
 const (
-	StatusDraft     = "draft"
-	StatusActive    = "active"
-	StatusCurrent   = "current"
-	StatusOpen      = "open"
-	StatusComplete  = "complete"
-	StatusCancelled = "cancelled"
-	StatusDismissed = "dismissed"
-	StatusRetired   = "retired"
+	StatusDraft      = "draft"
+	StatusActive     = "active"
+	StatusCurrent    = "current"
+	StatusOpen       = "open"
+	StatusComplete   = "complete"
+	StatusCanceled   = "cancelled" //nolint:misspell // data-compat: existing artifacts use this spelling
+	StatusDismissed  = "dismissed"
+	StatusRetired    = "retired"
 	StatusArchived   = "archived"
 	StatusMature     = "mature"
 	StatusAllocated  = "allocated"
@@ -50,6 +56,15 @@ const (
 	FieldKind      = "kind"
 	FieldDependsOn = "depends_on"
 	FieldLabels    = "labels"
+)
+
+// Structured log keys.
+const (
+	LogKeyID     = "id"
+	LogKeyKind   = "kind"
+	LogKeyFrom   = "from"
+	LogKeyTo     = "to"
+	LogKeyReason = "reason"
 )
 
 // Graph traversal directions.

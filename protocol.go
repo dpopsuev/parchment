@@ -181,6 +181,7 @@ type CreateInput struct {
 	CreatedAt  string              `json:"created_at,omitempty"`
 	ExplicitID string              `json:"explicit_id,omitempty"`
 	Sections   []Section           `json:"sections,omitempty"`
+	Patch      map[string]string   `json:"patch,omitempty"`
 	SkipHooks  bool                `json:"skip_hooks,omitempty"`
 }
 
@@ -277,6 +278,19 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	if in.CreatedAt != "" {
 		if t, err := time.Parse(time.RFC3339, in.CreatedAt); err == nil {
 			art.CreatedAt = t
+		}
+	}
+	if len(in.Patch) > 0 {
+		existing := make(map[string]int, len(art.Sections))
+		for i, s := range art.Sections {
+			existing[s.Name] = i
+		}
+		for name, text := range in.Patch {
+			if idx, ok := existing[name]; ok {
+				art.Sections[idx].Text = text
+			} else {
+				art.Sections = append(art.Sections, Section{Name: name, Text: text})
+			}
 		}
 	}
 	// Skip template, edge enforcement, and duplicate checks for SkipGuards kinds (e.g. mirror)

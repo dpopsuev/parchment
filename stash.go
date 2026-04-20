@@ -158,5 +158,14 @@ func MergeInput(base CreateInput, patch CreateInput) CreateInput {
 		}
 	}
 
+	if len(patch.Patch) > 0 {
+		if base.Patch == nil {
+			base.Patch = make(map[string]string, len(patch.Patch))
+		}
+		for k, v := range patch.Patch {
+			base.Patch[k] = v
+		}
+	}
+
 	return base
 }

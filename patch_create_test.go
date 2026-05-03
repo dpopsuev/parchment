@@ -18,9 +18,9 @@ func setupTemplateProto(t *testing.T) *parchment.Protocol {
 		ID: "TPL-1", Kind: "template", Status: "active", Title: "Bug Template", Scope: "test",
 		Sections: []parchment.Section{
 			{Name: "content", Text: "raw markdown"},
-			{Name: "steps", Text: "Reproduction steps"},
-			{Name: "expected", Text: "Expected behavior"},
-			{Name: "actual", Text: "Actual behavior"},
+			{Name: "observed", Text: "Observed vs expected behavior"},
+			{Name: "reproduction", Text: "Steps to reproduce"},
+			{Name: "root_cause", Text: "Component and code path"},
 		},
 	})
 	return proto
@@ -36,9 +36,9 @@ func TestCreateArtifact_PatchFillsSections(t *testing.T) {
 		Title: "crash on nil input",
 		Scope: "test",
 		Patch: map[string]string{
-			"steps":    "1. call Foo(nil)\n2. observe panic",
-			"expected": "graceful error return",
-			"actual":   "nil pointer dereference",
+			"observed":     "nil pointer dereference on Foo(nil)",
+			"reproduction": "1. call Foo(nil)\n2. observe panic",
+			"root_cause":   "missing nil guard",
 		},
 	})
 	if err != nil {
@@ -49,14 +49,14 @@ func TestCreateArtifact_PatchFillsSections(t *testing.T) {
 	for _, s := range art.Sections {
 		have[s.Name] = s.Text
 	}
-	if have["steps"] != "1. call Foo(nil)\n2. observe panic" {
-		t.Errorf("steps section not applied from patch, got: %q", have["steps"])
+	if have["observed"] != "nil pointer dereference on Foo(nil)" {
+		t.Errorf("observed section not applied from patch, got: %q", have["observed"])
 	}
-	if have["expected"] != "graceful error return" {
-		t.Errorf("expected section not applied from patch, got: %q", have["expected"])
+	if have["reproduction"] != "1. call Foo(nil)\n2. observe panic" {
+		t.Errorf("reproduction section not applied from patch, got: %q", have["reproduction"])
 	}
-	if have["actual"] != "nil pointer dereference" {
-		t.Errorf("actual section not applied from patch, got: %q", have["actual"])
+	if have["root_cause"] != "missing nil guard" {
+		t.Errorf("root_cause section not applied from patch, got: %q", have["root_cause"])
 	}
 }
 
@@ -70,11 +70,11 @@ func TestCreateArtifact_PatchMergesWithExplicitSections(t *testing.T) {
 		Title: "race condition",
 		Scope: "test",
 		Sections: []parchment.Section{
-			{Name: "steps", Text: "1. run with -race"},
+			{Name: "observed", Text: "data race on map"},
 		},
 		Patch: map[string]string{
-			"expected": "clean run",
-			"actual":   "data race on map",
+			"reproduction": "1. run with -race",
+			"root_cause":   "unsynchronized map access",
 		},
 	})
 	if err != nil {
@@ -85,11 +85,11 @@ func TestCreateArtifact_PatchMergesWithExplicitSections(t *testing.T) {
 	for _, s := range art.Sections {
 		have[s.Name] = s.Text
 	}
-	if have["steps"] != "1. run with -race" {
-		t.Errorf("explicit section should be preserved, got: %q", have["steps"])
+	if have["observed"] != "data race on map" {
+		t.Errorf("explicit section should be preserved, got: %q", have["observed"])
 	}
-	if have["expected"] != "clean run" {
-		t.Errorf("patch section not applied, got: %q", have["expected"])
+	if have["reproduction"] != "1. run with -race" {
+		t.Errorf("patch section not applied, got: %q", have["reproduction"])
 	}
 }
 
@@ -103,12 +103,12 @@ func TestCreateArtifact_PatchOverridesExplicitSection(t *testing.T) {
 		Title: "dup section",
 		Scope: "test",
 		Sections: []parchment.Section{
-			{Name: "steps", Text: "old steps"},
-			{Name: "expected", Text: "old expected"},
-			{Name: "actual", Text: "old actual"},
+			{Name: "observed", Text: "old observed"},
+			{Name: "reproduction", Text: "old reproduction"},
+			{Name: "root_cause", Text: "old root_cause"},
 		},
 		Patch: map[string]string{
-			"steps": "new steps from patch",
+			"observed": "new observed from patch",
 		},
 	})
 	if err != nil {
@@ -119,11 +119,11 @@ func TestCreateArtifact_PatchOverridesExplicitSection(t *testing.T) {
 	for _, s := range art.Sections {
 		have[s.Name] = s.Text
 	}
-	if have["steps"] != "new steps from patch" {
-		t.Errorf("patch should override explicit section, got: %q", have["steps"])
+	if have["observed"] != "new observed from patch" {
+		t.Errorf("patch should override explicit section, got: %q", have["observed"])
 	}
-	if have["expected"] != "old expected" {
-		t.Errorf("non-patched section should be preserved, got: %q", have["expected"])
+	if have["reproduction"] != "old reproduction" {
+		t.Errorf("non-patched section should be preserved, got: %q", have["reproduction"])
 	}
 }
 
@@ -153,9 +153,7 @@ func TestPromoteStash_PatchFillsMissingSections(t *testing.T) {
 	// Promote with patch providing missing sections
 	art, err := proto.PromoteStash(ctx, stashID, parchment.CreateInput{
 		Patch: map[string]string{
-			"steps":    "1. do the thing",
-			"expected": "it works",
-			"actual":   "it doesn't",
+			"observed": "it crashes",
 		},
 	})
 	if err != nil {
@@ -166,8 +164,8 @@ func TestPromoteStash_PatchFillsMissingSections(t *testing.T) {
 	for _, s := range art.Sections {
 		have[s.Name] = s.Text
 	}
-	if have["steps"] != "1. do the thing" {
-		t.Errorf("patch section not applied via promote, got: %q", have["steps"])
+	if have["observed"] != "it crashes" {
+		t.Errorf("patch section not applied via promote, got: %q", have["observed"])
 	}
 }
 
@@ -178,13 +176,13 @@ func TestMergeInput_PatchFieldMerged(t *testing.T) {
 		Kind:  "bug",
 		Title: "base title",
 		Sections: []parchment.Section{
-			{Name: "steps", Text: "existing steps"},
+			{Name: "observed", Text: "existing observed"},
 		},
 	}
 	patch := parchment.CreateInput{
 		Patch: map[string]string{
-			"expected": "new expected",
-			"actual":   "new actual",
+			"reproduction": "new reproduction",
+			"root_cause":   "new root_cause",
 		},
 	}
 
@@ -193,7 +191,7 @@ func TestMergeInput_PatchFieldMerged(t *testing.T) {
 	if len(merged.Patch) != 2 {
 		t.Errorf("patch map should be merged, got %d entries", len(merged.Patch))
 	}
-	if merged.Patch["expected"] != "new expected" {
-		t.Errorf("patch entry not merged, got: %q", merged.Patch["expected"])
+	if merged.Patch["reproduction"] != "new reproduction" {
+		t.Errorf("patch entry not merged, got: %q", merged.Patch["reproduction"])
 	}
 }

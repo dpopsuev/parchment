@@ -17,7 +17,6 @@ import (
 // =============================================================================
 
 func TestTopoSort_ShouldRespectParentGoalDependencies(t *testing.T) {
-	t.Skip("BUG-5: known failing — goal-level depends_on not propagated to child tasks in TopoSort")
 	t.Parallel()
 	proto, _ := newProto(t)
 	ctx := context.Background()

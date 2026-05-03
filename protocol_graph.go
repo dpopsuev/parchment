@@ -366,8 +366,27 @@ func (p *Protocol) TopoSort(ctx context.Context, rootID string) ([]TopoEntry, er
 	for id, art := range arts {
 		for _, dep := range art.DependsOn {
 			if _, ok := arts[dep]; ok {
-				// Edge: dep → id (id depends on dep, so dep must come first).
 				_ = g.AddEdge(dep, id)
+			}
+		}
+	}
+
+	// Propagate parent-level depends_on to children: if parent A depends on
+	// parent B, all children of A must come after all children of B.
+	parentChildren := make(map[string][]string)
+	for id, art := range arts {
+		if art.Parent != "" {
+			parentChildren[art.Parent] = append(parentChildren[art.Parent], id)
+		}
+	}
+	for parentID, childIDs := range parentChildren {
+		depEdges, _ := p.store.Neighbors(ctx, parentID, RelDependsOn, Outgoing)
+		for _, e := range depEdges {
+			depChildren := parentChildren[e.To]
+			for _, src := range depChildren {
+				for _, dst := range childIDs {
+					_ = g.AddEdge(src, dst)
+				}
 			}
 		}
 	}

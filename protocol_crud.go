@@ -3,6 +3,7 @@ package parchment
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -24,7 +25,14 @@ func (p *Protocol) PromoteStash(ctx context.Context, stashID string, patch Creat
 		if stashErr != nil {
 			return nil, fmt.Errorf("%w (stash unavailable: %w)", err, stashErr) //nolint:errorlint // pre-existing
 		}
-		return nil, fmt.Errorf("%w [stash_id=%s]", err, newID)
+		// If the underlying error is already a ConformanceError, update its StashID.
+		// Otherwise wrap in a new ConformanceError.
+		var ce *ConformanceError
+		if errors.As(err, &ce) {
+			ce.StashID = newID
+			return nil, ce
+		}
+		return nil, &ConformanceError{Err: err, StashID: newID}
 	}
 	p.stash.Delete(stashID)
 	return art, nil
@@ -197,7 +205,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		if err := p.checkTemplateConformance(ctx, art, true); err != nil {
 			// Stash the partial artifact for patch-based recovery
 			if stashID, stashErr := p.stash.Put(in); stashErr == nil {
-				return nil, fmt.Errorf("%w [stash_id=%s]", err, stashID)
+				return nil, &ConformanceError{Err: err, StashID: stashID}
 			}
 			return nil, err
 		}

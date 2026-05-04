@@ -2,7 +2,7 @@ package parchment_test
 
 import (
 	"context"
-	"strings"
+	"errors"
 	"testing"
 
 	"github.com/dpopsuev/parchment"
@@ -142,13 +142,15 @@ func TestPromoteStash_PatchFillsMissingSections(t *testing.T) {
 		t.Fatal("create without sections should fail")
 	}
 
-	// Extract stash_id from error
-	errStr := err.Error()
-	idx := strings.Index(errStr, "[stash_id=")
-	if idx < 0 {
-		t.Fatalf("error should contain stash_id, got: %s", errStr)
+	// Extract stash_id from ConformanceError
+	var ce *parchment.ConformanceError
+	if !errors.As(err, &ce) {
+		t.Fatalf("expected *ConformanceError, got %T: %v", err, err)
 	}
-	stashID := errStr[idx+len("[stash_id=") : len(errStr)-1]
+	stashID := ce.StashID
+	if stashID == "" {
+		t.Fatal("ConformanceError.StashID should be non-empty")
+	}
 
 	// Promote with patch providing missing sections
 	art, err := proto.PromoteStash(ctx, stashID, parchment.CreateInput{

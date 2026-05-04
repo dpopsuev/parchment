@@ -2619,6 +2619,55 @@ func TestDetectOrphans_RefWithoutDocuments(t *testing.T) {
 	}
 }
 
+// --- ConformanceError ---
+
+func TestCreateArtifact_ConformanceErrorHasStashID(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	proto := setupTemplateProtoForConformance(t)
+
+	// Create bug without required "observed" section — should fail conformance
+	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{
+		Kind:  "bug",
+		Title: "missing observed",
+		Scope: "test",
+	})
+	if err == nil {
+		t.Fatal("expected error for bug without required sections")
+	}
+
+	var ce *parchment.ConformanceError
+	if !errors.As(err, &ce) {
+		t.Fatalf("expected *ConformanceError, got %T: %v", err, err)
+	}
+	if ce.StashID == "" {
+		t.Error("ConformanceError.StashID should be non-empty")
+	}
+	if !strings.Contains(ce.Error(), "does not conform") {
+		t.Errorf("error message should contain 'does not conform', got: %s", ce.Error())
+	}
+}
+
+// setupTemplateProtoForConformance creates a protocol with a bug template
+// that requires an "observed" section (MustSection for bug kind).
+func setupTemplateProtoForConformance(t *testing.T) *parchment.Protocol {
+	t.Helper()
+	store := parchment.NewMemoryStore()
+	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
+	ctx := context.Background()
+
+	store.Put(ctx, &parchment.Artifact{
+		ID: "TPL-BUG-1", Kind: "template", Status: "active", Title: "Bug Template", Scope: "test",
+		Sections: []parchment.Section{
+			{Name: "content", Text: "raw markdown"},
+			{Name: "observed", Text: "Observed vs expected behavior"},
+			{Name: "reproduction", Text: "Steps to reproduce"},
+			{Name: "root_cause", Text: "Component and code path"},
+		},
+	})
+	return proto
+}
+
 // ============================================================
 // Helpers
 // ============================================================

@@ -9,6 +9,17 @@ var (
 	ErrNotArchived = errors.New("only archived artifacts can be deleted; use force to override")
 )
 
+// ConformanceError is returned when an artifact fails template conformance
+// during creation or promotion. It carries the stash ID so callers can
+// recover the partial artifact without parsing the error string.
+type ConformanceError struct {
+	Err     error
+	StashID string
+}
+
+func (e *ConformanceError) Error() string { return e.Err.Error() }
+func (e *ConformanceError) Unwrap() error { return e.Err }
+
 // Config key constants for sticky filter defaults.
 const (
 	configKeyDefaultScope         = "default_scope"

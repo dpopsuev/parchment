@@ -197,7 +197,11 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 					hasEdge = true
 				}
 				if !hasEdge {
-					return nil, fmt.Errorf("%s requires a %s edge — provide via links or depends_on", art.Kind, reqRel) //nolint:err113 // pre-existing
+					hint := fmt.Sprintf(`links: {"%s": ["<target-id>"]}`, reqRel)
+					if reqRel == RelDependsOn {
+						hint = fmt.Sprintf(`depends_on: ["<target-id>"] or links: {"%s": ["<target-id>"]}`, reqRel)
+					}
+					return nil, fmt.Errorf("%s requires a %s edge — add it at creation time via %s", art.Kind, reqRel, hint) //nolint:err113 // pre-existing
 				}
 			}
 		}

@@ -197,9 +197,11 @@ func (p *Protocol) checkTemplateConformance(ctx context.Context, art *Artifact, 
 		have[sec.Name] = true
 	}
 	var msgs []string
+	var missingNames []string
 	for name, guidance := range expected {
 		if !have[name] {
 			msgs = append(msgs, fmt.Sprintf("  - %s: %s", name, guidance))
+			missingNames = append(missingNames, name)
 		}
 	}
 	if len(msgs) == 0 {
@@ -212,6 +214,7 @@ func (p *Protocol) checkTemplateConformance(ctx context.Context, art *Artifact, 
 	}
 
 	sort.Strings(msgs)
+	sort.Strings(missingNames)
 	slog.WarnContext(ctx, "template conformance failed", //nolint:sloglint // pre-existing
 		"artifact_id", art.ID,
 		"artifact_kind", art.Kind,
@@ -221,6 +224,13 @@ func (p *Protocol) checkTemplateConformance(ctx context.Context, art *Artifact, 
 		"sections_missing", len(msgs),
 		"missing_list", strings.Join(msgs, "; "))
 
-	return fmt.Errorf("artifact does not conform to template %s — missing sections:\n%s", //nolint:err113 // pre-existing
-		tpl.ID, strings.Join(msgs, "\n"))
+	// Build a copy-paste-ready correction showing the required sections wire format.
+	fixParts := make([]string, 0, len(missingNames))
+	for _, name := range missingNames {
+		fixParts = append(fixParts, fmt.Sprintf(`{"name":%q,"text":"..."}`, name))
+	}
+	fix := "[" + strings.Join(fixParts, ", ") + "]"
+
+	return fmt.Errorf("artifact does not conform to template %s — missing sections:\n%s\nFix: pass sections: %s", //nolint:err113 // pre-existing
+		tpl.ID, strings.Join(msgs, "\n"), fix)
 }

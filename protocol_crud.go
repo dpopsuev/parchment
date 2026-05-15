@@ -104,6 +104,8 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	var id string
 	if in.ExplicitID != "" { //nolint:gocritic,nestif // ifElseChain: pre-existing
 		id = in.ExplicitID
+	} else if p.idFormat == IDFormatUUID && in.Prefix == "" {
+		id = GenerateUUID()
 	} else if p.idTemplate != nil && in.Prefix == "" {
 		id, err = p.generateTemplatedID(ctx, scope, in.Kind)
 		if err != nil {

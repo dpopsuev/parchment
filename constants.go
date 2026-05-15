@@ -67,6 +67,12 @@ const (
 	LogKeyReason = "reason"
 )
 
+// ID format identifiers.
+const (
+	IDFormatScoped = "scoped"
+	IDFormatUUID   = "uuid"
+)
+
 // Graph traversal directions.
 const (
 	DirOutbound = "outbound"

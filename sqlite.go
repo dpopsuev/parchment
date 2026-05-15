@@ -195,9 +195,15 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 		log.Warn("reseed scoped sequences failed", "error", err)
 	}
 
-	// Always rebuild FTS5 on startup — guarantees consistency after crash or unclean shutdown
+	// Always rebuild FTS5 on startup. If the shadow tables are corrupt (e.g.
+	// from a hard kill mid-write), drop and recreate them before rebuilding.
 	if _, err := writer.Exec("INSERT INTO artifacts_fts(artifacts_fts) VALUES('rebuild')"); err != nil {
-		log.Warn("FTS5 rebuild failed", "error", err)
+		log.Warn("FTS5 rebuild failed, attempting recovery", slog.Any("error", err))
+		if rerr := rebuildFTS5(writer); rerr != nil {
+			log.Error("FTS5 recovery failed", slog.Any("error", rerr))
+		} else {
+			log.Info("FTS5 recovered after corruption")
+		}
 	}
 
 	reader, err := sql.Open("sqlite", dsn+"&_pragma=query_only(on)")
@@ -228,6 +234,25 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 	snapshotter.AutoSnapshot(context.Background(), cfg.Snapshots)
 
 	return st, nil
+}
+
+// rebuildFTS5 drops the corrupt FTS5 virtual table and recreates it from
+// the main artifacts table. Called only when the normal 'rebuild' command fails.
+func rebuildFTS5(db *sql.DB) error {
+	if _, err := db.Exec("DROP TABLE IF EXISTS artifacts_fts"); err != nil {
+		return fmt.Errorf("drop fts5: %w", err)
+	}
+	if _, err := db.Exec(`CREATE VIRTUAL TABLE artifacts_fts USING fts5(
+		id, title, goal, sections,
+		content='artifacts',
+		content_rowid='rowid'
+	)`); err != nil {
+		return fmt.Errorf("create fts5: %w", err)
+	}
+	if _, err := db.Exec("INSERT INTO artifacts_fts(artifacts_fts) VALUES('rebuild')"); err != nil {
+		return fmt.Errorf("rebuild fts5: %w", err)
+	}
+	return nil
 }
 
 func generateUID() string {

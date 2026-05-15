@@ -51,6 +51,7 @@ type CreateInput struct {
 	DependsOn  []string            `json:"depends_on,omitempty"`
 	Labels     []string            `json:"labels,omitempty"`
 	Prefix     string              `json:"prefix,omitempty"`
+	Alias      string              `json:"alias,omitempty"`
 	Links      map[string][]string `json:"links,omitempty"`
 	Extra      map[string]any      `json:"extra,omitempty"`
 	CreatedAt  string              `json:"created_at,omitempty"`
@@ -106,6 +107,14 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		id = in.ExplicitID
 	} else if p.idFormat == IDFormatUUID && in.Prefix == "" {
 		id = GenerateUUID()
+		// Auto-generate a human-readable alias unless the caller supplied one.
+		if in.Alias == "" && scope != "" {
+			scopeKey, skErr := p.resolveScopeKey(ctx, scope)
+			if skErr == nil {
+				kindCode := p.resolveKindCode(in.Kind)
+				in.Alias, _ = p.store.NextScopedAlias(ctx, scopeKey, kindCode)
+			}
+		}
 	} else if p.idTemplate != nil && in.Prefix == "" {
 		id, err = p.generateTemplatedID(ctx, scope, in.Kind)
 		if err != nil {
@@ -144,7 +153,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		status = p.schema.DefaultStatus(in.Kind)
 	}
 	art := &Artifact{
-		ID: id, Kind: in.Kind, Scope: scope,
+		ID: id, Alias: in.Alias, Kind: in.Kind, Scope: scope,
 		Status: status, Parent: in.Parent,
 		Title: in.Title, Goal: in.Goal,
 		Priority:  in.Priority,
@@ -238,7 +247,16 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 }
 
 func (p *Protocol) GetArtifact(ctx context.Context, id string) (*Artifact, error) {
-	return p.store.Get(ctx, id)
+	art, err := p.store.Get(ctx, id)
+	if err != nil {
+		// Fall back to alias lookup so callers can use the human-readable name.
+		if byAlias, aliasErr := p.store.GetByAlias(ctx, id); aliasErr == nil {
+			return byAlias, nil
+		}
+		// Return the original error: it wraps ErrArtifactNotFound.
+		return nil, err
+	}
+	return art, nil
 }
 
 func (p *Protocol) DeleteArtifact(ctx context.Context, id string, force bool) error {

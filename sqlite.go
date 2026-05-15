@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -21,6 +22,7 @@ const schema = `
 CREATE TABLE IF NOT EXISTS artifacts (
 	uid         TEXT PRIMARY KEY,
 	id          TEXT NOT NULL UNIQUE,
+	alias       TEXT NOT NULL DEFAULT '',
 	kind        TEXT NOT NULL,
 	scope       TEXT NOT NULL DEFAULT '',
 	status      TEXT NOT NULL,
@@ -179,8 +181,12 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 		"UPDATE artifacts SET inserted_at = created_at WHERE inserted_at = ''")
 	writer.ExecContext(context.Background(),
 		"ALTER TABLE scope_keys ADD COLUMN labels TEXT NOT NULL DEFAULT ''")
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
+		"ALTER TABLE artifacts ADD COLUMN alias TEXT NOT NULL DEFAULT ''")
 	writer.ExecContext(context.Background(), //nolint:errcheck // migration: column may already exist
 		"ALTER TABLE artifacts ADD COLUMN components TEXT NOT NULL DEFAULT '{}'")
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: index may already exist
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_art_alias ON artifacts(alias) WHERE alias != ''")
 	writer.ExecContext(context.Background(), //nolint:errcheck // migration: column may already exist
 		"ALTER TABLE artifacts ADD COLUMN annotations TEXT NOT NULL DEFAULT '[]'")
 
@@ -354,10 +360,10 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	annotations, _ := json.Marshal(art.Annotations)
 
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO artifacts (uid, id, kind, scope, status, parent, title, goal, depends_on, labels, priority, sprint, sections, features, criteria, links, extra, components, annotations, created_at, updated_at, inserted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO artifacts (uid, id, alias, kind, scope, status, parent, title, goal, depends_on, labels, priority, sprint, sections, features, criteria, links, extra, components, annotations, created_at, updated_at, inserted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(uid) DO UPDATE SET
-			id=excluded.id, kind=excluded.kind, scope=excluded.scope, status=excluded.status,
+			id=excluded.id, alias=excluded.alias, kind=excluded.kind, scope=excluded.scope, status=excluded.status,
 			parent=excluded.parent, title=excluded.title, goal=excluded.goal,
 			depends_on=excluded.depends_on, labels=excluded.labels,
 			priority=excluded.priority, sprint=excluded.sprint,
@@ -365,7 +371,7 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 			criteria=excluded.criteria, links=excluded.links,
 			extra=excluded.extra, components=excluded.components,
 			annotations=excluded.annotations, updated_at=excluded.updated_at`,
-		art.UID, art.ID, art.Kind, art.Scope, art.Status, art.Parent, art.Title, art.Goal,
+		art.UID, art.ID, art.Alias, art.Kind, art.Scope, art.Status, art.Parent, art.Title, art.Goal,
 		string(dependsOn), string(labels), art.Priority, art.Sprint,
 		string(sections), string(features), string(criteria), string(links), string(extra),
 		string(components), string(annotations),
@@ -478,6 +484,63 @@ func (s *SQLiteStore) Get(ctx context.Context, id string) (*Artifact, error) {
 		return nil, fmt.Errorf("artifact %s not found", id)
 	}
 	return art, nil
+}
+
+// GetByAlias returns the artifact whose alias column matches alias.
+func (s *SQLiteStore) GetByAlias(ctx context.Context, alias string) (*Artifact, error) {
+	row := s.reader.QueryRowContext(ctx, "SELECT "+artifactColumns+" FROM artifacts WHERE alias = ?", alias)
+	art, err := scanArtifact(row)
+	if err != nil {
+		return nil, fmt.Errorf("artifact with alias %q: %w", alias, ErrArtifactNotFound)
+	}
+	return art, nil
+}
+
+// NextScopedAlias generates the next unique scope-derived alias (e.g. TST-TSK-3)
+// by checking the alias column. Used in UUID mode where id holds a UUID v4.
+func (s *SQLiteStore) NextScopedAlias(ctx context.Context, scopeKey, kindCode string) (string, error) {
+	return s.nextScopedValue(ctx, scopeKey, kindCode, "alias")
+}
+
+// nextScopedValue is the shared implementation for NextScopedID and NextScopedAlias.
+// checkColumn is either "id" or "alias" — an internal constant, never user input.
+func (s *SQLiteStore) nextScopedValue(ctx context.Context, scopeKey, kindCode, checkColumn string) (string, error) {
+	tx, err := s.writer.BeginTx(ctx, nil)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback() //nolint:errcheck // deferred rollback
+
+	var seq int64
+	err = tx.QueryRowContext(ctx,
+		"SELECT next_val FROM scoped_sequences WHERE scope_key = ? AND kind_code = ?",
+		scopeKey, kindCode).Scan(&seq)
+	if errors.Is(err, sql.ErrNoRows) {
+		seq = 1
+	} else if err != nil {
+		return "", err
+	}
+
+	for {
+		candidate := FormatScopedID(scopeKey, kindCode, int(seq))
+		var exists int
+		//nolint:gosec // checkColumn is an internal constant ("id" or "alias"), not user input
+		err = tx.QueryRowContext(ctx, "SELECT 1 FROM artifacts WHERE "+checkColumn+" = ?", candidate).Scan(&exists)
+		if errors.Is(err, sql.ErrNoRows) {
+			_, err = tx.ExecContext(ctx,
+				`INSERT INTO scoped_sequences (scope_key, kind_code, next_val) VALUES (?, ?, ?)
+				 ON CONFLICT(scope_key, kind_code) DO UPDATE SET next_val = ?`,
+				scopeKey, kindCode, seq+1, seq+1)
+			if err != nil {
+				return "", err
+			}
+			return candidate, tx.Commit()
+		}
+		if err != nil {
+			return "", err
+		}
+		seq++
+	}
 }
 
 func (s *SQLiteStore) Search(ctx context.Context, query string) ([]string, error) {
@@ -852,44 +915,10 @@ func (s *SQLiteStore) SeedSequence(ctx context.Context, prefix string, val uint6
 	return err
 }
 
+// NextScopedID generates the next unique scoped ID (e.g. SCR-TSK-3),
+// skipping any value that already exists in the id column.
 func (s *SQLiteStore) NextScopedID(ctx context.Context, scopeKey, kindCode string) (string, error) {
-	tx, err := s.writer.BeginTx(ctx, nil)
-	if err != nil {
-		return "", err
-	}
-	defer tx.Rollback()
-
-	var seq int64
-	err = tx.QueryRowContext(ctx,
-		"SELECT next_val FROM scoped_sequences WHERE scope_key = ? AND kind_code = ?",
-		scopeKey, kindCode).Scan(&seq)
-	if err == sql.ErrNoRows {
-		seq = 1
-	} else if err != nil {
-		return "", err
-	}
-
-	// Skip IDs that already exist in artifacts table (archived or otherwise)
-	for {
-		id := FormatScopedID(scopeKey, kindCode, int(seq))
-		var exists int
-		err = tx.QueryRowContext(ctx, "SELECT 1 FROM artifacts WHERE id = ?", id).Scan(&exists)
-		if err == sql.ErrNoRows {
-			// ID is free — use it
-			_, err = tx.ExecContext(ctx,
-				`INSERT INTO scoped_sequences (scope_key, kind_code, next_val) VALUES (?, ?, ?)
-				 ON CONFLICT(scope_key, kind_code) DO UPDATE SET next_val = ?`,
-				scopeKey, kindCode, seq+1, seq+1)
-			if err != nil {
-				return "", err
-			}
-			return id, tx.Commit()
-		}
-		if err != nil {
-			return "", err
-		}
-		seq++ // ID exists, try next
-	}
+	return s.nextScopedValue(ctx, scopeKey, kindCode, "id")
 }
 
 func (s *SQLiteStore) NextSeq(ctx context.Context, key string) (int64, error) {
@@ -1056,7 +1085,7 @@ func scanArtifactRows(rows *sql.Rows) (*Artifact, error) {
 
 // artifactColumns is the explicit column list for SELECT queries.
 // Must match the scan order in scanRow exactly.
-const artifactColumns = `uid, id, kind, scope, status, parent, title, goal, depends_on, labels, priority, sprint, sections, features, criteria, links, extra, components, annotations, created_at, updated_at, inserted_at`
+const artifactColumns = `uid, id, alias, kind, scope, status, parent, title, goal, depends_on, labels, priority, sprint, sections, features, criteria, links, extra, components, annotations, created_at, updated_at, inserted_at`
 
 func scanRow(s rowScanner) (*Artifact, error) {
 	var art Artifact
@@ -1064,7 +1093,7 @@ func scanRow(s rowScanner) (*Artifact, error) {
 	var createdAt, updatedAt, insertedAt string
 
 	err := s.Scan(
-		&art.UID, &art.ID, &art.Kind, &art.Scope, &art.Status, &art.Parent, &art.Title, &art.Goal,
+		&art.UID, &art.ID, &art.Alias, &art.Kind, &art.Scope, &art.Status, &art.Parent, &art.Title, &art.Goal,
 		&dependsOn, &labels, &art.Priority, &art.Sprint,
 		&sections, &features, &criteria, &links, &extra,
 		&components, &annotations,

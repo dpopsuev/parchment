@@ -46,6 +46,7 @@ const (
 
 // Artifact field names (for SetField, update, etc.).
 const (
+	FieldAlias     = "alias"
 	FieldStatus    = "status"
 	FieldTitle     = "title"
 	FieldGoal      = "goal"

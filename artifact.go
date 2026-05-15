@@ -10,6 +10,7 @@ import (
 type Artifact struct {
 	UID         string              `json:"uid,omitempty"`
 	ID          string              `json:"id"`
+	Alias       string              `json:"alias,omitempty"`
 	Kind        string              `json:"kind"`
 	Scope       string              `json:"scope,omitempty"`
 	Status      string              `json:"status"`

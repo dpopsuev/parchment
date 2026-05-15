@@ -17,7 +17,8 @@ import (
 type MemoryStore struct {
 	mu          sync.RWMutex
 	artifacts   map[string]*Artifact
-	edges       map[string]Edge // key: "from|rel|to"
+	aliases     map[string]string // alias → artifact ID
+	edges       map[string]Edge   // key: "from|rel|to"
 	sequences   map[string]int64
 	scopeKeys   map[string]scopeKeyEntry
 	scopeLabels map[string][]string
@@ -35,6 +36,7 @@ var _ Store = (*MemoryStore)(nil)
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
 		artifacts:   make(map[string]*Artifact),
+		aliases:     make(map[string]string),
 		edges:       make(map[string]Edge),
 		sequences:   make(map[string]int64),
 		scopeKeys:   make(map[string]scopeKeyEntry),
@@ -50,6 +52,14 @@ func (m *MemoryStore) Put(_ context.Context, art *Artifact) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// Remove stale alias mapping for this artifact if alias changed.
+	if old, ok := m.artifacts[art.ID]; ok && old.Alias != "" && old.Alias != art.Alias {
+		delete(m.aliases, old.Alias)
+	}
+	if art.Alias != "" {
+		m.aliases[art.Alias] = art.ID
+	}
+
 	// Reconcile parent edge.
 	if art.Parent != "" {
 		m.edges[edgeKey(art.Parent, RelParentOf, art.ID)] = Edge{From: art.Parent, To: art.ID, Relation: RelParentOf}
@@ -62,6 +72,22 @@ func (m *MemoryStore) Put(_ context.Context, art *Artifact) error {
 	clone := *art
 	m.artifacts[art.ID] = &clone
 	return nil
+}
+
+// GetByAlias returns the artifact whose Alias field matches alias.
+func (m *MemoryStore) GetByAlias(_ context.Context, alias string) (*Artifact, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	id, ok := m.aliases[alias]
+	if !ok {
+		return nil, fmt.Errorf("artifact with alias %q: %w", alias, ErrArtifactNotFound)
+	}
+	art, ok := m.artifacts[id]
+	if !ok {
+		return nil, fmt.Errorf("artifact with alias %q: %w", alias, ErrArtifactNotFound)
+	}
+	clone := *art
+	return &clone, nil
 }
 
 func (m *MemoryStore) Get(_ context.Context, id string) (*Artifact, error) {
@@ -252,6 +278,21 @@ func (m *MemoryStore) NextScopedID(_ context.Context, scopeKey, kindCode string)
 	key := scopeKey + "-" + kindCode
 	m.sequences[key]++
 	return FormatScopedID(scopeKey, kindCode, int(m.sequences[key])), nil
+}
+
+// NextScopedAlias generates the next unique scope-derived alias (e.g. TST-TSK-3)
+// by checking the in-memory alias index. Used in UUID mode.
+func (m *MemoryStore) NextScopedAlias(_ context.Context, scopeKey, kindCode string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := scopeKey + "-" + kindCode
+	for {
+		m.sequences[key]++
+		candidate := FormatScopedID(scopeKey, kindCode, int(m.sequences[key]))
+		if _, taken := m.aliases[candidate]; !taken {
+			return candidate, nil
+		}
+	}
 }
 
 func (m *MemoryStore) NextSeq(_ context.Context, key string) (int64, error) {

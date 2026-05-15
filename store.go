@@ -23,6 +23,7 @@ type WalkFn func(depth int, edge Edge) (cont bool)
 type ArtifactStore interface {
 	Put(ctx context.Context, art *Artifact) error
 	Get(ctx context.Context, id string) (*Artifact, error)
+	GetByAlias(ctx context.Context, alias string) (*Artifact, error)
 	Delete(ctx context.Context, id string) error
 	List(ctx context.Context, f Filter) ([]*Artifact, error)
 	Children(ctx context.Context, parentID string) ([]*Artifact, error)
@@ -42,6 +43,7 @@ type SequenceStore interface {
 	NextID(ctx context.Context, prefix string) (string, error)
 	SeedSequence(ctx context.Context, prefix string, val uint64, force bool) error
 	NextScopedID(ctx context.Context, scopeKey, kindCode string) (string, error)
+	NextScopedAlias(ctx context.Context, scopeKey, kindCode string) (string, error)
 	NextSeq(ctx context.Context, key string) (int64, error)
 }
 

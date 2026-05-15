@@ -125,6 +125,8 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 	}
 
 	switch field {
+	case FieldAlias:
+		art.Alias = value
 	case "inserted_at":
 		return Result{ID: id, Error: "inserted_at is immutable"}
 	case "created_at":

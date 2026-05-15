@@ -236,8 +236,42 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 	return st, nil
 }
 
+// syncFTSInTx keeps the FTS5 index in sync with an artifact write, entirely
+// inside the caller's transaction. This makes FTS5 updates atomic with the
+// artifact row: a SIGKILL after tx.Commit() cannot cause divergence.
+//
+// old is the pre-update snapshot (nil on insert). We delete old tokens before
+// inserting new ones so stale entries never linger.
+func syncFTSInTx(ctx context.Context, tx *sql.Tx, old, cur *Artifact) error {
+	var rowid int64
+	if err := tx.QueryRowContext(ctx,
+		"SELECT rowid FROM artifacts WHERE uid = ?", cur.UID).Scan(&rowid); err != nil {
+		return fmt.Errorf("fts rowid lookup: %w", err)
+	}
+	if old != nil {
+		oldSections, _ := json.Marshal(old.Sections)
+		_, _ = tx.ExecContext(ctx, // best-effort delete of stale tokens; non-fatal if missing
+			"INSERT INTO artifacts_fts(artifacts_fts, rowid, id, title, goal, sections) VALUES ('delete', ?, ?, ?, ?, ?)",
+			rowid, old.ID, old.Title, old.Goal, string(oldSections))
+	}
+	newSections, _ := json.Marshal(cur.Sections)
+	_, err := tx.ExecContext(ctx,
+		"INSERT INTO artifacts_fts(rowid, id, title, goal, sections) VALUES (?, ?, ?, ?, ?)",
+		rowid, cur.ID, cur.Title, cur.Goal, string(newSections))
+	return err
+}
+
+// deleteFTSInTx removes an artifact's tokens from the FTS5 index inside
+// the caller's DELETE transaction.
+func deleteFTSInTx(ctx context.Context, tx *sql.Tx, rowid int64, art *Artifact) {
+	sectionsJSON, _ := json.Marshal(art.Sections)
+	_, _ = tx.ExecContext(ctx, // best-effort; FTS5 rebuilt on next startup if stale
+		"INSERT INTO artifacts_fts(artifacts_fts, rowid, id, title, goal, sections) VALUES ('delete', ?, ?, ?, ?, ?)",
+		rowid, art.ID, art.Title, art.Goal, string(sectionsJSON))
+}
+
 // rebuildFTS5 drops the corrupt FTS5 virtual table and recreates it from
-// the main artifacts table. Called only when the normal 'rebuild' command fails.
+// the main artifacts table. Called when the normal startup rebuild fails.
 func rebuildFTS5(db *sql.DB) error {
 	if _, err := db.Exec("DROP TABLE IF EXISTS artifacts_fts"); err != nil {
 		return fmt.Errorf("drop fts5: %w", err)
@@ -410,47 +444,10 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	if err := reconcileEdgesSQL(ctx, tx, old, art); err != nil {
 		return err
 	}
-	if err := tx.Commit(); err != nil {
-		return err
+	if err := syncFTSInTx(ctx, tx, old, art); err != nil {
+		slog.WarnContext(ctx, "FTS5 sync failed (non-fatal)", slog.String(LogKeyID, art.ID), slog.Any("error", err))
 	}
-
-	// Update FTS5 index outside the main transaction to avoid WAL contention
-	s.updateFTS(ctx, art)
-	return nil
-}
-
-// updateFTS updates the FTS5 index for an artifact. Runs outside the main
-// transaction to prevent FTS5 shadow table writes from extending the WAL lock window.
-func (s *SQLiteStore) updateFTS(ctx context.Context, art *Artifact) {
-	var rowid int64
-	if err := s.writer.QueryRowContext(ctx, "SELECT rowid FROM artifacts WHERE uid = ?", art.UID).Scan(&rowid); err != nil {
-		return
-	}
-	sectionsJSON, _ := json.Marshal(art.Sections)
-
-	// Delete old entry then insert new — retry once on failure
-	for attempt := 0; attempt < 2; attempt++ {
-		s.writer.ExecContext(ctx,
-			"INSERT INTO artifacts_fts(artifacts_fts, rowid, id, title, goal, sections) VALUES ('delete', ?, ?, ?, ?, ?)",
-			rowid, art.ID, art.Title, art.Goal, string(sectionsJSON))
-		_, err := s.writer.ExecContext(ctx,
-			"INSERT INTO artifacts_fts(rowid, id, title, goal, sections) VALUES (?, ?, ?, ?, ?)",
-			rowid, art.ID, art.Title, art.Goal, string(sectionsJSON))
-		if err == nil {
-			return
-		}
-		if attempt == 0 {
-			slog.Debug("FTS5 update retry", "id", art.ID, "error", err)
-		}
-	}
-}
-
-// deleteFTS removes an artifact from the FTS5 index by rowid.
-func (s *SQLiteStore) deleteFTS(ctx context.Context, rowid int64, art *Artifact) {
-	sectionsJSON, _ := json.Marshal(art.Sections)
-	s.writer.ExecContext(ctx,
-		"INSERT INTO artifacts_fts(artifacts_fts, rowid, id, title, goal, sections) VALUES ('delete', ?, ?, ?, ?, ?)",
-		rowid, art.ID, art.Title, art.Goal, string(sectionsJSON))
+	return tx.Commit()
 }
 
 // autoRenameArtifact renames an existing artifact's human ID to the next free
@@ -587,16 +584,16 @@ func (s *SQLiteStore) Search(ctx context.Context, query string) ([]string, error
 }
 
 func (s *SQLiteStore) Delete(ctx context.Context, id string) error {
-	// Capture artifact data + rowid for FTS5 cleanup before deletion
+	// Capture artifact data and rowid before deletion for FTS5 cleanup.
 	art, _ := s.Get(ctx, id)
 	var rowid int64
-	s.writer.QueryRowContext(ctx, "SELECT rowid FROM artifacts WHERE id = ?", id).Scan(&rowid)
+	_ = s.reader.QueryRowContext(ctx, "SELECT rowid FROM artifacts WHERE id = ?", id).Scan(&rowid) // best-effort; rowid only used for FTS5 cleanup
 
 	tx, err := s.writer.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // deferred rollback
 
 	res, err := tx.ExecContext(ctx, "DELETE FROM artifacts WHERE id = ?", id)
 	if err != nil {
@@ -615,16 +612,10 @@ func (s *SQLiteStore) Delete(ctx context.Context, id string) error {
 	if err := s.cleanDanglingRefs(ctx, tx, id); err != nil {
 		slog.Warn("cleanDanglingRefs", "deleted_id", id, "error", err)
 	}
-
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-
-	// Clean FTS5 index after commit
 	if art != nil && rowid > 0 {
-		s.deleteFTS(ctx, rowid, art)
+		deleteFTSInTx(ctx, tx, rowid, art)
 	}
-	return nil
+	return tx.Commit()
 }
 
 // cleanDanglingRefs removes a deleted ID from other artifacts' DependsOn and Links JSON fields.

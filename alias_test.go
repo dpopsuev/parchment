@@ -202,6 +202,43 @@ func TestAlias_ScopedModeNoAlias(t *testing.T) {
 	}
 }
 
+// TestAlias_RenameByAlias verifies that SetField accepts an alias as the
+// lookup key, so callers never need to know the underlying UUID.
+func TestAlias_RenameByAlias(t *testing.T) {
+	t.Parallel()
+	proto := uuidProto(t)
+	ctx := context.Background()
+
+	art, err := proto.CreateArtifact(ctx, CreateInput{
+		Kind: "task", Title: "Rename by alias", Scope: "test",
+		Alias:    "step-one",
+		Sections: []Section{{Name: "context", Text: "ctx"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Rename using the alias as the lookup key — not the UUID.
+	results, err := proto.SetField(ctx, []string{"step-one"}, FieldAlias, "step-two")
+	if err != nil || len(results) != 1 || results[0].Error != "" {
+		t.Fatalf("SetField by alias: err=%v results=%+v", err, results)
+	}
+
+	// Old alias no longer resolves.
+	if _, err := proto.GetArtifact(ctx, "step-one"); err == nil {
+		t.Error("old alias step-one should no longer resolve")
+	}
+
+	// New alias resolves to the same UUID.
+	got, err := proto.GetArtifact(ctx, "step-two")
+	if err != nil {
+		t.Fatalf("GetArtifact by new alias: %v", err)
+	}
+	if got.ID != art.ID {
+		t.Errorf("new alias resolved to %q, want %q", got.ID, art.ID)
+	}
+}
+
 // TestAlias_SQLite_RoundTrip verifies alias persistence and resolution
 // against a real SQLite store (not just MemoryStore).
 func TestAlias_SQLite_RoundTrip(t *testing.T) {

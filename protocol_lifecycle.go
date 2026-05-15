@@ -115,7 +115,7 @@ func (p *Protocol) SetField(ctx context.Context, ids []string, field, value stri
 }
 
 func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, opt SetFieldOptions) Result { //nolint:gocyclo // pre-existing complexity, moved from protocol.go
-	art, err := p.store.Get(ctx, id)
+	art, err := p.GetArtifact(ctx, id)
 	if err != nil {
 		return Result{ID: id, Error: err.Error()}
 	}

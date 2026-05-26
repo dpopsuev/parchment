@@ -50,6 +50,16 @@ const (
 	KindMirror   = "mirror"
 )
 
+// Artifact kind families — three-family model.
+// Every kind belongs to exactly one family. Scribe uses families for
+// cross-family traceability checks and motd grouping.
+const (
+	FamilyIntent    = "intent"    // need, spec, bug, decision — desired state
+	FamilyEffort    = "effort"    // campaign, goal, task — how we get there
+	FamilyKnowledge = "knowledge" // note, journal, source, concept, context — what we learn
+	FamilySupport   = "support"   // template, config, mirror, doc, ref — infrastructure
+)
+
 // Artifact kinds — knowledge layer.
 // These extend the work kinds via KnowledgeSchema().
 const (

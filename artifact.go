@@ -123,6 +123,8 @@ type IDConfig struct {
 
 // Filter constrains artifact list/query operations.
 type Filter struct {
+	Family          string            // restrict to a kind family (intent, effort, knowledge, support)
+	FamilyKinds     map[string]bool   // populated at query time: kind → true for the requested family
 	Kind            string
 	ExcludeKind     string
 	ExcludeStatus   string // exclude artifacts with this status
@@ -145,7 +147,12 @@ type Filter struct {
 }
 
 // Matches reports whether art satisfies all non-zero filter fields.
-func (f Filter) Matches(art *Artifact) bool {
+func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop // filter has many independent fields
+	if f.Family != "" && len(f.FamilyKinds) > 0 {
+		if !f.FamilyKinds[art.Kind] {
+			return false
+		}
+	}
 	if f.IDPrefix != "" && !strings.HasPrefix(art.ID, f.IDPrefix) {
 		return false
 	}

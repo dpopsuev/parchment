@@ -273,6 +273,7 @@ func (p *Protocol) DeleteArtifact(ctx context.Context, id string, force bool) er
 }
 
 type ListInput struct {
+	Family         string   `json:"family,omitempty"` // filter by kind family: intent, effort, knowledge, support
 	Kind           string   `json:"kind,omitempty"`
 	Scope          string   `json:"scope,omitempty"`
 	Status         string   `json:"status,omitempty"`
@@ -315,6 +316,7 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 	}
 
 	f := Filter{
+		Family: in.Family,
 		Kind: in.Kind, Status: in.Status,
 		Parent: in.Parent, Sprint: in.Sprint,
 		IDPrefix:       in.IDPrefix,
@@ -336,7 +338,21 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 		f.Scopes = p.scopes
 	}
 	p.populateScopeLabelIndex(ctx, &f)
+	p.populateFamilyKinds(&f)
 	return p.store.List(ctx, f)
+}
+
+// populateFamilyKinds resolves the Family filter field into a FamilyKinds
+// map so Filter.Matches can check it without a schema reference.
+func (p *Protocol) populateFamilyKinds(f *Filter) {
+	if f.Family == "" {
+		return
+	}
+	kinds := p.schema.KindsForFamily(f.Family)
+	f.FamilyKinds = make(map[string]bool, len(kinds))
+	for _, k := range kinds {
+		f.FamilyKinds[k] = true
+	}
 }
 
 func (p *Protocol) populateScopeLabelIndex(ctx context.Context, f *Filter) {

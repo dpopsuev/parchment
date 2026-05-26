@@ -18,6 +18,7 @@ type KindRelations struct {
 
 // KindDef describes a known artifact kind.
 type KindDef struct {
+	Family string `json:"family,omitempty" yaml:"family,omitempty"` // intent | effort | knowledge | support
 	Prefix           string   `json:"prefix" yaml:"prefix"`
 	Code             string   `json:"code,omitempty" yaml:"code,omitempty"`
 	Protected        bool     `json:"protected,omitempty" yaml:"protected,omitempty"`
@@ -402,6 +403,19 @@ func (s *Schema) ValidChild(parentKind, childKind string) (string, bool) {
 		parentKind, childKind, strings.Join(kd.Children, ", ")), false
 }
 
+// KindsForFamily returns all kind names belonging to the given family,
+// sorted alphabetically.
+func (s *Schema) KindsForFamily(family string) []string {
+	var out []string
+	for name, kd := range s.Kinds {
+		if kd.Family == family {
+			out = append(out, name)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 // UnknownKind reports whether kind is not in Schema.Kinds.
 func (s *Schema) UnknownKind(kind string) bool {
 	_, ok := s.Kinds[kind]
@@ -600,7 +614,7 @@ func (s *Schema) MergeDefaults(defaults *Schema) {
 func DefaultSchema() *Schema {
 	return &Schema{
 		Kinds: map[string]KindDef{
-			"goal": {Prefix: "GOAL", Code: "GOL", Protected: true,
+			"goal": {Prefix: "GOAL", Code: "GOL", Protected: true, Family: FamilyEffort,
 				IsGoalKind: true, ActiveStatus: "current", TrackInMotd: true,
 				AutoArchiveOnJustifyComplete: true,
 				Children:                     []string{"task", "spec", "bug", "need", "ref", "doc", "decision"},
@@ -610,7 +624,7 @@ func DefaultSchema() *Schema {
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"task": {Prefix: "TASK", Code: "TSK",
+			"task": {Prefix: "TASK", Code: "TSK", Family: FamilyEffort,
 				TriggerStatus:              "complete",
 				ActivationRequiresSections: true,
 				MustSections:               []string{"context"},
@@ -624,7 +638,7 @@ func DefaultSchema() *Schema {
 					Targets:  map[string][]string{RelImplements: {"spec", "bug"}, RelSatisfies: {"template"}},
 				},
 			},
-			"spec": {Prefix: "SPEC", Code: "SPC", Protected: true,
+			"spec": {Prefix: "SPEC", Code: "SPC", Protected: true, Family: FamilyIntent,
 				ActivationRequiresSections: true,
 				MustSections:               []string{"problem"},
 				ShouldSections:             []string{"decision", "acceptance"},
@@ -636,7 +650,7 @@ func DefaultSchema() *Schema {
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"bug": {Prefix: "BUG", Code: "BUG", Protected: true,
+			"bug": {Prefix: "BUG", Code: "BUG", Protected: true, Family: FamilyIntent,
 				MustSections:   []string{"observed"},
 				ShouldSections: []string{"reproduction"},
 				Children:       []string{},
@@ -646,7 +660,7 @@ func DefaultSchema() *Schema {
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"need": {Prefix: "NEED", Code: "NED", Protected: true,
+			"need": {Prefix: "NEED", Code: "NED", Protected: true, Family: FamilyIntent,
 				MustSections:   []string{"problem"},
 				ShouldSections: []string{"value", "acceptance"},
 				Children:       []string{},
@@ -655,7 +669,7 @@ func DefaultSchema() *Schema {
 					Targets:  map[string][]string{RelJustifies: {"spec"}, RelSatisfies: {"template"}},
 				},
 			},
-			"ref": {Prefix: "REF", Code: "REF", Protected: true,
+			"ref": {Prefix: "REF", Code: "REF", Protected: true, Family: FamilySupport,
 				ShouldSections: []string{"summary", "source"},
 				Children:       []string{},
 				Relations: KindRelations{
@@ -664,7 +678,7 @@ func DefaultSchema() *Schema {
 					Targets:          map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"doc": {Prefix: "DOC", Code: "DOC", Protected: true,
+			"doc": {Prefix: "DOC", Code: "DOC", Protected: true, Family: FamilySupport,
 				ShouldSections: []string{"overview"},
 				CouldSections:  []string{"content"},
 				Children:       []string{},
@@ -674,13 +688,13 @@ func DefaultSchema() *Schema {
 					Targets:          map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"decision": {Prefix: "ADR", Code: "ADR", Protected: true, Children: []string{},
+			"decision": {Prefix: "ADR", Code: "ADR", Protected: true, Family: FamilyIntent, Children: []string{},
 				Relations: KindRelations{
 					Outgoing: []string{RelSatisfies},
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"campaign": {Prefix: "CMP", Code: "CMP", Protected: true,
+			"campaign": {Prefix: "CMP", Code: "CMP", Protected: true, Family: FamilyEffort,
 				ActiveStatus: "active", TrackInMotd: true,
 				MustSections:   []string{"mission"},
 				ShouldSections: []string{"goals", "success_criteria"},
@@ -690,14 +704,14 @@ func DefaultSchema() *Schema {
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"config": {Prefix: "CFG", Code: "CFG", Protected: true,
+			"config": {Prefix: "CFG", Code: "CFG", Protected: true, Family: FamilySupport,
 				Children: []string{},
 			},
-			"mirror": {Prefix: "MIR", Code: "MIR", Protected: true,
+			"mirror": {Prefix: "MIR", Code: "MIR", Protected: true, Family: FamilySupport,
 				SkipGuards: true,
 				Children:   []string{},
 			},
-			"template": {Prefix: "TPL", Code: "TPL", Protected: true,
+			"template": {Prefix: "TPL", Code: "TPL", Protected: true, Family: FamilySupport,
 				MustSections: []string{"content"},
 				Children:     []string{},
 				Relations: KindRelations{
@@ -766,6 +780,7 @@ func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inher
 			// note: the core knowledge unit.
 			// Lifecycle mirrors Zettelkasten: fleeting capture → active processing → evergreen permanence.
 			KindNote: {
+				Family:        FamilyKnowledge,
 				Prefix:        "NOT",
 				Code:          "n",
 				DefaultStatus: StatusFleeting,
@@ -785,6 +800,7 @@ func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inher
 			// journal: daily dated entry. One per day, idempotent create.
 			// Equivalent to Obsidian daily note / Logseq journal page.
 			KindJournal: {
+				Family:        FamilyKnowledge,
 				Prefix:        "JRN",
 				Code:          "j",
 				DefaultStatus: StatusActive,
@@ -797,6 +813,7 @@ func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inher
 			// source: ingested external material.
 			// URL, book, article, podcast — the raw input agents process.
 			KindSource: {
+				Family:        FamilyKnowledge,
 				Prefix:        "SRC",
 				Code:          "s",
 				DefaultStatus: StatusActive,
@@ -810,6 +827,7 @@ func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inher
 			// concept: atomic definition or idea.
 			// Zettelkasten atomic note: one idea, fully expressed, linked.
 			KindConcept: {
+				Family:        FamilyKnowledge,
 				Prefix:        "CON",
 				Code:          "c",
 				DefaultStatus: StatusActive,
@@ -822,6 +840,7 @@ func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inher
 			// context: agent's persistent memory about a person, project, or workflow.
 			// Protected — agents write, humans read. Survives session boundaries.
 			KindContext: {
+				Family:        FamilyKnowledge,
 				Prefix:        "CTX",
 				Code:          "x",
 				DefaultStatus: StatusActive,

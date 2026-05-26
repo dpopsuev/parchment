@@ -50,6 +50,15 @@ const (
 	KindMirror   = "mirror"
 )
 
+// Intent lifecycle statuses — for need, spec, bug, decision kinds.
+// Mirrors RFC/ADR review process: draft → proposed → accepted/rejected/deferred.
+const (
+	StatusProposed = "proposed" // submitted for review
+	StatusAccepted = "accepted" // approved, immutable — decision is final
+	StatusRejected = "rejected" // declined, terminal
+	StatusDeferred = "deferred" // postponed, may be re-proposed
+)
+
 // Artifact kind families — three-family model.
 // Every kind belongs to exactly one family. Scribe uses families for
 // cross-family traceability checks and motd grouping.

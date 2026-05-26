@@ -638,7 +638,7 @@ func DefaultSchema() *Schema {
 					Targets:  map[string][]string{RelImplements: {"spec", "bug"}, RelSatisfies: {"template"}},
 				},
 			},
-			"spec": {Prefix: "SPEC", Code: "SPC", Protected: true, Family: FamilyIntent,
+			"spec": {Prefix: "SPEC", Code: "SPC", Protected: true, Family: FamilyIntent, Transitions: intentTransitions(),
 				ActivationRequiresSections: true,
 				MustSections:               []string{"problem"},
 				ShouldSections:             []string{"decision", "acceptance"},
@@ -650,7 +650,7 @@ func DefaultSchema() *Schema {
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"bug": {Prefix: "BUG", Code: "BUG", Protected: true, Family: FamilyIntent,
+			"bug": {Prefix: "BUG", Code: "BUG", Protected: true, Family: FamilyIntent, Transitions: intentTransitions(),
 				MustSections:   []string{"observed"},
 				ShouldSections: []string{"reproduction"},
 				Children:       []string{},
@@ -660,7 +660,7 @@ func DefaultSchema() *Schema {
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"need": {Prefix: "NEED", Code: "NED", Protected: true, Family: FamilyIntent,
+			"need": {Prefix: "NEED", Code: "NED", Protected: true, Family: FamilyIntent, Transitions: intentTransitions(),
 				MustSections:   []string{"problem"},
 				ShouldSections: []string{"value", "acceptance"},
 				Children:       []string{},
@@ -688,7 +688,7 @@ func DefaultSchema() *Schema {
 					Targets:          map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"decision": {Prefix: "ADR", Code: "ADR", Protected: true, Family: FamilyIntent, Children: []string{},
+			"decision": {Prefix: "ADR", Code: "ADR", Protected: true, Family: FamilyIntent, Transitions: intentTransitions(), Children: []string{},
 				Relations: KindRelations{
 					Outgoing: []string{RelSatisfies},
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
@@ -724,9 +724,14 @@ func DefaultSchema() *Schema {
 			"mature", "allocated", "in_progress", "in_review",
 			"complete", "cancelled", "dismissed", "promoted",
 			"retired", "archived",
+			// Intent lifecycle statuses.
+			StatusProposed, StatusAccepted, StatusRejected, StatusDeferred,
 		},
-		TerminalStatuses: []string{"complete", "cancelled", "dismissed", "retired", "archived"},
-		ReadonlyStatuses: []string{"archived"},
+		TerminalStatuses: []string{
+			"complete", "cancelled", "dismissed", "retired", "archived",
+			StatusAccepted, StatusRejected, // intent decisions are terminal
+		},
+		ReadonlyStatuses: []string{"archived", StatusAccepted}, // accepted = immutable
 		Relations: []string{
 			RelParentOf, RelDependsOn, RelFollows,
 			RelJustifies, RelImplements, RelDocuments, RelSatisfies,
@@ -740,6 +745,22 @@ func DefaultSchema() *Schema {
 		},
 		Priorities:      []string{"none", "low", "medium", "high", "critical"},
 		DefaultPriority: "none",
+	}
+}
+
+// intentTransitions defines the lifecycle for intent artifacts
+// (need, spec, bug, decision): draft → proposed → accepted/rejected/deferred.
+// accepted and rejected are terminal. deferred can re-enter as proposed.
+func intentTransitions() map[string][]string {
+	return map[string][]string{
+		StatusDraft:    {StatusProposed, StatusActive, StatusCanceled},
+		StatusActive:   {StatusProposed, StatusDraft, StatusCanceled},
+		StatusProposed: {StatusAccepted, StatusRejected, StatusDeferred, StatusDraft},
+		StatusDeferred: {StatusProposed, StatusCanceled},
+		StatusAccepted: {StatusArchived}, // readonly — only archival allowed
+		StatusRejected: {StatusArchived}, // terminal
+		StatusCanceled: {StatusDraft, StatusArchived},
+		StatusArchived: {},
 	}
 }
 

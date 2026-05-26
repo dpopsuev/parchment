@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 )
 
 // RenderMarkdown renders an artifact as a human-readable markdown document.
@@ -245,6 +246,216 @@ func RenderJSONList(arts []*Artifact) string {
 }
 
 const renderNoArtifacts = "No artifacts found.\n"
+
+// RenderVaultMarkdown renders an artifact as a vault-compatible markdown file
+// with a YAML frontmatter block followed by section bodies. The output is
+// suitable for writing to a .md file in an Obsidian-style vault and can be
+// round-tripped through ParseVaultMarkdown.
+func RenderVaultMarkdown(art *Artifact) string {
+	var b strings.Builder
+
+	// --- YAML frontmatter ---
+	b.WriteString("---\n")
+	fmt.Fprintf(&b, "id: %s\n", art.ID)
+	if art.Alias != "" {
+		fmt.Fprintf(&b, "alias: %s\n", art.Alias)
+	}
+	fmt.Fprintf(&b, "kind: %s\n", art.Kind)
+	fmt.Fprintf(&b, "status: %s\n", art.Status)
+	if art.Scope != "" {
+		fmt.Fprintf(&b, "scope: %s\n", art.Scope)
+	}
+	if art.Parent != "" {
+		fmt.Fprintf(&b, "parent: %s\n", art.Parent)
+	}
+	if art.Priority != "" {
+		fmt.Fprintf(&b, "priority: %s\n", art.Priority)
+	}
+	if art.Sprint != "" {
+		fmt.Fprintf(&b, "sprint: %s\n", art.Sprint)
+	}
+	if len(art.Labels) > 0 {
+		fmt.Fprintf(&b, "labels: [%s]\n", strings.Join(art.Labels, ", "))
+	}
+	if len(art.DependsOn) > 0 {
+		fmt.Fprintf(&b, "depends_on: [%s]\n", strings.Join(art.DependsOn, ", "))
+	}
+	if !art.CreatedAt.IsZero() {
+		fmt.Fprintf(&b, "created_at: %s\n", art.CreatedAt.UTC().Format(time.RFC3339))
+	}
+	if !art.UpdatedAt.IsZero() {
+		fmt.Fprintf(&b, "updated_at: %s\n", art.UpdatedAt.UTC().Format(time.RFC3339))
+	}
+	if len(art.Extra) > 0 {
+		for _, k := range renderSortedKeys(art.Extra) {
+			fmt.Fprintf(&b, "%s: %v\n", k, art.Extra[k])
+		}
+	}
+	b.WriteString("---\n\n")
+
+	// --- Title ---
+	fmt.Fprintf(&b, "# %s\n\n", art.Title)
+
+	// --- Goal (if set) ---
+	if art.Goal != "" {
+		fmt.Fprintf(&b, "%s\n\n", art.Goal)
+	}
+
+	// --- Sections as H2 blocks ---
+	for _, sec := range art.Sections {
+		fmt.Fprintf(&b, "## %s\n\n%s\n\n", sec.Name, strings.TrimSpace(sec.Text))
+	}
+
+	return b.String()
+}
+
+// ParseVaultMarkdown parses a vault-compatible markdown file with YAML
+// frontmatter into an Artifact. Frontmatter fields map directly to Artifact
+// fields. H2 headings become named sections. The body between the title and
+// the first H2 (if any) becomes the goal field when no explicit goal section
+// is present.
+//
+// Unlike parseTemplateFile (internal, template-only), this function:
+//   - Is exported and works for any artifact kind
+//   - Does not double-write the body as both "content" and parsed sections
+//   - Handles the full Artifact field set from frontmatter
+func ParseVaultMarkdown(data []byte) (*Artifact, error) { //nolint:gocyclo,nestif // parsing logic is inherently branchy
+	content := strings.ReplaceAll(string(data), "\r\n", "\n")
+	art := &Artifact{}
+	content = vaultParseFrontmatter(content, art)
+	content = vaultParseTitle(content, art)
+	vaultParseSections(content, art)
+	return art, nil
+}
+
+// vaultParseFrontmatter extracts YAML frontmatter from content, applies
+// fields to art, and returns the remaining body text.
+func vaultParseFrontmatter(content string, art *Artifact) string {
+	if !strings.HasPrefix(content, "---\n") {
+		return content
+	}
+	end := strings.Index(content[4:], "\n---")
+	if end < 0 {
+		return content
+	}
+	fm := content[4 : 4+end]
+	body := strings.TrimSpace(content[4+end+4:])
+	for _, line := range strings.Split(fm, "\n") {
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		vaultApplyFrontmatterField(art, strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
+	}
+	return body
+}
+
+// vaultApplyFrontmatterField maps a single frontmatter key/value onto art.
+func vaultApplyFrontmatterField(art *Artifact, key, val string) { //nolint:cyclop // switch over all known fields
+	switch key {
+	case "id":
+		art.ID = val
+	case "alias":
+		art.Alias = val
+	case FieldKind:
+		art.Kind = val
+	case FieldStatus:
+		art.Status = val
+	case FieldScope:
+		art.Scope = val
+	case FieldParent:
+		art.Parent = val
+	case FieldPriority:
+		art.Priority = val
+	case FieldSprint:
+		art.Sprint = val
+	case FieldLabels:
+		for _, l := range strings.Split(strings.Trim(val, "[]"), ",") {
+			if l = strings.TrimSpace(l); l != "" {
+				art.Labels = append(art.Labels, l)
+			}
+		}
+	case FieldDependsOn:
+		for _, d := range strings.Split(strings.Trim(val, "[]"), ",") {
+			if d = strings.TrimSpace(d); d != "" {
+				art.DependsOn = append(art.DependsOn, d)
+			}
+		}
+	case "created_at":
+		if t, err := time.Parse(time.RFC3339, val); err == nil {
+			art.CreatedAt = t
+		}
+	case "updated_at":
+		if t, err := time.Parse(time.RFC3339, val); err == nil {
+			art.UpdatedAt = t
+		}
+	default:
+		if art.Extra == nil {
+			art.Extra = make(map[string]any)
+		}
+		art.Extra[key] = val
+	}
+}
+
+// vaultParseTitle finds the H1 heading, sets art.Title, returns remaining body.
+func vaultParseTitle(content string, art *Artifact) string {
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(line, "# ") {
+			art.Title = strings.TrimPrefix(line, "# ")
+			return strings.TrimSpace(strings.Join(lines[i+1:], "\n"))
+		}
+	}
+	return content
+}
+
+// vaultParseSections parses H2 sections from body into art.
+// Content before the first H2 becomes art.Goal (if non-empty and goal not already set).
+func vaultParseSections(body string, art *Artifact) {
+	var currentName string
+	var currentText strings.Builder
+	var preH2 strings.Builder
+	hitH2 := false
+
+	flushSection := func() {
+		if currentName != "" {
+			art.Sections = append(art.Sections, Section{
+				Name: currentName,
+				Text: strings.TrimSpace(currentText.String()),
+			})
+			currentText.Reset()
+		}
+	}
+
+	for _, line := range strings.Split(body, "\n") {
+		switch {
+		case strings.HasPrefix(line, "## "):
+			if !hitH2 {
+				if g := strings.TrimSpace(preH2.String()); g != "" && art.Goal == "" {
+					art.Goal = g
+				}
+				hitH2 = true
+			} else {
+				flushSection()
+			}
+			currentName = strings.ToLower(strings.ReplaceAll(
+				strings.TrimPrefix(line, "## "), " ", "_"))
+		case !hitH2:
+			preH2.WriteString(line + "\n")
+		default:
+			currentText.WriteString(line + "\n")
+		}
+	}
+
+	flushSection()
+	if !hitH2 {
+		if g := strings.TrimSpace(preH2.String()); g != "" && art.Goal == "" {
+			art.Goal = g
+		}
+	}
+}
+
+
 
 func renderGroupKey(a *Artifact, field string) string {
 	switch field {

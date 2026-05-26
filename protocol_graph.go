@@ -488,6 +488,25 @@ type EdgeSummary struct {
 	} `json:"target"`
 }
 
+// Backlinks returns all artifacts that have an outgoing edge pointing TO id
+// via the given relation. Pass relation="" to return all incoming edges
+// regardless of type. This is the inverse of LinkArtifacts.
+func (p *Protocol) Backlinks(ctx context.Context, id, relation string) ([]*Artifact, error) {
+	edges, err := p.store.Neighbors(ctx, id, relation, Incoming)
+	if err != nil {
+		return nil, err
+	}
+	arts := make([]*Artifact, 0, len(edges))
+	for _, e := range edges {
+		art, err := p.store.Get(ctx, e.From)
+		if err != nil {
+			continue
+		}
+		arts = append(arts, art)
+	}
+	return arts, nil
+}
+
 func (p *Protocol) GetArtifactEdges(ctx context.Context, id string) ([]EdgeSummary, error) {
 	edges, err := p.store.Neighbors(ctx, id, "", Both)
 	if err != nil {

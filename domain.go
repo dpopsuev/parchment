@@ -11,15 +11,18 @@ type LifecycleManager interface {
 	RegisterGate(g QualityGate)
 }
 
-// GraphManager handles edges, trees, topological sort, and cascade.
+// GraphManager handles edges, trees, topological sort, cascade, and backlinks.
 type GraphManager interface {
 	LinkArtifacts(ctx context.Context, sourceID, relation string, targetIDs []string) ([]Result, error)
 	UnlinkArtifacts(ctx context.Context, sourceID, relation string, targetIDs []string) ([]Result, error)
 	ArtifactTree(ctx context.Context, in TreeInput) (*TreeNode, error)
 	TopoSort(ctx context.Context, rootID string) ([]TopoEntry, error)
 	GetArtifactEdges(ctx context.Context, id string) ([]EdgeSummary, error)
+	Backlinks(ctx context.Context, id, relation string) ([]*Artifact, error)
 	Cascade(ctx context.Context, changedID string) []string
 	CascadeAndInvalidate(ctx context.Context, changedID, invalidStatus string) ([]string, error)
+	ResolveWikilinks(ctx context.Context, text string) map[string]string
+	SyncWikilinks(ctx context.Context, id string) ([]string, error)
 }
 
 // CRUDManager handles artifact creation, retrieval, mutation, and archival.

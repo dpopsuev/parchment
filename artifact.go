@@ -72,7 +72,7 @@ type Edge struct {
 	Relation string `json:"relation"`
 }
 
-// Well-known edge relations.
+// Well-known edge relations — work tracking.
 const (
 	RelParentOf   = "parent_of"
 	RelDependsOn  = "depends_on"
@@ -81,6 +81,15 @@ const (
 	RelImplements = "implements"
 	RelDocuments  = "documents"
 	RelSatisfies  = "satisfies"
+)
+
+// Well-known edge relations — knowledge layer.
+const (
+	RelCites       = "cites"       // note → source (this note draws from this source)
+	RelElaborates  = "elaborates"  // note → concept (expands on an atomic idea)
+	RelContradicts = "contradicts" // note ↔ note (documents disagreement)
+	RelSynthesises = "synthesises" // note → [note…] (is a synthesis of multiple notes)
+	RelRemembers   = "remembers"   // context → note/concept (agent bookmarked this)
 )
 
 // ComponentMap describes what code an artifact will create or modify.

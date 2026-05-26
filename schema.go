@@ -743,3 +743,129 @@ func taskTransitions() map[string][]string {
 		StatusCanceled:   {StatusDraft, StatusArchived},
 	}
 }
+
+// KnowledgeSchema returns a schema that extends DefaultSchema with the
+// knowledge layer: note/journal/source/concept/context kinds,
+// fleeting/evergreen statuses, and cites/elaborates/contradicts/
+// synthesises/remembers relations.
+//
+// It is additive — all work kinds (task, spec, bug, etc.) are preserved.
+// Pass this to Protocol.New() in Scribe to enable both work tracking and
+// knowledge management in the same store.
+//
+// Design rationale (from Zettelkasten / PKM research):
+//
+//	fleeting  = quick capture, unprocessed ("take the note, process later")
+//	evergreen = mature, permanent, well-connected ("this idea has landed")
+//
+// Lifecycle: fleeting → active → evergreen (or directly fleeting → evergreen)
+// Evergreen is NOT readonly — permanent notes remain editable in Zettelkasten.
+func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inherently long
+	s := &Schema{
+		Kinds: map[string]KindDef{
+			// note: the core knowledge unit.
+			// Lifecycle mirrors Zettelkasten: fleeting capture → active processing → evergreen permanence.
+			KindNote: {
+				Prefix:        "NOT",
+				Code:          "n",
+				DefaultStatus: StatusFleeting,
+				ShouldSections: []string{"body", "connections", "sources"},
+				Transitions: map[string][]string{
+					StatusFleeting:  {StatusActive, StatusEvergreen, StatusArchived},
+					StatusActive:    {StatusEvergreen, StatusFleeting, StatusArchived},
+					StatusEvergreen: {StatusActive, StatusArchived},
+					StatusArchived:  {},
+				},
+				Relations: KindRelations{
+					Outgoing: []string{RelCites, RelElaborates, RelSynthesises, RelDocuments},
+					Incoming: []string{RelSynthesises, RelRemembers, RelContradicts},
+				},
+			},
+
+			// journal: daily dated entry. One per day, idempotent create.
+			// Equivalent to Obsidian daily note / Logseq journal page.
+			KindJournal: {
+				Prefix:        "JRN",
+				Code:          "j",
+				DefaultStatus: StatusActive,
+				ShouldSections: []string{"body"},
+				Relations: KindRelations{
+					Outgoing: []string{RelCites, RelDocuments},
+				},
+			},
+
+			// source: ingested external material.
+			// URL, book, article, podcast — the raw input agents process.
+			KindSource: {
+				Prefix:        "SRC",
+				Code:          "s",
+				DefaultStatus: StatusActive,
+				MustSections:  []string{"summary"},
+				ShouldSections: []string{"key-insights", "provenance"},
+				Relations: KindRelations{
+					Incoming: []string{RelCites},
+				},
+			},
+
+			// concept: atomic definition or idea.
+			// Zettelkasten atomic note: one idea, fully expressed, linked.
+			KindConcept: {
+				Prefix:        "CON",
+				Code:          "c",
+				DefaultStatus: StatusActive,
+				ShouldSections: []string{"definition", "principles", "examples", "applications"},
+				Relations: KindRelations{
+					Incoming: []string{RelElaborates},
+				},
+			},
+
+			// context: agent's persistent memory about a person, project, or workflow.
+			// Protected — agents write, humans read. Survives session boundaries.
+			KindContext: {
+				Prefix:        "CTX",
+				Code:          "x",
+				DefaultStatus: StatusActive,
+				Protected:     true,
+				ShouldSections: []string{"content", "scope", "confidence"},
+				Relations: KindRelations{
+					Outgoing: []string{RelRemembers},
+				},
+			},
+		},
+
+		// Knowledge statuses added on top of the work statuses.
+		Statuses: []string{StatusFleeting, StatusEvergreen},
+
+		// Knowledge relations.
+		Relations: []string{
+			RelCites, RelElaborates, RelContradicts, RelSynthesises, RelRemembers,
+		},
+	}
+
+	// Merge: knowledge kinds + relations + statuses layer on top of the full
+	// work schema. MergeDefaults fills gaps; we extend the slices manually
+	// for statuses and relations since MergeDefaults only fills empty slices.
+	base := DefaultSchema()
+
+	// Merge kinds: knowledge kinds take precedence, work kinds fill gaps.
+	for k, v := range base.Kinds {
+		if _, exists := s.Kinds[k]; !exists {
+			s.Kinds[k] = v
+		}
+	}
+
+	// Extend statuses: prepend knowledge statuses before work statuses.
+	s.Statuses = append(s.Statuses, base.Statuses...)
+
+	// Extend relations: append knowledge relations to work relations.
+	s.Relations = append(base.Relations, s.Relations...)
+
+	// Inherit the rest from base.
+	s.TerminalStatuses = base.TerminalStatuses
+	s.ReadonlyStatuses = base.ReadonlyStatuses
+	s.Guards = base.Guards
+	s.Priorities = base.Priorities
+	s.DefaultPriority = base.DefaultPriority
+
+	return s
+}

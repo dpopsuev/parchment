@@ -11,7 +11,7 @@ var (
 	ErrMissingSections       = errors.New("missing sections for activation")
 )
 
-// Artifact statuses.
+// Artifact statuses — work tracking.
 const (
 	StatusDraft      = "draft"
 	StatusActive     = "active"
@@ -28,7 +28,13 @@ const (
 	StatusInReview   = "in_review"
 )
 
-// Artifact kinds.
+// Artifact statuses — knowledge layer.
+const (
+	StatusFleeting  = "fleeting"  // quick capture, unprocessed; Zettelkasten: fleeting note
+	StatusEvergreen = "evergreen" // mature, permanent, well-connected; Zettelkasten: permanent note
+)
+
+// Artifact kinds — work tracking.
 const (
 	KindTask     = "task"
 	KindSpec     = "spec"
@@ -42,6 +48,16 @@ const (
 	KindDecision = "decision"
 	KindConfig   = "config"
 	KindMirror   = "mirror"
+)
+
+// Artifact kinds — knowledge layer.
+// These extend the work kinds via KnowledgeSchema().
+const (
+	KindNote    = "note"    // core knowledge unit; fleeting → evergreen lifecycle
+	KindJournal = "journal" // daily dated entry (Obsidian: daily note)
+	KindSource  = "source"  // ingested external material: URL, book, article
+	KindConcept = "concept" // atomic definition or idea (Zettelkasten: Zettel)
+	KindContext = "context" // agent's persistent memory about a person or workflow
 )
 
 // Artifact field names (for SetField, update, etc.).

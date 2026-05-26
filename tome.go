@@ -3,6 +3,7 @@ package parchment
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 )
@@ -95,13 +96,19 @@ func (p *Protocol) TomeCreate(ctx context.Context, in TomeInput) (*TomeMeta, err
 		return nil, fmt.Errorf("tome: create: %w", err)
 	}
 
-	return &TomeMeta{
+	meta := &TomeMeta{
 		ID:        tome.ID,
 		Title:     tome.Title,
 		Scope:     tome.Scope,
 		Count:     len(members),
 		CreatedAt: tome.CreatedAt,
-	}, nil
+	}
+	slog.InfoContext(ctx, "tome created",
+		slog.String(LogKeyID, tome.ID),
+		slog.String("title", tome.Title),
+		slog.String("scope", in.Scope),
+		slog.Int("count", len(members)))
+	return meta, nil
 }
 
 // TomeList returns metadata for all tomes, newest first.

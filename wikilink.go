@@ -2,6 +2,7 @@ package parchment
 
 import (
 	"context"
+	"log/slog"
 	"regexp"
 	"strings"
 )
@@ -124,6 +125,11 @@ func (p *Protocol) SyncWikilinks(ctx context.Context, id string) ([]string, erro
 		if r.OK {
 			created = append(created, r.ID)
 		}
+	}
+	if len(created) > 0 {
+		slog.InfoContext(ctx, "wikilinks synced",
+			slog.String(LogKeyID, id),
+			slog.Int("new_edges", len(created)))
 	}
 	return created, nil
 }

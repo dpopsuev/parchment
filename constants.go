@@ -119,6 +119,8 @@ const (
 	LogKeyOverlaps  = "overlaps"
 	LogKeyOrphans   = "orphans"
 	LogKeyLine      = "line"
+	LogKeyScanned   = "scanned"
+	LogKeyCandidates = "candidates"
 )
 
 // ID format identifiers.

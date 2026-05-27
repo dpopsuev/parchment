@@ -255,12 +255,25 @@ func (p *Protocol) GetArtifact(ctx context.Context, id string) (*Artifact, error
 	if err != nil {
 		// Fall back to alias lookup so callers can use the human-readable name.
 		if byAlias, aliasErr := p.store.GetByAlias(ctx, id); aliasErr == nil {
+			p.recordAccess(ctx, byAlias.ID)
 			return byAlias, nil
 		}
 		// Return the original error: it wraps ErrArtifactNotFound.
 		return nil, err
 	}
+	p.recordAccess(ctx, art.ID)
 	return art, nil
+}
+
+// recordAccess increments the access counter when the store supports MetricsStore.
+func (p *Protocol) recordAccess(ctx context.Context, id string) {
+	if ms, ok := p.store.(MetricsStore); ok {
+		if err := ms.RecordAccess(ctx, id); err != nil {
+			slog.WarnContext(ctx, "record access failed",
+				slog.String(LogKeyID, id),
+				slog.Any(LogKeyError, err))
+		}
+	}
 }
 
 func (p *Protocol) DeleteArtifact(ctx context.Context, id string, force bool) error {

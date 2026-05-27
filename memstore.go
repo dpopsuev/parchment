@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 // MemoryStore is an in-memory Store backed by atomic JSON save/load.
@@ -24,6 +25,8 @@ type MemoryStore struct {
 	scopeLabels map[string][]string
 	// embeddings["artifactID:model"] = vector
 	embeddings  map[string][]float32
+	// metrics tracks access counts and timestamps per artifact ID.
+	metrics     map[string]ArtifactMetrics
 }
 
 type scopeKeyEntry struct {
@@ -44,8 +47,42 @@ func NewMemoryStore() *MemoryStore {
 		scopeKeys:   make(map[string]scopeKeyEntry),
 		scopeLabels: make(map[string][]string),
 		embeddings:  make(map[string][]float32),
+		metrics:     make(map[string]ArtifactMetrics),
 	}
 }
+
+// RecordAccess increments the access counter for the artifact.
+func (m *MemoryStore) RecordAccess(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	entry := m.metrics[id]
+	entry.AccessCount++
+	entry.LastAccessed = time.Now().UTC()
+	m.metrics[id] = entry
+	return nil
+}
+
+// GetMetrics returns access metrics for an artifact.
+// Returns zero-value ArtifactMetrics for unknown artifacts.
+func (m *MemoryStore) GetMetrics(_ context.Context, id string) (ArtifactMetrics, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.metrics[id], nil
+}
+
+// BulkGetMetrics returns metrics for multiple artifacts.
+func (m *MemoryStore) BulkGetMetrics(_ context.Context, ids []string) (map[string]ArtifactMetrics, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make(map[string]ArtifactMetrics, len(ids))
+	for _, id := range ids {
+		out[id] = m.metrics[id]
+	}
+	return out, nil
+}
+
+// Compile-time MetricsStore verification.
+var _ MetricsStore = (*MemoryStore)(nil)
 
 func edgeKey(from, rel, to string) string { return from + "|" + rel + "|" + to }
 

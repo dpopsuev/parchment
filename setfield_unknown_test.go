@@ -15,6 +15,7 @@ package parchment_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/dpopsuev/parchment"
@@ -133,6 +134,33 @@ func TestSetField_KnownFields_StillWork(t *testing.T) {
 			}
 			if !tc.check(got) {
 				t.Errorf("SetField(%q, %q): value not reflected on artifact", tc.field, tc.value)
+			}
+		})
+	}
+}
+
+// TestSetField_UnknownField_RedirectsToAttachSection verifies the error message
+// tells the agent exactly what to do instead.
+func TestSetField_UnknownField_RedirectsToAttachSection(t *testing.T) {
+	proto, _ := newProto(t)
+	ctx := context.Background()
+
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
+		Kind: parchment.KindTask, Title: "redirect test", Scope: "test",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, field := range []string{"description", "body", "notes"} {
+		t.Run(field, func(t *testing.T) {
+			results, _ := proto.SetField(ctx, []string{art.ID}, field, "some content")
+			if len(results) == 0 {
+				t.Fatal("expected result")
+			}
+			msg := results[0].Error
+			if !strings.Contains(msg, "attach_section") {
+				t.Errorf("error for unknown field %q must mention attach_section\nGot: %s", field, msg)
 			}
 		})
 	}

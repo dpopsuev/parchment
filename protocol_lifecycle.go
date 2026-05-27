@@ -196,9 +196,9 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		}
 	default:
 		return Result{ID: id, Error: fmt.Sprintf(
-			"unknown field %q — valid fields: %s",
-			field,
-			"alias, status, title, goal, scope, parent, priority, sprint, kind, depends_on, labels, inserted_at, created_at",
+			"unknown field %q — valid fields: alias, status, title, goal, scope, parent, priority, sprint, kind, depends_on, labels; "+
+			"to store named content use attach_section(id=%s, name=%s, text=...)",
+			field, id, field,
 		)}
 	}
 

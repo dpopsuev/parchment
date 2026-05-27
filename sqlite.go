@@ -86,6 +86,12 @@ CREATE TABLE IF NOT EXISTS artifact_embeddings (
 	PRIMARY KEY (artifact_id, model)
 );
 
+CREATE TABLE IF NOT EXISTS artifact_metrics (
+	artifact_id   TEXT PRIMARY KEY,
+	access_count  INTEGER NOT NULL DEFAULT 0,
+	last_accessed TEXT NOT NULL DEFAULT ''
+);
+
 CREATE VIRTUAL TABLE IF NOT EXISTS artifacts_fts USING fts5(
 	id, title, goal, sections,
 	content='artifacts',
@@ -1342,3 +1348,95 @@ func (s *SQLiteStore) SearchSemantic(ctx context.Context, model string, query []
 	}
 	return ids, nil
 }
+
+// ─── MetricsStore ─────────────────────────────────────────────────────────────
+
+// RecordAccess increments the access counter and updates last_accessed.
+// Uses INSERT OR REPLACE to upsert atomically.
+func (s *SQLiteStore) RecordAccess(ctx context.Context, id string) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	_, err := s.writer.ExecContext(ctx,
+		`INSERT INTO artifact_metrics (artifact_id, access_count, last_accessed)
+		 VALUES (?, 1, ?)
+		 ON CONFLICT(artifact_id) DO UPDATE SET
+		   access_count  = access_count + 1,
+		   last_accessed = excluded.last_accessed`,
+		id, now)
+	if err != nil {
+		slog.WarnContext(ctx, "record access failed",
+			slog.String(LogKeyID, id),
+			slog.Any(LogKeyError, err))
+	}
+	return err
+}
+
+// GetMetrics returns access metrics for a single artifact.
+// Returns zero-value ArtifactMetrics (no error) for unknown artifacts.
+func (s *SQLiteStore) GetMetrics(ctx context.Context, id string) (ArtifactMetrics, error) {
+	var count int
+	var lastStr string
+	err := s.reader.QueryRowContext(ctx,
+		`SELECT access_count, last_accessed FROM artifact_metrics WHERE artifact_id = ?`, id).
+		Scan(&count, &lastStr)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ArtifactMetrics{}, nil
+		}
+		slog.WarnContext(ctx, "get metrics failed",
+			slog.String(LogKeyID, id),
+			slog.Any(LogKeyError, err))
+		return ArtifactMetrics{}, err
+	}
+	var last time.Time
+	if lastStr != "" {
+		if t, parseErr := time.Parse(time.RFC3339Nano, lastStr); parseErr == nil {
+			last = t
+		}
+	}
+	return ArtifactMetrics{AccessCount: count, LastAccessed: last}, nil
+}
+
+// BulkGetMetrics returns metrics for multiple artifacts in one query.
+func (s *SQLiteStore) BulkGetMetrics(ctx context.Context, ids []string) (map[string]ArtifactMetrics, error) {
+	out := make(map[string]ArtifactMetrics, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	// Build IN clause.
+	placeholders := make([]byte, 0, len(ids)*3)
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		if i > 0 {
+			placeholders = append(placeholders, ',')
+		}
+		placeholders = append(placeholders, '?')
+		args[i] = id
+	}
+	// placeholders contains only '?' characters — no user data interpolated.
+	query := `SELECT artifact_id, access_count, last_accessed FROM artifact_metrics WHERE artifact_id IN (` + string(placeholders) + `)` //nolint:gosec // only '?' placeholders, no user data
+	rows, err := s.reader.QueryContext(ctx, query, args...)
+	if err != nil {
+		slog.WarnContext(ctx, "bulk get metrics failed", slog.Any(LogKeyError, err))
+		return out, err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var id string
+		var count int
+		var lastStr string
+		if err := rows.Scan(&id, &count, &lastStr); err != nil {
+			continue
+		}
+		var last time.Time
+		if lastStr != "" {
+			if t, parseErr := time.Parse(time.RFC3339Nano, lastStr); parseErr == nil {
+				last = t
+			}
+		}
+		out[id] = ArtifactMetrics{AccessCount: count, LastAccessed: last}
+	}
+	return out, rows.Err()
+}
+
+// Compile-time MetricsStore verification.
+var _ MetricsStore = (*SQLiteStore)(nil)

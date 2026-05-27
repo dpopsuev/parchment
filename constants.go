@@ -121,6 +121,7 @@ const (
 	LogKeyLine      = "line"
 	LogKeyScanned   = "scanned"
 	LogKeyCandidates = "candidates"
+	LogKeyCreation   = "creation"
 )
 
 // ID format identifiers.

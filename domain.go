@@ -36,7 +36,7 @@ type CRUDManager interface {
 	AttachSection(ctx context.Context, id, name, text string) (bool, error)
 	GetSection(ctx context.Context, id, name string) (string, error)
 	DetachSection(ctx context.Context, id, name string) (bool, error)
-	ArchiveArtifact(ctx context.Context, ids []string, cascade bool) ([]Result, error)
+	ArchiveArtifact(ctx context.Context, ids []string, cascade, dryRun bool) ([]Result, error)
 	DeArchive(ctx context.Context, ids []string, cascade bool) ([]Result, error)
 	PromoteStash(ctx context.Context, stashID string, patch CreateInput) (*Artifact, error)
 }

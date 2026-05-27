@@ -57,7 +57,7 @@ func (p *Protocol) BulkArchive(ctx context.Context, in BulkMutationInput) (*Bulk
 	if len(result.AffectedIDs) == 0 {
 		return result, nil
 	}
-	_, err = p.ArchiveArtifact(ctx, result.AffectedIDs, false)
+	_, err = p.ArchiveArtifact(ctx, result.AffectedIDs, false, false)
 	if err == nil {
 		slog.InfoContext(ctx, "bulk archived", slog.Int(LogKeyCount, result.Count))
 	}

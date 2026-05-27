@@ -172,6 +172,10 @@ func (p *Protocol) checkTemplateConformance(ctx context.Context, art *Artifact, 
 	if tpl == nil {
 		return nil
 	}
+	slog.DebugContext(ctx, "template conformance check",
+		slog.String(LogKeyID, art.ID),
+		slog.String(LogKeyKind, art.Kind),
+		slog.Bool(LogKeyCreation, creation))
 	expected := templateSections(tpl)
 	if len(expected) == 0 {
 		return nil
@@ -243,6 +247,9 @@ func (p *Protocol) checkTemplateConformance(ctx context.Context, art *Artifact, 
 // a "required:" prefix are deferred to completion — enforced by checkTemplateConformance
 // with creation=false in the template_conformance_complete guard.
 func (p *Protocol) checkTemplateConformancePromote(ctx context.Context, art *Artifact) error {
+	slog.DebugContext(ctx, "template conformance promote check",
+		slog.String(LogKeyID, art.ID),
+		slog.String(LogKeyKind, art.Kind))
 	tpl := p.resolveTemplate(ctx, art)
 	if tpl == nil {
 		return nil

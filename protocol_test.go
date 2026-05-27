@@ -640,7 +640,7 @@ func TestArchiveArtifact_Single(t *testing.T) {
 
 	task := createTask(t, proto, "archive me")
 
-	results, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false)
+	results, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false, false)
 	if err != nil {
 		t.Fatalf("ArchiveArtifact: %v", err)
 	}
@@ -670,7 +670,7 @@ func TestArchiveArtifact_Cascade(t *testing.T) {
 		},
 	})
 
-	results, err := proto.ArchiveArtifact(ctx, []string{parent.ID}, true)
+	results, err := proto.ArchiveArtifact(ctx, []string{parent.ID}, true, false)
 	if err != nil {
 		t.Fatalf("ArchiveArtifact cascade: %v", err)
 	}
@@ -705,7 +705,7 @@ func TestArchiveArtifact_BlockedByActiveChild(t *testing.T) {
 	})
 
 	// Non-cascade archive should fail when child is not readonly
-	results, err := proto.ArchiveArtifact(ctx, []string{parent.ID}, false)
+	results, err := proto.ArchiveArtifact(ctx, []string{parent.ID}, false, false)
 	if err != nil {
 		t.Fatalf("ArchiveArtifact: %v", err)
 	}
@@ -731,7 +731,7 @@ func TestArchiveArtifact_AlreadyArchived(t *testing.T) {
 	store.Put(ctx, art)
 
 	// Archiving already-archived should succeed silently
-	results, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false)
+	results, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false, false)
 	if err != nil {
 		t.Fatalf("ArchiveArtifact: %v", err)
 	}
@@ -745,7 +745,7 @@ func TestArchiveArtifact_EmptyIDs(t *testing.T) {
 	proto, _ := newProto(t)
 	ctx := context.Background()
 
-	_, err := proto.ArchiveArtifact(ctx, []string{}, false)
+	_, err := proto.ArchiveArtifact(ctx, []string{}, false, false)
 	if err == nil {
 		t.Error("expected error for empty ids")
 	}

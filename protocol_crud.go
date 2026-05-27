@@ -638,10 +638,21 @@ func (p *Protocol) resolveKindCode(kind string) string {
 // --- Composite actions ---
 
 
-func (p *Protocol) ArchiveArtifact(ctx context.Context, ids []string, cascade bool) ([]Result, error) {
+// ArchiveArtifact transitions ids to the archived status (readonly, vacuumable).
+// When dryRun is true the affected IDs are returned but no mutation occurs.
+func (p *Protocol) ArchiveArtifact(ctx context.Context, ids []string, cascade, dryRun bool) ([]Result, error) {
 	slog.InfoContext(ctx, "archive",
 		slog.Int(LogKeyCount, len(ids)),
-		slog.Bool(LogKeyCascade, cascade))
+		slog.Bool(LogKeyCascade, cascade),
+		slog.Bool(LogKeyDryRun, dryRun))
+	if dryRun {
+		slog.DebugContext(ctx, "archive dry-run — no mutation")
+		results := make([]Result, len(ids))
+		for i, id := range ids {
+			results[i] = Result{ID: id, OK: true}
+		}
+		return results, nil
+	}
 	return p.applyToEach(ctx, ids, "archive", func(id string) error {
 		return p.archiveSingle(ctx, id, cascade)
 	})

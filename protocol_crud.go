@@ -217,13 +217,17 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 			}
 		}
 
-		if err := p.checkTemplateConformance(ctx, art, true); err != nil {
-			// Partial creates are accepted as draft with a warning instead of
-			// hard-rejecting. Agents can add sections via attach_section and
-			// template conformance is enforced when promoting out of draft.
-			slog.WarnContext(ctx, "partial create: template sections missing — artifact created as draft",
-				"artifact_id", art.ID, "error", err.Error())
-			art.Warnings = append(art.Warnings, err.Error())
+		// When the caller explicitly requests draft, skip conformance —
+		// draft is intentional "work in progress"; sections come later.
+		// When status defaults to draft, still warn so agents know what's missing.
+		explicitDraft := in.Status == StatusDraft
+		if !explicitDraft {
+			if err := p.checkTemplateConformance(ctx, art, true); err != nil {
+				slog.WarnContext(ctx, "partial create: template sections missing",
+					slog.String(LogKeyID, art.ID),
+					slog.Any(LogKeyError, err))
+				art.Warnings = append(art.Warnings, err.Error())
+			}
 		}
 		// Duplicate awareness: warn if similar non-terminal artifact exists
 		if existing, _ := p.store.List(ctx, Filter{Kind: art.Kind, Scope: art.Scope}); len(existing) > 0 {

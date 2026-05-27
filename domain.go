@@ -36,7 +36,6 @@ type CRUDManager interface {
 	AttachSection(ctx context.Context, id, name, text string) (bool, error)
 	GetSection(ctx context.Context, id, name string) (string, error)
 	DetachSection(ctx context.Context, id, name string) (bool, error)
-	SetGoal(ctx context.Context, in SetGoalInput) (*SetGoalResult, error)
 	ArchiveArtifact(ctx context.Context, ids []string, cascade bool) ([]Result, error)
 	DeArchive(ctx context.Context, ids []string, cascade bool) ([]Result, error)
 	PromoteStash(ctx context.Context, stashID string, patch CreateInput) (*Artifact, error)
@@ -44,9 +43,6 @@ type CRUDManager interface {
 
 // AdminManager handles diagnostics, housekeeping, import/export, and bulk ops.
 type AdminManager interface {
-	Motd(ctx context.Context) (*MotdResult, error)
-	Dashboard(ctx context.Context, staleDays int) (*DashboardResult, error)
-	Inventory(ctx context.Context) (*InventoryResult, error)
 	Vacuum(ctx context.Context, days int, scope string, force bool) ([]string, error)
 	Check(ctx context.Context, scope string) (*CheckReport, error)
 	CheckFix(ctx context.Context, scope string) (*CheckReport, []string, error)
@@ -54,8 +50,6 @@ type AdminManager interface {
 	Lint() []LintResult
 	DetectOverlaps(ctx context.Context, in OverlapInput) (*OverlapReport, error)
 	DetectOrphans(ctx context.Context, in OrphanInput) (*OrphanReport, error)
-	DrainDiscover(ctx context.Context, path string) ([]DrainEntry, error)
-	DrainCleanup(ctx context.Context, path string) (int, error)
 	Export(ctx context.Context, w io.Writer, scope string) (int, error)
 	Import(ctx context.Context, r io.Reader) (int, error)
 	GetConfig(ctx context.Context, key, scope string) string

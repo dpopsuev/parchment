@@ -317,7 +317,7 @@ func reseedScopedSequences(db *sql.DB) error {
 		if err := rows.Scan(&scopeKey, &id); err != nil {
 			continue
 		}
-		// Parse ID: SCR-TSK-91 → scopeKey=SCR, kindCode=TSK, seq=91
+		// Parse ID: PROJ-TSK-91 → scopeKey=PROJ, kindCode=TSK, seq=91
 		parts := strings.SplitN(id, "-", 3)
 		if len(parts) != 3 || parts[0] != scopeKey {
 			continue
@@ -456,7 +456,7 @@ func (s *SQLiteStore) autoRenameArtifact(ctx context.Context, tx *sql.Tx, existi
 	oldID := existing.ID
 
 	// Parse ID to find prefix and sequence number.
-	// Supports both "PREFIX-SEQ" (T-001) and "SCOPE-KIND-SEQ" (SCR-SPC-1) formats.
+	// Supports both "PREFIX-SEQ" (T-001) and "SCOPE-KIND-SEQ" (PROJ-SPC-1) formats.
 	lastDash := strings.LastIndex(oldID, "-")
 	if lastDash < 0 {
 		return fmt.Errorf("cannot auto-rename ID without sequence number: %q", oldID)
@@ -931,7 +931,7 @@ func (s *SQLiteStore) SeedSequence(ctx context.Context, prefix string, val uint6
 	return err
 }
 
-// NextScopedID generates the next unique scoped ID (e.g. SCR-TSK-3),
+// NextScopedID generates the next unique scoped ID (e.g. PROJ-TSK-3),
 // skipping any value that already exists in the id column.
 func (s *SQLiteStore) NextScopedID(ctx context.Context, scopeKey, kindCode string) (string, error) {
 	return s.nextScopedValue(ctx, scopeKey, kindCode, "id")

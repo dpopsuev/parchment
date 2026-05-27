@@ -375,9 +375,8 @@ func (p *Protocol) transitionGuards() []transitionGuard {
 		})
 	}
 
-	// Template conformance on promotion out of draft.
-	// Replaces the hard-error at create time — agents can create partial drafts
-	// and add sections before promoting. Fires on both active and complete.
+	// Template conformance on promotion: partial drafts are allowed at create time,
+	// required sections must be present before the artifact can go active.
 	guards = append(guards, transitionGuard{
 		name: "template_conformance_promote", when: StatusActive, forceable: true,
 		check: func(ctx context.Context, p *Protocol, art *Artifact) error {

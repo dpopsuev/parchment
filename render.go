@@ -315,10 +315,8 @@ func RenderVaultMarkdown(art *Artifact) string {
 // the first H2 (if any) becomes the goal field when no explicit goal section
 // is present.
 //
-// Unlike parseTemplateFile (internal, template-only), this function:
-//   - Is exported and works for any artifact kind
-//   - Does not double-write the body as both "content" and parsed sections
-//   - Handles the full Artifact field set from frontmatter
+// Exported for use by any artifact kind. Parses the full Artifact field set
+// from frontmatter without duplicating the body as a "content" section.
 func ParseVaultMarkdown(data []byte) (*Artifact, error) { //nolint:gocyclo,nestif // parsing logic is inherently branchy
 	content := strings.ReplaceAll(string(data), "\r\n", "\n")
 	art := &Artifact{}

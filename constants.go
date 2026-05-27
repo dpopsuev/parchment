@@ -96,12 +96,29 @@ const (
 
 // Structured log keys.
 const (
-	LogKeyID     = "id"
-	LogKeyKind   = "kind"
-	LogKeyFrom   = "from"
-	LogKeyTo     = "to"
-	LogKeyReason = "reason"
-	LogKeyError  = "error"
+	LogKeyID       = "id"
+	LogKeyKind     = "kind"
+	LogKeyFrom     = "from"
+	LogKeyTo       = "to"
+	LogKeyReason   = "reason"
+	LogKeyError    = "error"
+	LogKeyScope    = "scope"
+	LogKeyCount    = "count"
+	LogKeyField    = "field"
+	LogKeyValue    = "value"
+	LogKeyOp       = "op"
+	LogKeyRelation = "relation"
+	LogKeyTarget   = "target"
+	LogKeyQuery    = "query"
+	LogKeyDays     = "days"
+	LogKeyCascade  = "cascade"
+	LogKeyForce    = "force"
+	LogKeyTitle    = "title"
+	LogKeyDryRun    = "dry_run"
+	LogKeyProject   = "project"
+	LogKeyOverlaps  = "overlaps"
+	LogKeyOrphans   = "orphans"
+	LogKeyLine      = "line"
 )
 
 // ID format identifiers.

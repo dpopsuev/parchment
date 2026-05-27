@@ -100,6 +100,10 @@ func (p *Protocol) SetField(ctx context.Context, ids []string, field, value stri
 	if field == "" {
 		return nil, fmt.Errorf("field is required") //nolint:err113 // pre-existing
 	}
+	slog.DebugContext(ctx, "set field",
+		slog.Int(LogKeyCount, len(ids)),
+		slog.String(LogKeyField, field),
+		slog.String(LogKeyValue, value))
 
 	var opt SetFieldOptions
 	if len(opts) > 0 {

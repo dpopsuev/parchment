@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"maps"
 	"regexp"
 	"slices"
@@ -32,6 +33,10 @@ type BulkMutationResult struct {
 
 // BulkArchive archives all artifacts matching the filter.
 func (p *Protocol) BulkArchive(ctx context.Context, in BulkMutationInput) (*BulkMutationResult, error) {
+	slog.DebugContext(ctx, "bulk archive",
+		slog.String(LogKeyScope, in.Scope),
+		slog.String(LogKeyKind, in.Kind),
+		slog.Bool(LogKeyDryRun, in.DryRun))
 	li := ListInput{
 		Scope: in.Scope, Kind: in.Kind, Status: in.Status,
 		IDPrefix: in.IDPrefix, ExcludeKind: in.ExcludeKind,
@@ -46,17 +51,27 @@ func (p *Protocol) BulkArchive(ctx context.Context, in BulkMutationInput) (*Bulk
 	}
 	result.Count = len(result.AffectedIDs)
 	if in.DryRun {
+		slog.InfoContext(ctx, "bulk archive dry-run", slog.Int(LogKeyCount, result.Count))
 		return result, nil
 	}
 	if len(result.AffectedIDs) == 0 {
 		return result, nil
 	}
 	_, err = p.ArchiveArtifact(ctx, result.AffectedIDs, false)
+	if err == nil {
+		slog.InfoContext(ctx, "bulk archived", slog.Int(LogKeyCount, result.Count))
+	}
 	return result, err
 }
 
 // BulkSetField sets a field on all artifacts matching the filter.
 func (p *Protocol) BulkSetField(ctx context.Context, in BulkMutationInput, field, value string) (*BulkMutationResult, error) {
+	slog.DebugContext(ctx, "bulk set field",
+		slog.String(LogKeyScope, in.Scope),
+		slog.String(LogKeyKind, in.Kind),
+		slog.String(LogKeyField, field),
+		slog.String(LogKeyValue, value),
+		slog.Bool(LogKeyDryRun, in.DryRun))
 	li := ListInput{
 		Scope: in.Scope, Kind: in.Kind, Status: in.Status,
 		IDPrefix: in.IDPrefix, ExcludeKind: in.ExcludeKind,
@@ -71,12 +86,21 @@ func (p *Protocol) BulkSetField(ctx context.Context, in BulkMutationInput, field
 	}
 	result.Count = len(result.AffectedIDs)
 	if in.DryRun {
+		slog.InfoContext(ctx, "bulk set field dry-run",
+			slog.String(LogKeyField, field),
+			slog.Int(LogKeyCount, result.Count))
 		return result, nil
 	}
 	if len(result.AffectedIDs) == 0 {
 		return result, nil
 	}
 	_, err = p.SetField(ctx, result.AffectedIDs, field, value)
+	if err == nil {
+		slog.InfoContext(ctx, "bulk set field applied",
+			slog.String(LogKeyField, field),
+			slog.String(LogKeyValue, value),
+			slog.Int(LogKeyCount, result.Count))
+	}
 	return result, err
 }
 
@@ -84,6 +108,10 @@ func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force boo
 	if days <= 0 {
 		days = p.defaults.GetVacuumDays()
 	}
+	slog.InfoContext(ctx, "vacuum start",
+		slog.Int(LogKeyDays, days),
+		slog.String(LogKeyScope, scope),
+		slog.Bool(LogKeyForce, force))
 	maxAge := time.Duration(days) * 24 * time.Hour
 	f := Filter{Status: StatusArchived}
 	if scope != "" {
@@ -103,10 +131,14 @@ func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force boo
 			continue
 		}
 		if err := p.store.Delete(ctx, art.ID); err != nil {
+			slog.WarnContext(ctx, "vacuum delete failed",
+				slog.String(LogKeyID, art.ID),
+				slog.Any(LogKeyError, err))
 			return deleted, fmt.Errorf("vacuum %s: %w", art.ID, err)
 		}
 		deleted = append(deleted, art.ID)
 	}
+	slog.InfoContext(ctx, "vacuum complete", slog.Int(LogKeyCount, len(deleted)))
 	return deleted, nil
 }
 
@@ -154,6 +186,9 @@ type OverlapInput struct {
 }
 
 func (p *Protocol) DetectOverlaps(ctx context.Context, in OverlapInput) (*OverlapReport, error) {
+	slog.DebugContext(ctx, "detect overlaps",
+		slog.String(LogKeyKind, in.Kind),
+		slog.String(LogKeyProject, in.Project))
 	kind := in.Kind
 	if kind == "" {
 		kind = KindTask
@@ -196,6 +231,7 @@ func (p *Protocol) DetectOverlaps(ctx context.Context, in OverlapInput) (*Overla
 		return report.Overlaps[i].Label < report.Overlaps[j].Label
 	})
 	report.TotalOverlaps = len(report.Overlaps)
+	slog.DebugContext(ctx, "detect overlaps complete", slog.Int(LogKeyOverlaps, report.TotalOverlaps))
 	return report, nil
 }
 
@@ -270,6 +306,7 @@ func (p *Protocol) DetectOrphans(ctx context.Context, in OrphanInput) (*OrphanRe
 		return report.Orphans[i].ID < report.Orphans[j].ID
 	})
 	report.TotalOrphans = len(report.Orphans)
+	slog.DebugContext(ctx, "detect orphans complete", slog.Int(LogKeyOrphans, report.TotalOrphans))
 	return report, nil
 }
 
@@ -292,6 +329,7 @@ func (p *Protocol) VocabAdd(kind string) error {
 		return fmt.Errorf("kind %q is already registered", kind) //nolint:err113 // pre-existing
 	}
 	p.vocab = append(p.vocab, kind)
+	slog.InfoContext(context.Background(), "vocab kind added", slog.String(LogKeyKind, kind))
 	return nil
 }
 
@@ -317,6 +355,7 @@ func (p *Protocol) VocabRemove(ctx context.Context, kind string) error {
 		}
 	}
 	p.vocab = kept
+	slog.InfoContext(ctx, "vocab kind removed", slog.String(LogKeyKind, kind))
 	return nil
 }
 
@@ -360,6 +399,7 @@ func (p *Protocol) ListKindCodes() map[string]string {
 // Export writes all artifacts (optionally filtered by scope) as JSON-lines to w.
 // Each line is a complete artifact with sections, edges, and metadata.
 func (p *Protocol) Export(ctx context.Context, w io.Writer, scope string) (int, error) {
+	slog.InfoContext(ctx, "export start", slog.String(LogKeyScope, scope))
 	filter := Filter{}
 	if scope != "" {
 		filter.Scope = scope
@@ -382,6 +422,7 @@ func (p *Protocol) Export(ctx context.Context, w io.Writer, scope string) (int, 
 			return 0, err
 		}
 	}
+	slog.InfoContext(ctx, "export complete", slog.Int(LogKeyCount, len(arts)))
 	return len(arts), nil
 }
 
@@ -394,14 +435,21 @@ type ExportRecord struct {
 // Import reads JSON-lines from r and creates/updates artifacts.
 // Returns count of imported artifacts.
 func (p *Protocol) Import(ctx context.Context, r io.Reader) (int, error) {
+	slog.InfoContext(ctx, "import start")
 	dec := json.NewDecoder(r)
 	count := 0
 	for dec.More() {
 		var rec ExportRecord
 		if err := dec.Decode(&rec); err != nil {
+			slog.WarnContext(ctx, "import decode error",
+				slog.Int(LogKeyLine, count+1),
+				slog.Any(LogKeyError, err))
 			return count, fmt.Errorf("line %d: %w", count+1, err)
 		}
 		if err := p.store.Put(ctx, &rec.Artifact); err != nil {
+			slog.WarnContext(ctx, "import put failed",
+				slog.String(LogKeyID, rec.ID),
+				slog.Any(LogKeyError, err))
 			return count, fmt.Errorf("import %s: %w", rec.ID, err)
 		}
 		// Restore edges
@@ -410,6 +458,7 @@ func (p *Protocol) Import(ctx context.Context, r io.Reader) (int, error) {
 		}
 		count++
 	}
+	slog.InfoContext(ctx, "import complete", slog.Int(LogKeyCount, count))
 	return count, nil
 }
 

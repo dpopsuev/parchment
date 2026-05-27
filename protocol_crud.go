@@ -273,7 +273,13 @@ func (p *Protocol) DeleteArtifact(ctx context.Context, id string, force bool) er
 			return fmt.Errorf("%w: %s (status: %s)", ErrNotArchived, id, art.Status)
 		}
 	}
-	return p.store.Delete(ctx, id)
+	if err := p.store.Delete(ctx, id); err != nil {
+		return err
+	}
+	slog.InfoContext(ctx, "artifact deleted",
+		slog.String(LogKeyID, id),
+		slog.Bool(LogKeyForce, force))
+	return nil
 }
 
 type ListInput struct {
@@ -623,9 +629,15 @@ func (p *Protocol) ArchiveArtifact(ctx context.Context, ids []string, cascade bo
 	if len(ids) == 0 {
 		return nil, fmt.Errorf("ids is required") //nolint:err113 // pre-existing
 	}
+	slog.InfoContext(ctx, "archive",
+		slog.Int(LogKeyCount, len(ids)),
+		slog.Bool(LogKeyCascade, cascade))
 	results := make([]Result, 0, len(ids))
 	for _, id := range ids {
 		if err := p.archiveSingle(ctx, id, cascade); err != nil {
+			slog.WarnContext(ctx, "archive failed",
+				slog.String(LogKeyID, id),
+				slog.Any(LogKeyError, err))
 			results = append(results, Result{ID: id, Error: err.Error()})
 			continue
 		}
@@ -639,6 +651,9 @@ func (p *Protocol) DeArchive(ctx context.Context, ids []string, cascade bool) ([
 	if len(ids) == 0 {
 		return nil, fmt.Errorf("ids is required") //nolint:err113 // pre-existing
 	}
+	slog.InfoContext(ctx, "de-archive",
+		slog.Int(LogKeyCount, len(ids)),
+		slog.Bool(LogKeyCascade, cascade))
 	results := make([]Result, 0, len(ids))
 	for _, id := range ids {
 		art, err := p.store.Get(ctx, id)

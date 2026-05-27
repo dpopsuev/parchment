@@ -152,6 +152,10 @@ func (p *Protocol) CascadeAndInvalidate(ctx context.Context, changedID, invalidS
 	if err != nil {
 		return affected, fmt.Errorf("cascade invalidate: %w", err)
 	}
+	slog.InfoContext(ctx, "cascade invalidate",
+		slog.String(LogKeyID, changedID),
+		slog.String(LogKeyTo, invalidStatus),
+		slog.Int(LogKeyCount, len(affected)))
 	return affected, nil
 }
 
@@ -234,6 +238,10 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 		results = append(results, Result{ID: tid, OK: true})
 	}
 	_ = p.store.Put(ctx, art)
+	slog.InfoContext(ctx, "link artifacts",
+		slog.String(LogKeyID, sourceID),
+		slog.String(LogKeyRelation, relation),
+		slog.Int(LogKeyCount, len(targetIDs)))
 	return results, nil
 }
 
@@ -275,6 +283,10 @@ func (p *Protocol) UnlinkArtifacts(ctx context.Context, sourceID, relation strin
 		delete(art.Links, relation)
 	}
 	_ = p.store.Put(ctx, art)
+	slog.InfoContext(ctx, "unlink artifacts",
+		slog.String(LogKeyID, sourceID),
+		slog.String(LogKeyRelation, relation),
+		slog.Int(LogKeyCount, len(targetIDs)))
 	return results, nil
 }
 

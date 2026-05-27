@@ -1,4 +1,4 @@
-# golangci-lint config — aligned with Lex rules
+# golangci-lint config v2 — aligned with Lex rules
 # go-best-practices, code-smells, naming, hexagonal-architecture, solid-principles
 version: "2"
 
@@ -8,7 +8,7 @@ run:
   tests: true
 
 linters:
-  disable-all: true
+  default: none
   enable:
     # --- Default / essential ---
     - errcheck        # go-best-practices §2: never swallow errors
@@ -47,112 +47,114 @@ linters:
     # --- Security ---
     - gosec           # security issues
 
-linters-settings:
-  errcheck:
-    check-type-assertions: false
-    exclude-functions:
-      - (io.Closer).Close
-      - (net/http.ResponseWriter).Write
-      - fmt.Fprint
-      - fmt.Fprintf
-      - fmt.Fprintln
+  settings:
+    errcheck:
+      check-type-assertions: false
+      exclude-functions:
+        - (io.Closer).Close
+        - (net/http.ResponseWriter).Write
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
 
-  goconst:
-    min-len: 2
-    min-occurrences: 3
+    goconst:
+      min-len: 2
+      min-occurrences: 3
 
-  errorlint:
-    errorf: true
-    asserts: true
-    comparison: true
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
 
-  nestif:
-    min-complexity: 5
+    nestif:
+      min-complexity: 5
 
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-      - opinionated
-    settings:
-      hugeParam:
-        sizeThreshold: 256
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+        - opinionated
+      settings:
+        hugeParam:
+          sizeThreshold: 256
 
-  gocyclo:
-    min-complexity: 20
+    gocyclo:
+      min-complexity: 20
 
-  funlen:
-    lines: 120
-    statements: 70
+    funlen:
+      lines: 120
+      statements: 70
 
-  dupl:
-    threshold: 100
+    dupl:
+      threshold: 100
 
-  misspell:
-    locale: US
+    misspell:
+      locale: US
 
-  revive:
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+        - name: unexported-return
+          disabled: false
+        - name: blank-imports
+          disabled: false
+        - name: context-as-argument
+          disabled: false
+        - name: error-return
+          disabled: false
+        - name: error-naming
+          disabled: false
+        - name: increment-decrement
+          disabled: false
+        - name: var-declaration
+          disabled: false
+        - name: range
+          disabled: false
+        - name: receiver-naming
+          disabled: false
+
+    depguard:
+      rules:
+        production:
+          files:
+            - "!**/*_test.go"
+            - "!**/testkit/**"
+          deny:
+            - pkg: "^log$"
+              desc: "use slog or structured logging instead of stdlib log"
+
+    prealloc:
+      simple: true
+      range-loops: true
+      for-loops: false
+
+    sloglint:
+      context: "all"
+      static-msg: true
+      no-raw-keys: true
+      key-naming-case: snake
+
+    thelper:
+      test:
+        begin: true
+
+  exclusions:
+    presets: []
     rules:
-      - name: exported
-        disabled: true
-      - name: unexported-return
-        disabled: false
-      - name: blank-imports
-        disabled: false
-      - name: context-as-argument
-        disabled: false
-      - name: error-return
-        disabled: false
-      - name: error-naming
-        disabled: false
-      - name: increment-decrement
-        disabled: false
-      - name: var-declaration
-        disabled: false
-      - name: range
-        disabled: false
-      - name: receiver-naming
-        disabled: false
-
-  depguard:
-    rules:
-      main:
-        deny:
-          - pkg: "^log$"
-            desc: "use slog or structured logging instead of stdlib log"
-
-  prealloc:
-    simple: true
-    range-loops: true
-    for-loops: false
-
-  sloglint:
-    context: "all"
-    static-msg: true
-    no-raw-keys: true
-    key-naming-case: snake
-
-  thelper:
-    test:
-      begin: true
-
-issues:
-  exclude-use-default: true
-  max-issues-per-linter: 0
-  max-same-issues: 0
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
-        - funlen
-        - dupl
-        - goconst
-        - gosec
-        - err113
-    - path: testkit/
-      linters:
-        - errcheck
-        - unused
-        - funlen
-        - err113
+      - path: _test\.go
+        linters:
+          - errcheck
+          - funlen
+          - dupl
+          - goconst
+          - gosec
+          - err113
+          - depguard
+      - path: testkit/
+        linters:
+          - errcheck
+          - unused
+          - funlen
+          - err113

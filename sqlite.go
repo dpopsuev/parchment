@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -76,6 +77,13 @@ CREATE TABLE IF NOT EXISTS scoped_sequences (
 	kind_code TEXT NOT NULL,
 	next_val  INTEGER NOT NULL DEFAULT 1,
 	PRIMARY KEY (scope_key, kind_code)
+);
+
+CREATE TABLE IF NOT EXISTS artifact_embeddings (
+	artifact_id TEXT NOT NULL,
+	model       TEXT NOT NULL,
+	vector      BLOB NOT NULL,
+	PRIMARY KEY (artifact_id, model)
 );
 
 CREATE VIRTUAL TABLE IF NOT EXISTS artifacts_fts USING fts5(
@@ -1248,18 +1256,89 @@ func reconcileEdgesSQL(ctx context.Context, tx *sql.Tx, old, cur *Artifact) erro
 }
 
 // --- Embedding store (SQLiteStore) ---
-// Full implementation in future sprint — stubs satisfy the Store interface.
-// The memory store (memstore.go) provides working in-memory embeddings
-// used by tests; SQLiteStore will persist to a dedicated embeddings table.
+// Embeddings stored as little-endian IEEE 754 float32 BLOBs.
+// 768-dim vector (nomic-embed-text) = 3072 bytes per row.
 
-func (s *SQLiteStore) PutEmbedding(_ context.Context, _, _ string, _ []float32) error {
-	return nil // TODO: persist to embeddings table
+func vecToBlob(v []float32) []byte {
+	b := make([]byte, len(v)*4)
+	for i, f := range v {
+		u := math.Float32bits(f)
+		b[i*4] = uint8(u & 0xFF)         //nolint:gosec // intentional low-byte extraction
+		b[i*4+1] = uint8((u >> 8) & 0xFF)  //nolint:gosec // intentional byte slice
+		b[i*4+2] = uint8((u >> 16) & 0xFF) //nolint:gosec // intentional byte slice
+		b[i*4+3] = uint8((u >> 24) & 0xFF) //nolint:gosec // intentional high-byte extraction
+	}
+	return b
 }
 
-func (s *SQLiteStore) GetEmbedding(_ context.Context, _, _ string) ([]float32, error) {
-	return nil, fmt.Errorf("embeddings not yet persisted in SQLiteStore") //nolint:err113 // stub — SQLite embedding persistence tracked in PRC-NED-7
+func blobToVec(b []byte) []float32 {
+	if len(b)%4 != 0 {
+		return nil
+	}
+	v := make([]float32, len(b)/4)
+	for i := range v {
+		u := uint32(b[i*4]) | uint32(b[i*4+1])<<8 | uint32(b[i*4+2])<<16 | uint32(b[i*4+3])<<24
+		v[i] = math.Float32frombits(u)
+	}
+	return v
 }
 
-func (s *SQLiteStore) SearchSemantic(_ context.Context, _ string, _ []float32, _ int) ([]string, error) {
-	return nil, nil // graceful degradation — falls back to FTS
+func (s *SQLiteStore) PutEmbedding(ctx context.Context, artifactID, model string, vec []float32) error {
+	_, err := s.writer.ExecContext(ctx,
+		`INSERT INTO artifact_embeddings (artifact_id, model, vector) VALUES (?, ?, ?)
+		 ON CONFLICT(artifact_id, model) DO UPDATE SET vector=excluded.vector`,
+		artifactID, model, vecToBlob(vec))
+	return err
+}
+
+func (s *SQLiteStore) GetEmbedding(ctx context.Context, artifactID, model string) ([]float32, error) {
+	var blob []byte
+	err := s.reader.QueryRowContext(ctx,
+		`SELECT vector FROM artifact_embeddings WHERE artifact_id=? AND model=?`,
+		artifactID, model).Scan(&blob)
+	if err != nil {
+		return nil, err
+	}
+	return blobToVec(blob), nil
+}
+
+func (s *SQLiteStore) SearchSemantic(ctx context.Context, model string, query []float32, n int) ([]string, error) {
+	rows, err := s.reader.QueryContext(ctx,
+		`SELECT artifact_id, vector FROM artifact_embeddings WHERE model=?`, model)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck // best-effort close on read-only query
+
+	type scored struct {
+		id    string
+		score float32
+	}
+	var results []scored
+	for rows.Next() {
+		var id string
+		var blob []byte
+		if err := rows.Scan(&id, &blob); err != nil {
+			continue
+		}
+		vec := blobToVec(blob)
+		sim := CosineSimilarity(query, vec)
+		results = append(results, scored{id, sim})
+	}
+
+	// Sort descending by cosine similarity.
+	for i := 1; i < len(results); i++ {
+		for j := i; j > 0 && results[j].score > results[j-1].score; j-- {
+			results[j], results[j-1] = results[j-1], results[j]
+		}
+	}
+
+	if n > len(results) {
+		n = len(results)
+	}
+	ids := make([]string, n)
+	for i := range ids {
+		ids[i] = results[i].id
+	}
+	return ids, nil
 }

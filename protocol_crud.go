@@ -244,6 +244,9 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		p.executeTemplateHooks(ctx, art)
 	}
 
+	// Index embedding asynchronously after successful write.
+	p.indexEmbedding(ctx, art)
+
 	return art, nil
 }
 
@@ -731,5 +734,61 @@ func mergeStampFiles(art *Artifact, stampsJSON string) {
 			seen[file] = true
 			art.Components.Files = append(art.Components.Files, file)
 		}
+	}
+}
+
+// SearchSemantic finds artifacts by vector similarity.
+// If the Protocol has no EmbedFunc configured, it returns an error.
+// The query text is embedded, then compared against stored embeddings.
+func (p *Protocol) SearchSemantic(ctx context.Context, query string, in ListInput) ([]*Artifact, error) { //nolint:gocritic // hugeParam: ListInput value semantics intentional, matching all other Protocol methods
+	if p.embedFunc == nil {
+		return nil, fmt.Errorf("semantic search requires EmbedFunc in ProtocolConfig") //nolint:err113 // agent-facing configuration error
+	}
+	queryVec, err := p.embedFunc(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("embed query: %w", err)
+	}
+	ids, err := p.store.SearchSemantic(ctx, p.embedModel, queryVec, 20)
+	if err != nil {
+		return nil, fmt.Errorf("semantic search: %w", err)
+	}
+	var results []*Artifact
+	for _, id := range ids {
+		art, err := p.store.Get(ctx, id)
+		if err != nil {
+			continue
+		}
+		if in.Scope != "" && art.Scope != in.Scope {
+			continue
+		}
+		if in.Kind != "" && art.Kind != in.Kind {
+			continue
+		}
+		results = append(results, art)
+		if in.Limit > 0 && len(results) >= in.Limit {
+			break
+		}
+	}
+	return results, nil
+}
+
+// indexEmbedding stores an embedding for an artifact if EmbedFunc is configured.
+// Called after successful artifact writes. Errors are logged but not fatal —
+// a missing embedding degrades to FTS, it doesn't break the write.
+func (p *Protocol) indexEmbedding(ctx context.Context, art *Artifact) {
+	if p.embedFunc == nil {
+		return
+	}
+	text := art.Title + " " + art.Goal
+	for _, sec := range art.Sections {
+		text += " " + sec.Text
+	}
+	vec, err := p.embedFunc(ctx, text)
+	if err != nil {
+		slog.WarnContext(ctx, "embedding failed", slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, err))
+		return
+	}
+	if err := p.store.PutEmbedding(ctx, art.ID, p.embedModel, vec); err != nil {
+		slog.WarnContext(ctx, "store embedding failed", slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, err))
 	}
 }

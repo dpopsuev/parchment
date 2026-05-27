@@ -260,7 +260,7 @@ func TestProtocol_WithEmbedding_IndexesOnCapture(t *testing.T) {
 	vocab := []string{"template", "conformance", "setfield", "recall"}
 	embedFn := parchment.SemanticEmbeddingFunc(vocab)
 
-	proto := parchment.New(store, nil, []string{"test"}, nil,
+	proto := parchment.New(store, parchment.KnowledgeSchema(), []string{"test"}, nil,
 		parchment.ProtocolConfig{EmbedFunc: embedFn})
 
 	ctx := context.Background()
@@ -295,7 +295,7 @@ func TestProtocol_SemanticRecall_BeatsFTSOnSemantic(t *testing.T) {
 		"ptp", "clock", "holdover", "synchronization"}
 	embedFn := parchment.SemanticEmbeddingFunc(vocab)
 
-	proto := parchment.New(store, nil, []string{"test"}, nil,
+	proto := parchment.New(store, parchment.KnowledgeSchema(), []string{"test"}, nil,
 		parchment.ProtocolConfig{EmbedFunc: embedFn})
 
 	ctx := context.Background()

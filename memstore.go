@@ -22,6 +22,8 @@ type MemoryStore struct {
 	sequences   map[string]int64
 	scopeKeys   map[string]scopeKeyEntry
 	scopeLabels map[string][]string
+	// embeddings["artifactID:model"] = vector
+	embeddings  map[string][]float32
 }
 
 type scopeKeyEntry struct {
@@ -41,6 +43,7 @@ func NewMemoryStore() *MemoryStore {
 		sequences:   make(map[string]int64),
 		scopeKeys:   make(map[string]scopeKeyEntry),
 		scopeLabels: make(map[string][]string),
+		embeddings:  make(map[string][]float32),
 	}
 }
 
@@ -462,4 +465,66 @@ func (m *MemoryStore) Load(path string) error {
 		m.scopeLabels = make(map[string][]string)
 	}
 	return nil
+}
+
+// --- Embedding store ---
+
+func embeddingKey(artifactID, model string) string { return artifactID + ":" + model }
+
+func (m *MemoryStore) PutEmbedding(_ context.Context, artifactID, model string, vec []float32) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := make([]float32, len(vec))
+	copy(cp, vec)
+	m.embeddings[embeddingKey(artifactID, model)] = cp
+	return nil
+}
+
+func (m *MemoryStore) GetEmbedding(_ context.Context, artifactID, model string) ([]float32, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	v, ok := m.embeddings[embeddingKey(artifactID, model)]
+	if !ok {
+		return nil, fmt.Errorf("no embedding for %s/%s", artifactID, model) //nolint:err113 // agent-facing error, inline message is the contract
+	}
+	cp := make([]float32, len(v))
+	copy(cp, v)
+	return cp, nil
+}
+
+func (m *MemoryStore) SearchSemantic(_ context.Context, model string, query []float32, n int) ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	type scored struct {
+		id    string
+		score float32
+	}
+	var results []scored
+	for key, vec := range m.embeddings {
+		// key format: "artifactID:model"
+		colonIdx := len(key) - len(model) - 1
+		if colonIdx < 0 || key[colonIdx:] != ":"+model {
+			continue
+		}
+		artifactID := key[:colonIdx]
+		sim := CosineSimilarity(query, vec)
+		results = append(results, scored{artifactID, sim})
+	}
+
+	// Sort descending by cosine similarity.
+	for i := 1; i < len(results); i++ {
+		for j := i; j > 0 && results[j].score > results[j-1].score; j-- {
+			results[j], results[j-1] = results[j-1], results[j]
+		}
+	}
+
+	if n > len(results) {
+		n = len(results)
+	}
+	ids := make([]string, n)
+	for i := range ids {
+		ids[i] = results[i].id
+	}
+	return ids, nil
 }

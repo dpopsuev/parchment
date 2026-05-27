@@ -101,6 +101,7 @@ const (
 	LogKeyFrom   = "from"
 	LogKeyTo     = "to"
 	LogKeyReason = "reason"
+	LogKeyError  = "error"
 )
 
 // ID format identifiers.

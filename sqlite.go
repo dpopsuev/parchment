@@ -1246,3 +1246,20 @@ func reconcileEdgesSQL(ctx context.Context, tx *sql.Tx, old, cur *Artifact) erro
 	}
 	return nil
 }
+
+// --- Embedding store (SQLiteStore) ---
+// Full implementation in future sprint — stubs satisfy the Store interface.
+// The memory store (memstore.go) provides working in-memory embeddings
+// used by tests; SQLiteStore will persist to a dedicated embeddings table.
+
+func (s *SQLiteStore) PutEmbedding(_ context.Context, _, _ string, _ []float32) error {
+	return nil // TODO: persist to embeddings table
+}
+
+func (s *SQLiteStore) GetEmbedding(_ context.Context, _, _ string) ([]float32, error) {
+	return nil, fmt.Errorf("embeddings not yet persisted in SQLiteStore") //nolint:err113 // stub — SQLite embedding persistence tracked in PRC-NED-7
+}
+
+func (s *SQLiteStore) SearchSemantic(_ context.Context, _ string, _ []float32, _ int) ([]string, error) {
+	return nil, nil // graceful degradation — falls back to FTS
+}

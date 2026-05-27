@@ -65,6 +65,11 @@ type ProtocolConfig struct {
 	MutableCreatedAt bool
 	Defaults         DefaultsProvider
 	ScopePolicies    map[string]ScopePolicy
+	// EmbedFunc enables semantic search. nil = FTS5 only (default, backwards-compatible).
+	EmbedFunc EmbeddingFunc
+	// EmbedModel is the model identifier stored alongside embeddings.
+	// Defaults to DefaultEmbedModel when EmbedFunc is set.
+	EmbedModel string
 }
 
 // Protocol implements all Scribe business logic.
@@ -83,6 +88,8 @@ type Protocol struct {
 	scopePolicies    map[string]ScopePolicy
 	stash            *StashStore
 	gates            []QualityGate
+	embedFunc        EmbeddingFunc
+	embedModel       string
 }
 
 // New creates a Protocol with the given store, schema, home scopes,
@@ -107,6 +114,11 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 	}
 	p.scopePolicies = idc.ScopePolicies
 	p.stash = NewStashStore(0, 0) // use defaults
+	p.embedFunc = idc.EmbedFunc
+	p.embedModel = idc.EmbedModel
+	if p.embedFunc != nil && p.embedModel == "" {
+		p.embedModel = DefaultEmbedModel
+	}
 	return p
 }
 

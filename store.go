@@ -19,7 +19,7 @@ type WalkFn func(depth int, edge Edge) (cont bool)
 
 // --- ISP: Role-specific interfaces ---
 
-// ArtifactStore handles artifact CRUD and text search.
+// ArtifactStore handles artifact CRUD, keyword search, and semantic search.
 type ArtifactStore interface {
 	Put(ctx context.Context, art *Artifact) error
 	Get(ctx context.Context, id string) (*Artifact, error)
@@ -28,6 +28,10 @@ type ArtifactStore interface {
 	List(ctx context.Context, f Filter) ([]*Artifact, error)
 	Children(ctx context.Context, parentID string) ([]*Artifact, error)
 	Search(ctx context.Context, query string) ([]string, error)
+	// Embedding operations — optional semantic layer over FTS5.
+	PutEmbedding(ctx context.Context, artifactID, model string, vec []float32) error
+	GetEmbedding(ctx context.Context, artifactID, model string) ([]float32, error)
+	SearchSemantic(ctx context.Context, model string, query []float32, n int) ([]string, error)
 }
 
 // GraphStore handles explicit edge operations and traversal.

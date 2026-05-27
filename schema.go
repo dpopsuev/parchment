@@ -12,7 +12,12 @@ import (
 type KindRelations struct {
 	Outgoing         []string            `json:"outgoing,omitempty" yaml:"outgoing,omitempty"`
 	Incoming         []string            `json:"incoming,omitempty" yaml:"incoming,omitempty"`
+	// RequiredOutgoing blocks creation if the edge is absent.
 	RequiredOutgoing []string            `json:"required_outgoing,omitempty" yaml:"required_outgoing,omitempty"`
+	// ExpectedOutgoing flags artifacts as orphans when the edge is absent
+	// but does not block creation. Use when the edge is desirable but
+	// cannot always be satisfied at creation time.
+	ExpectedOutgoing []string            `json:"expected_outgoing,omitempty" yaml:"expected_outgoing,omitempty"`
 	Targets          map[string][]string `json:"targets,omitempty" yaml:"targets,omitempty"`
 }
 
@@ -674,7 +679,7 @@ func DefaultSchema() *Schema {
 				Children:       []string{},
 				Relations: KindRelations{
 					Outgoing:         []string{RelDocuments, RelSatisfies},
-					RequiredOutgoing: []string{RelDocuments},
+					ExpectedOutgoing: []string{RelDocuments},
 					Targets:          map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
@@ -684,7 +689,7 @@ func DefaultSchema() *Schema {
 				Children:       []string{},
 				Relations: KindRelations{
 					Outgoing:         []string{RelDocuments, RelSatisfies},
-					RequiredOutgoing: []string{RelDocuments},
+					ExpectedOutgoing: []string{RelDocuments},
 					Targets:          map[string][]string{RelSatisfies: {"template"}},
 				},
 			},

@@ -251,7 +251,7 @@ func (p *Protocol) DetectOrphans(ctx context.Context, in OrphanInput) (*OrphanRe
 			continue
 		}
 
-		for _, rel := range kd.Relations.RequiredOutgoing {
+		for _, rel := range append(kd.Relations.RequiredOutgoing, kd.Relations.ExpectedOutgoing...) {
 			report.TotalScanned++
 			edges, err := p.store.Neighbors(ctx, art.ID, rel, Outgoing)
 			if err != nil {

@@ -195,10 +195,11 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 			art.Labels = strings.Split(value, ",")
 		}
 	default:
-		if art.Extra == nil {
-			art.Extra = make(map[string]any)
-		}
-		art.Extra[field] = value
+		return Result{ID: id, Error: fmt.Sprintf(
+			"unknown field %q — valid fields: %s",
+			field,
+			"alias, status, title, goal, scope, parent, priority, sprint, kind, depends_on, labels, inserted_at, created_at",
+		)}
 	}
 
 	if err := p.store.Put(ctx, art); err != nil {
@@ -374,6 +375,21 @@ func (p *Protocol) transitionGuards() []transitionGuard {
 		})
 	}
 
+	// Template conformance on promotion out of draft.
+	// Replaces the hard-error at create time — agents can create partial drafts
+	// and add sections before promoting. Fires on both active and complete.
+	guards = append(guards, transitionGuard{
+		name: "template_conformance_promote", when: StatusActive, forceable: true,
+		check: func(ctx context.Context, p *Protocol, art *Artifact) error {
+			// Enforce sections explicitly marked "required:" in the template guidance text,
+			// plus schema MustSections. Investigation-time sections (fix, root_cause, etc.)
+			// without a "required:" prefix are deferred to completion.
+			if err := p.checkTemplateConformancePromote(ctx, art); err != nil {
+				return fmt.Errorf("cannot promote to active: %w", err) //nolint:err113
+			}
+			return nil
+		},
+	})
 	// Template conformance on completion
 	guards = append(guards, transitionGuard{
 		name: "template_conformance_complete", when: StatusComplete, forceable: true,

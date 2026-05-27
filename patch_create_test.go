@@ -2,7 +2,6 @@ package parchment_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/dpopsuev/parchment"
@@ -132,42 +131,39 @@ func TestPromoteStash_PatchFillsMissingSections(t *testing.T) {
 	ctx := context.Background()
 	proto := setupTemplateProto(t)
 
-	// Create without required sections — should fail and stash
-	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{
+	// Create without required sections — now succeeds as draft with a warning.
+	// The stash/promote_stash recovery path is still supported for callers that
+	// pre-built a stash from an older workflow, but the happy path no longer
+	// requires it.
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
 		Kind:  "bug",
 		Title: "stash test bug",
 		Scope: "test",
 	})
-	if err == nil {
-		t.Fatal("create without sections should fail")
-	}
-
-	// Extract stash_id from ConformanceError
-	var ce *parchment.ConformanceError
-	if !errors.As(err, &ce) {
-		t.Fatalf("expected *ConformanceError, got %T: %v", err, err)
-	}
-	stashID := ce.StashID
-	if stashID == "" {
-		t.Fatal("ConformanceError.StashID should be non-empty")
-	}
-
-	// Promote with patch providing missing sections
-	art, err := proto.PromoteStash(ctx, stashID, parchment.CreateInput{
-		Patch: map[string]string{
-			"observed": "it crashes",
-		},
-	})
 	if err != nil {
-		t.Fatalf("promote_stash with patch should succeed: %v", err)
+		t.Fatalf("create without sections should succeed as draft: %v", err)
+	}
+	if len(art.Warnings) == 0 {
+		t.Error("expected conformance warning on partial create")
 	}
 
-	have := map[string]string{}
-	for _, s := range art.Sections {
-		have[s.Name] = s.Text
+	// Attach the missing section directly — no stash needed.
+	_, err = proto.AttachSection(ctx, art.ID, "observed", "it crashes")
+	if err != nil {
+		t.Fatalf("attach_section should succeed: %v", err)
 	}
-	if have["observed"] != "it crashes" {
-		t.Errorf("patch section not applied via promote, got: %q", have["observed"])
+
+	// Now promote to active — should succeed (required section is present).
+	results, err := proto.SetField(ctx, []string{art.ID}, parchment.FieldStatus, parchment.StatusActive)
+	if err != nil {
+		t.Fatalf("promote: %v", err)
+	}
+	if len(results) == 0 || !results[0].OK {
+		msg := ""
+		if len(results) > 0 {
+			msg = results[0].Error
+		}
+		t.Fatalf("promote to active after adding required section should succeed: %s", msg)
 	}
 }
 

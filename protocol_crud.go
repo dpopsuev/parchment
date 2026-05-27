@@ -218,11 +218,12 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		}
 
 		if err := p.checkTemplateConformance(ctx, art, true); err != nil {
-			// Stash the partial artifact for patch-based recovery
-			if stashID, stashErr := p.stash.Put(in); stashErr == nil {
-				return nil, &ConformanceError{Err: err, StashID: stashID}
-			}
-			return nil, err
+			// Partial creates are accepted as draft with a warning instead of
+			// hard-rejecting. Agents can add sections via attach_section and
+			// template conformance is enforced when promoting out of draft.
+			slog.WarnContext(ctx, "partial create: template sections missing — artifact created as draft",
+				"artifact_id", art.ID, "error", err.Error())
+			art.Warnings = append(art.Warnings, err.Error())
 		}
 		// Duplicate awareness: warn if similar non-terminal artifact exists
 		if existing, _ := p.store.List(ctx, Filter{Kind: art.Kind, Scope: art.Scope}); len(existing) > 0 {

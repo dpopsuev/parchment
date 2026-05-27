@@ -31,6 +31,10 @@ type Artifact struct {
 	CreatedAt   time.Time           `json:"created_at"`
 	UpdatedAt   time.Time           `json:"updated_at"`
 	InsertedAt  time.Time           `json:"inserted_at"`
+
+	// Warnings carries transient advisory messages set by Protocol operations.
+	// Not persisted — callers should surface these to agents/operators.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // Section is a named free-text block within an artifact.

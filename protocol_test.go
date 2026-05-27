@@ -2372,26 +2372,29 @@ func TestCreateArtifact_ConformanceErrorHasStashID(t *testing.T) {
 	ctx := context.Background()
 	proto := setupTemplateProtoForConformance(t)
 
-	// Create bug without required "observed" section — should fail conformance
-	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{
+	// Create bug without required "observed" section.
+	// New behaviour: succeeds as draft with a warning (no hard error at create time).
+	// Template conformance fires when promoting out of draft.
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
 		Kind:  "bug",
 		Title: "missing observed",
 		Scope: "test",
 	})
-	if err == nil {
-		t.Fatal("expected error for bug without required sections")
+	if err != nil {
+		t.Fatalf("create with missing sections should succeed as draft, got error: %v", err)
 	}
-
-	var ce *parchment.ConformanceError
-	if !errors.As(err, &ce) {
-		t.Fatalf("expected *ConformanceError, got %T: %v", err, err)
+	if art == nil {
+		t.Fatal("expected artifact, got nil")
 	}
-	if ce.StashID == "" {
-		t.Error("ConformanceError.StashID should be non-empty")
+	if len(art.Warnings) == 0 {
+		t.Error("expected Warnings to be non-empty when required sections are missing")
 	}
-	if !strings.Contains(ce.Error(), "does not conform") {
-		t.Errorf("error message should contain 'does not conform', got: %s", ce.Error())
+	for _, w := range art.Warnings {
+		if strings.Contains(w, "does not conform") || strings.Contains(w, "missing") {
+			return // found expected warning
+		}
 	}
+	t.Errorf("warning should mention conformance/missing sections, got: %v", art.Warnings)
 }
 
 // setupTemplateProtoForConformance creates a protocol with a bug template

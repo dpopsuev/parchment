@@ -234,3 +234,59 @@ func (p *Protocol) checkTemplateConformance(ctx context.Context, art *Artifact, 
 	return fmt.Errorf("artifact does not conform to template %s — missing sections:\n%s\nFix: pass sections: %s", //nolint:err113 // pre-existing
 		tpl.ID, strings.Join(msgs, "\n"), fix)
 }
+
+// checkTemplateConformancePromote enforces sections that are explicitly required
+// at promote-time: sections whose guidance text starts with "required:" plus the
+// schema-defined MustSections for the kind.
+//
+// Investigation-time sections (fix, root_cause, security_assessment, etc.) without
+// a "required:" prefix are deferred to completion — enforced by checkTemplateConformance
+// with creation=false in the template_conformance_complete guard.
+func (p *Protocol) checkTemplateConformancePromote(ctx context.Context, art *Artifact) error {
+	tpl := p.resolveTemplate(ctx, art)
+	if tpl == nil {
+		return nil
+	}
+	all := templateSections(tpl)
+	if len(all) == 0 {
+		return nil
+	}
+
+	// Build the required set: sections with "required:" prefix OR in schema MustSections.
+	mustSet := make(map[string]bool)
+	for _, s := range p.schema.GetMustSections(art.Kind) {
+		mustSet[s] = true
+	}
+	required := make(map[string]string)
+	for name, guidance := range all {
+		if mustSet[name] || strings.HasPrefix(guidance, "required:") {
+			required[name] = guidance
+		}
+	}
+	if len(required) == 0 {
+		return nil
+	}
+
+	have := make(map[string]bool, len(art.Sections))
+	for _, sec := range art.Sections {
+		have[sec.Name] = true
+	}
+	var msgs, missingNames []string
+	for name, guidance := range required {
+		if !have[name] {
+			msgs = append(msgs, fmt.Sprintf("  - %s: %s", name, guidance))
+			missingNames = append(missingNames, name)
+		}
+	}
+	if len(msgs) == 0 {
+		return nil
+	}
+	sort.Strings(msgs)
+	sort.Strings(missingNames)
+	fixParts := make([]string, 0, len(missingNames))
+	for _, name := range missingNames {
+		fixParts = append(fixParts, fmt.Sprintf(`{"name":%q,"text":"..."}`, name))
+	}
+	return fmt.Errorf("artifact does not conform to template %s — missing sections:\n%s\nFix: pass sections: %s", //nolint:err113
+		tpl.ID, strings.Join(msgs, "\n"), "["+strings.Join(fixParts, ", ")+"]")
+}

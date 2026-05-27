@@ -316,6 +316,7 @@ type ListInput struct {
 	Sort           string   `json:"sort,omitempty"`
 	Limit          int      `json:"limit,omitempty"`
 	Query          string   `json:"query,omitempty"`
+	TitleContains  string   `json:"title_contains,omitempty"` // substring filter on title (case-insensitive)
 	CreatedAfter   string   `json:"created_after,omitempty"`
 	CreatedBefore  string   `json:"created_before,omitempty"`
 	UpdatedAfter   string   `json:"updated_after,omitempty"`
@@ -366,7 +367,18 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 	}
 	p.populateScopeLabelIndex(ctx, &f)
 	p.populateFamilyKinds(&f)
-	return p.store.List(ctx, f)
+	arts, err := p.store.List(ctx, f)
+	if err != nil || in.TitleContains == "" {
+		return arts, err
+	}
+	q := strings.ToLower(in.TitleContains)
+	var filtered []*Artifact
+	for _, art := range arts {
+		if strings.Contains(strings.ToLower(art.Title), q) {
+			filtered = append(filtered, art)
+		}
+	}
+	return filtered, nil
 }
 
 // populateFamilyKinds resolves the Family filter field into a FamilyKinds

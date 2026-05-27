@@ -127,6 +127,15 @@ func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force boo
 		if !art.UpdatedAt.Before(cutoff) {
 			continue
 		}
+		// Retired artifacts are permanent — never vacuumed, even with force.
+		if art.Status == StatusRetired {
+			continue
+		}
+		// Kinds with Vacuumable=false are exempt unconditionally — force cannot override.
+		// This protects knowledge artifacts regardless of operator intent.
+		if kd, ok := p.schema.Kinds[art.Kind]; ok && !kd.Vacuumable {
+			continue
+		}
 		if !force && p.schema.IsProtected(art.Kind) {
 			continue
 		}

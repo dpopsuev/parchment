@@ -626,16 +626,38 @@ func (p *Protocol) resolveKindCode(kind string) string {
 
 
 func (p *Protocol) ArchiveArtifact(ctx context.Context, ids []string, cascade bool) ([]Result, error) {
-	if len(ids) == 0 {
-		return nil, fmt.Errorf("ids is required") //nolint:err113 // pre-existing
-	}
 	slog.InfoContext(ctx, "archive",
 		slog.Int(LogKeyCount, len(ids)),
 		slog.Bool(LogKeyCascade, cascade))
+	return p.applyToEach(ctx, ids, "archive", func(id string) error {
+		return p.archiveSingle(ctx, id, cascade)
+	})
+}
+
+// RetireArtifact transitions artifacts to the retired status — terminal but
+// NOT readonly. Retired artifacts remain searchable and writable (for
+// post-mortems) and are never deleted by Vacuum. Use for completed or
+// canceled work you want to preserve as memory. Use ArchiveArtifact for
+// work you want to freeze and eventually discard.
+func (p *Protocol) RetireArtifact(ctx context.Context, ids []string, cascade bool) ([]Result, error) {
+	slog.InfoContext(ctx, "retire",
+		slog.Int(LogKeyCount, len(ids)),
+		slog.Bool(LogKeyCascade, cascade))
+	return p.applyToEach(ctx, ids, "retire", func(id string) error {
+		return p.retireSingle(ctx, id, cascade)
+	})
+}
+
+// applyToEach applies fn to each id and accumulates Results, logging failures.
+func (p *Protocol) applyToEach(ctx context.Context, ids []string, op string, fn func(string) error) ([]Result, error) {
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("ids is required") //nolint:err113 // pre-existing
+	}
 	results := make([]Result, 0, len(ids))
 	for _, id := range ids {
-		if err := p.archiveSingle(ctx, id, cascade); err != nil {
-			slog.WarnContext(ctx, "archive failed",
+		if err := fn(id); err != nil {
+			slog.WarnContext(ctx, "operation failed",
+				slog.String(LogKeyOp, op),
 				slog.String(LogKeyID, id),
 				slog.Any(LogKeyError, err))
 			results = append(results, Result{ID: id, Error: err.Error()})
@@ -644,6 +666,37 @@ func (p *Protocol) ArchiveArtifact(ctx context.Context, ids []string, cascade bo
 		results = append(results, Result{ID: id, OK: true})
 	}
 	return results, nil
+}
+
+func (p *Protocol) retireSingle(ctx context.Context, id string, cascade bool) error {
+	art, err := p.store.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if art.Status == StatusRetired {
+		return nil // idempotent
+	}
+	if p.schema.IsReadonly(art.Status) {
+		return fmt.Errorf("%s is %s (readonly) — de-archive before retiring", id, art.Status) //nolint:err113 // domain error
+	}
+	children, err := p.store.Children(ctx, id)
+	if err != nil {
+		return err
+	}
+	for _, ch := range children {
+		if cascade {
+			if err := p.retireSingle(ctx, ch.ID, true); err != nil {
+				return fmt.Errorf("cascade retire %s: %w", ch.ID, err)
+			}
+		} else if !p.schema.IsTerminal(ch.Status) {
+			return fmt.Errorf("cannot retire %s: child %s is %s (use cascade to retire the whole tree)", id, ch.ID, ch.Status) //nolint:err113 // domain error
+		}
+	}
+	art.Status = StatusRetired
+	slog.InfoContext(ctx, "retired",
+		slog.String(LogKeyID, id),
+		slog.String(LogKeyKind, art.Kind))
+	return p.store.Put(ctx, art)
 }
 
 // DeArchive restores archived artifacts to draft status, bypassing ArchivedReadonly guard.

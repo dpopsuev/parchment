@@ -18,7 +18,8 @@ type KindRelations struct {
 	// but does not block creation. Use when the edge is desirable but
 	// cannot always be satisfied at creation time.
 	ExpectedOutgoing []string            `json:"expected_outgoing,omitempty" yaml:"expected_outgoing,omitempty"`
-	Targets          map[string][]string `json:"targets,omitempty" yaml:"targets,omitempty"`
+
+	Targets  map[string][]string `json:"targets,omitempty" yaml:"targets,omitempty"`
 }
 
 // KindDef describes a known artifact kind.
@@ -49,6 +50,11 @@ type KindDef struct {
 	Relations  KindRelations `json:"relations,omitempty" yaml:"relations,omitempty"`
 	Children   []string      `json:"children,omitempty" yaml:"children,omitempty"`
 	SkipGuards bool          `json:"skip_guards,omitempty" yaml:"skip_guards,omitempty"`
+	// Vacuumable controls whether Vacuum may permanently delete this kind's
+	// archived artifacts. False by default — knowledge kinds and protected
+	// kinds are never vacuumed. Set true on work kinds (task, bug) where
+	// old archived artifacts carry little long-term value.
+	Vacuumable bool          `json:"vacuumable,omitempty" yaml:"vacuumable,omitempty"`
 }
 
 // Schema is the single source of truth for the Scribe data model.
@@ -619,7 +625,7 @@ func (s *Schema) MergeDefaults(defaults *Schema) {
 func DefaultSchema() *Schema {
 	return &Schema{
 		Kinds: map[string]KindDef{
-			"goal": {Prefix: "GOAL", Code: "GOL", Protected: true, Family: FamilyEffort,
+			"goal": {Prefix: "GOAL", Code: "GOL", Protected: true, Vacuumable: true, Family: FamilyEffort,
 				IsGoalKind: true, ActiveStatus: "current", TrackInMotd: true,
 				AutoArchiveOnJustifyComplete: true,
 				Children:                     []string{"task", "spec", "bug", "need", "ref", "doc", "decision"},
@@ -629,7 +635,7 @@ func DefaultSchema() *Schema {
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"task": {Prefix: "TASK", Code: "TSK", Family: FamilyEffort,
+			"task": {Prefix: "TASK", Code: "TSK", Family: FamilyEffort, Vacuumable: true,
 				TriggerStatus:              "complete",
 				ActivationRequiresSections: true,
 				MustSections:               []string{"context"},
@@ -655,7 +661,7 @@ func DefaultSchema() *Schema {
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"bug": {Prefix: "BUG", Code: "BUG", Protected: true, Family: FamilyIntent, Transitions: intentTransitions(),
+			"bug": {Prefix: "BUG", Code: "BUG", Protected: true, Family: FamilyIntent, Vacuumable: true, Transitions: intentTransitions(),
 				MustSections:   []string{"observed"},
 				ShouldSections: []string{"reproduction"},
 				Children:       []string{},
@@ -762,9 +768,10 @@ func intentTransitions() map[string][]string {
 		StatusActive:   {StatusProposed, StatusDraft, StatusCanceled},
 		StatusProposed: {StatusAccepted, StatusRejected, StatusDeferred, StatusDraft},
 		StatusDeferred: {StatusProposed, StatusCanceled},
-		StatusAccepted: {StatusArchived}, // readonly — only archival allowed
-		StatusRejected: {StatusArchived}, // terminal
-		StatusCanceled: {StatusDraft, StatusArchived},
+		StatusAccepted: {StatusRetired, StatusArchived}, // readonly — retire or archive
+		StatusRejected: {StatusRetired, StatusArchived}, // terminal
+		StatusCanceled: {StatusDraft, StatusRetired, StatusArchived},
+		StatusRetired:  {},
 		StatusArchived: {},
 	}
 }
@@ -779,8 +786,9 @@ func taskTransitions() map[string][]string {
 		StatusAllocated:  {StatusInProgress, StatusMature, StatusCanceled},
 		StatusInProgress: {StatusInReview, StatusAllocated, StatusCanceled},
 		StatusInReview:   {StatusComplete, StatusInProgress, StatusCanceled},
-		StatusComplete:   {StatusArchived},
-		StatusCanceled:   {StatusDraft, StatusArchived},
+		StatusComplete:   {StatusRetired, StatusArchived},
+		StatusCanceled:   {StatusDraft, StatusRetired, StatusArchived},
+		StatusRetired:    {},
 	}
 }
 

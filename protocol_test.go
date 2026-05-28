@@ -640,7 +640,7 @@ func TestArchiveArtifact_Single(t *testing.T) {
 
 	task := createTask(t, proto, "archive me")
 
-	results, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false, false)
+	results, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false)
 	if err != nil {
 		t.Fatalf("ArchiveArtifact: %v", err)
 	}
@@ -654,37 +654,29 @@ func TestArchiveArtifact_Single(t *testing.T) {
 	}
 }
 
-func TestArchiveArtifact_Cascade(t *testing.T) {
+func TestArchiveArtifact_BlockedByNonTerminalChild(t *testing.T) {
+	// Archive does not cascade. A non-terminal child blocks the parent.
 	t.Parallel()
 	proto, _ := newProto(t)
 	ctx := context.Background()
 
 	parent := createGoal(t, proto, "parent goal")
-	child := mustCreate(t, proto, parchment.CreateInput{
-		Kind:   "task",
-		Title:  "child task",
-		Scope:  "test",
-		Parent: parent.ID,
-		Sections: []parchment.Section{
-			{Name: "context", Text: "ctx"},
-		},
+	_ = mustCreate(t, proto, parchment.CreateInput{
+		Kind: "task", Title: "active child",
+		Scope: "test", Parent: parent.ID,
+		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
 	})
 
-	results, err := proto.ArchiveArtifact(ctx, []string{parent.ID}, true, false)
+	results, err := proto.ArchiveArtifact(ctx, []string{parent.ID}, false)
 	if err != nil {
-		t.Fatalf("ArchiveArtifact cascade: %v", err)
+		t.Fatalf("ArchiveArtifact: %v", err)
 	}
-	if len(results) == 0 || !results[0].OK {
-		t.Errorf("expected OK result, got %+v", results)
+	// Should fail — child is non-terminal.
+	if len(results) > 0 && results[0].OK {
+		t.Error("expected archive to fail when non-terminal children exist")
 	}
-
-	gotParent, _ := proto.GetArtifact(ctx, parent.ID)
-	if gotParent.Status != "archived" {
-		t.Errorf("parent status=%s, want archived", gotParent.Status)
-	}
-	gotChild, _ := proto.GetArtifact(ctx, child.ID)
-	if gotChild.Status != "archived" {
-		t.Errorf("child status=%s, want archived", gotChild.Status)
+	if len(results) > 0 && results[0].Error == "" {
+		t.Error("expected error message about non-terminal child")
 	}
 }
 
@@ -705,7 +697,7 @@ func TestArchiveArtifact_BlockedByActiveChild(t *testing.T) {
 	})
 
 	// Non-cascade archive should fail when child is not readonly
-	results, err := proto.ArchiveArtifact(ctx, []string{parent.ID}, false, false)
+	results, err := proto.ArchiveArtifact(ctx, []string{parent.ID}, false)
 	if err != nil {
 		t.Fatalf("ArchiveArtifact: %v", err)
 	}
@@ -731,7 +723,7 @@ func TestArchiveArtifact_AlreadyArchived(t *testing.T) {
 	store.Put(ctx, art)
 
 	// Archiving already-archived should succeed silently
-	results, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false, false)
+	results, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false)
 	if err != nil {
 		t.Fatalf("ArchiveArtifact: %v", err)
 	}
@@ -745,7 +737,7 @@ func TestArchiveArtifact_EmptyIDs(t *testing.T) {
 	proto, _ := newProto(t)
 	ctx := context.Background()
 
-	_, err := proto.ArchiveArtifact(ctx, []string{}, false, false)
+	_, err := proto.ArchiveArtifact(ctx, []string{}, false)
 	if err == nil {
 		t.Error("expected error for empty ids")
 	}

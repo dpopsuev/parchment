@@ -107,7 +107,7 @@ func TestRetireArtifact_ArchivedIsNotWritable(t *testing.T) {
 		parchment.SetFieldOptions{Force: true}); err != nil {
 		t.Fatalf("drive to complete: %v", err)
 	}
-	if _, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false, false); err != nil {
+	if _, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false); err != nil {
 		t.Fatalf("archive: %v", err)
 	}
 

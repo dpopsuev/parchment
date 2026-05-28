@@ -16,7 +16,7 @@ func TestArchiveArtifact_DryRun_NoMutation(t *testing.T) {
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
 	})
 
-	results, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false, true) // dry_run=true
+	results, err := proto.ArchiveArtifact(ctx, []string{task.ID}, true) // dry_run=true
 	if err != nil {
 		t.Fatalf("ArchiveArtifact dry_run: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestArchiveArtifact_DryRun_False_DoesArchive(t *testing.T) {
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
 	})
 
-	_, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false, false) // dry_run=false
+	_, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false) // dry_run=false
 	if err != nil {
 		t.Fatalf("ArchiveArtifact: %v", err)
 	}

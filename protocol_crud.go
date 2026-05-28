@@ -655,11 +655,13 @@ func (p *Protocol) resolveKindCode(kind string) string {
 
 
 // ArchiveArtifact transitions ids to the archived status (readonly, vacuumable).
-// When dryRun is true the affected IDs are returned but no mutation occurs.
-func (p *Protocol) ArchiveArtifact(ctx context.Context, ids []string, cascade, dryRun bool) ([]Result, error) {
+// Archive is single-artifact only — no cascade. Cascading archive was the footgun
+// behind the 1342-artifact silent-archive incident (PRC-BUG-10). Use RetireArtifact
+// with cascade=true for whole-tree terminal operations; archive individual artifacts
+// explicitly. When dryRun is true the affected IDs are returned but no mutation occurs.
+func (p *Protocol) ArchiveArtifact(ctx context.Context, ids []string, dryRun bool) ([]Result, error) {
 	slog.InfoContext(ctx, "archive",
 		slog.Int(LogKeyCount, len(ids)),
-		slog.Bool(LogKeyCascade, cascade),
 		slog.Bool(LogKeyDryRun, dryRun))
 	if dryRun {
 		slog.DebugContext(ctx, "archive dry-run — no mutation")
@@ -670,7 +672,7 @@ func (p *Protocol) ArchiveArtifact(ctx context.Context, ids []string, cascade, d
 		return results, nil
 	}
 	return p.applyToEach(ctx, ids, "archive", func(id string) error {
-		return p.archiveSingle(ctx, id, cascade)
+		return p.archiveSingle(ctx, id)
 	})
 }
 
@@ -777,7 +779,7 @@ func (p *Protocol) DeArchive(ctx context.Context, ids []string, cascade bool) ([
 	return results, nil
 }
 
-func (p *Protocol) archiveSingle(ctx context.Context, id string, cascade bool) error {
+func (p *Protocol) archiveSingle(ctx context.Context, id string) error {
 	art, err := p.store.Get(ctx, id)
 	if err != nil {
 		return err
@@ -785,21 +787,15 @@ func (p *Protocol) archiveSingle(ctx context.Context, id string, cascade bool) e
 	if p.schema.IsReadonly(art.Status) {
 		return nil
 	}
+	// No cascade — archive is single-artifact only. Children must already be
+	// terminal for the parent to be archived; non-terminal children block it.
 	children, err := p.store.Children(ctx, id)
 	if err != nil {
 		return err
 	}
-	if cascade {
-		for _, ch := range children {
-			if err := p.archiveSingle(ctx, ch.ID, true); err != nil {
-				return fmt.Errorf("cascade archive %s: %w", ch.ID, err)
-			}
-		}
-	} else {
-		for _, ch := range children {
-			if !p.schema.IsReadonly(ch.Status) {
-				return fmt.Errorf("cannot archive %s: child %s is %s (use cascade to archive the whole tree)", id, ch.ID, ch.Status) //nolint:err113 // pre-existing
-			}
+	for _, ch := range children {
+		if !p.schema.IsTerminal(ch.Status) {
+			return fmt.Errorf("cannot archive %s: child %s is %s — retire or complete children first", id, ch.ID, ch.Status) //nolint:err113 // domain error
 		}
 	}
 	art.Status = p.schema.ReadonlyStatuses[0]

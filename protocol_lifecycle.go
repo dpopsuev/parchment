@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sort"
 	"strings"
 	"time"
 )
@@ -318,11 +317,6 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 			info = append(info, extra)
 		}
 	}
-	if p.schema.HasAutoActivateNext(art.Kind) && status == triggerStatus {
-		if extra := p.autoActivateNextSprint(ctx, art); extra != "" {
-			info = append(info, extra)
-		}
-	}
 	// Auto-enrichment: on task completion, update implementing spec
 	if art.Kind == KindTask && status == StatusComplete { //nolint:nestif // pre-existing complexity, moved from protocol/
 		if targets, ok := art.Links[RelImplements]; ok {
@@ -579,17 +573,3 @@ func (p *Protocol) autoCompleteParent(ctx context.Context, art *Artifact) string
 	return ""
 }
 
-func (p *Protocol) autoActivateNextSprint(ctx context.Context, completed *Artifact) string {
-	defaultStatus := p.schema.DefaultStatus(completed.Kind)
-	drafts, err := p.store.List(ctx, Filter{Kind: completed.Kind, Status: defaultStatus})
-	if err != nil || len(drafts) == 0 {
-		return ""
-	}
-	sort.Slice(drafts, func(i, j int) bool { return drafts[i].ID < drafts[j].ID })
-	next := drafts[0]
-	next.Status = p.schema.ActiveStatusFor(completed.Kind)
-	if err := p.store.Put(ctx, next); err != nil {
-		return ""
-	}
-	return fmt.Sprintf("activated %s: %s", next.ID, next.Title)
-}

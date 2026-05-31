@@ -104,7 +104,13 @@ func (p *Protocol) BulkSetField(ctx context.Context, in BulkMutationInput, field
 	return result, err
 }
 
-func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force bool) ([]string, error) {
+// VacuumResult reports which artifacts were deleted and which were skipped.
+type VacuumResult struct {
+	Deleted []string // IDs permanently removed
+	Skipped []string // IDs spared because they still have incoming edges
+}
+
+func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force bool) (VacuumResult, error) {
 	if days <= 0 {
 		days = p.defaults.GetVacuumDays()
 	}
@@ -119,10 +125,10 @@ func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force boo
 	}
 	arts, err := p.store.List(ctx, f)
 	if err != nil {
-		return nil, err
+		return VacuumResult{}, err
 	}
 	cutoff := time.Now().UTC().Add(-maxAge)
-	var deleted []string //nolint:prealloc // pre-existing
+	var result VacuumResult
 	for _, art := range arts {
 		if !art.UpdatedAt.Before(cutoff) {
 			continue
@@ -139,16 +145,30 @@ func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force boo
 		if !force && p.schema.IsProtected(art.Kind) {
 			continue
 		}
+		// Skip artifacts that still have incoming edges — age alone is not enough
+		// to justify deleting something other artifacts depend on.
+		if !force {
+			incoming, _ := p.store.Neighbors(ctx, art.ID, "", Incoming)
+			if len(incoming) > 0 {
+				slog.WarnContext(ctx, "vacuum skipping connected artifact",
+					slog.String(LogKeyID, art.ID),
+					slog.Int(LogKeyIncomingEdges, len(incoming)))
+				result.Skipped = append(result.Skipped, art.ID)
+				continue
+			}
+		}
 		if err := p.store.Delete(ctx, art.ID); err != nil {
 			slog.WarnContext(ctx, "vacuum delete failed",
 				slog.String(LogKeyID, art.ID),
 				slog.Any(LogKeyError, err))
-			return deleted, fmt.Errorf("vacuum %s: %w", art.ID, err)
+			return result, fmt.Errorf("vacuum %s: %w", art.ID, err)
 		}
-		deleted = append(deleted, art.ID)
+		result.Deleted = append(result.Deleted, art.ID)
 	}
-	slog.InfoContext(ctx, "vacuum complete", slog.Int(LogKeyCount, len(deleted)))
-	return deleted, nil
+	slog.InfoContext(ctx, "vacuum complete",
+		slog.Int(LogKeyCount, len(result.Deleted)),
+		slog.Int(LogKeySkipped, len(result.Skipped)))
+	return result, nil
 }
 
 // componentLabelRe and extractComponentLabels are private helpers used by

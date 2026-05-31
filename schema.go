@@ -29,7 +29,6 @@ type KindDef struct {
 	Code             string   `json:"code,omitempty" yaml:"code,omitempty"`
 	Protected        bool     `json:"protected,omitempty" yaml:"protected,omitempty"`
 	DefaultStatus    string   `json:"default_status,omitempty" yaml:"default_status,omitempty"`
-	AutoActivateNext bool     `json:"auto_activate_next,omitempty" yaml:"auto_activate_next,omitempty"`
 	ExpectedSections []string `json:"expected_sections,omitempty" yaml:"expected_sections,omitempty"`
 	MustSections     []string `json:"must_sections,omitempty" yaml:"must_sections,omitempty"`
 	ShouldSections   []string `json:"should_sections,omitempty" yaml:"should_sections,omitempty"`
@@ -289,14 +288,6 @@ func (s *Schema) MissingCompletionGates(art *Artifact) []string {
 		}
 	}
 	return missing
-}
-
-// HasAutoActivateNext reports whether the kind should trigger next-draft activation on completion.
-func (s *Schema) HasAutoActivateNext(kind string) bool {
-	if kd, ok := s.Kinds[kind]; ok {
-		return kd.AutoActivateNext
-	}
-	return false
 }
 
 // GoalKind returns the kind name and def with IsGoalKind=true.

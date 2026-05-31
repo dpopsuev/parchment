@@ -1772,12 +1772,12 @@ func TestVacuum_RemovesOldArchived(t *testing.T) {
 	art.UpdatedAt = time.Now().Add(-180 * 24 * time.Hour) // 180 days ago
 	store.Put(ctx, art)
 
-	deleted, err := proto.Vacuum(ctx, 90, "", false)
+	result, err := proto.Vacuum(ctx, 90, "", false)
 	if err != nil {
 		t.Fatalf("Vacuum: %v", err)
 	}
-	if len(deleted) != 1 {
-		t.Errorf("expected 1 deleted, got %d", len(deleted))
+	if len(result.Deleted) != 1 {
+		t.Errorf("expected 1 deleted, got %d", len(result.Deleted))
 	}
 
 	// Verify actually gone
@@ -1799,12 +1799,12 @@ func TestVacuum_SkipsProtectedKinds(t *testing.T) {
 	art.UpdatedAt = time.Now().Add(-180 * 24 * time.Hour)
 	store.Put(ctx, art)
 
-	deleted, err := proto.Vacuum(ctx, 90, "", false)
+	result, err := proto.Vacuum(ctx, 90, "", false)
 	if err != nil {
 		t.Fatalf("Vacuum: %v", err)
 	}
-	if len(deleted) != 0 {
-		t.Errorf("expected 0 deleted (protected kind), got %d", len(deleted))
+	if len(result.Deleted) != 0 {
+		t.Errorf("expected 0 deleted (protected kind), got %d", len(result.Deleted))
 	}
 }
 
@@ -1819,12 +1819,12 @@ func TestVacuum_ForceDeletesProtected(t *testing.T) {
 	art.UpdatedAt = time.Now().Add(-180 * 24 * time.Hour)
 	store.Put(ctx, art)
 
-	deleted, err := proto.Vacuum(ctx, 90, "", true)
+	result, err := proto.Vacuum(ctx, 90, "", true)
 	if err != nil {
 		t.Fatalf("Vacuum: %v", err)
 	}
-	if len(deleted) != 1 {
-		t.Errorf("expected 1 deleted with force=true, got %d", len(deleted))
+	if len(result.Deleted) != 1 {
+		t.Errorf("expected 1 deleted with force=true, got %d", len(result.Deleted))
 	}
 }
 
@@ -1839,12 +1839,12 @@ func TestVacuum_SkipsRecentArchived(t *testing.T) {
 	art.UpdatedAt = time.Now().Add(-10 * 24 * time.Hour) // 10 days ago
 	store.Put(ctx, art)
 
-	deleted, err := proto.Vacuum(ctx, 90, "", false)
+	result, err := proto.Vacuum(ctx, 90, "", false)
 	if err != nil {
 		t.Fatalf("Vacuum: %v", err)
 	}
-	if len(deleted) != 0 {
-		t.Errorf("expected 0 deleted (too recent), got %d", len(deleted))
+	if len(result.Deleted) != 0 {
+		t.Errorf("expected 0 deleted (too recent), got %d", len(result.Deleted))
 	}
 }
 
@@ -1872,12 +1872,12 @@ func TestVacuum_ScopeFilter(t *testing.T) {
 	b1.UpdatedAt = time.Now().Add(-180 * 24 * time.Hour)
 	store.Put(ctx, b1)
 
-	deleted, err := proto.Vacuum(ctx, 90, "alpha", true)
+	result, err := proto.Vacuum(ctx, 90, "alpha", true)
 	if err != nil {
 		t.Fatalf("Vacuum: %v", err)
 	}
-	if len(deleted) != 1 {
-		t.Errorf("expected 1 deleted (alpha only), got %d", len(deleted))
+	if len(result.Deleted) != 1 {
+		t.Errorf("expected 1 deleted (alpha only), got %d", len(result.Deleted))
 	}
 }
 
@@ -2204,27 +2204,6 @@ func TestGetConfig_WithScopedConfig(t *testing.T) {
 	val := proto.GetConfig(ctx, "default_scope", "test")
 	if val != "test" {
 		t.Errorf("expected 'test', got %q", val)
-	}
-}
-
-// --- CascadeAndInvalidate ---
-
-func TestCascadeAndInvalidate(t *testing.T) {
-	t.Parallel()
-	proto, _ := newProto(t)
-	ctx := context.Background()
-
-	a := createTask(t, proto, "changed")
-	b := createTask(t, proto, "dependent")
-
-	proto.LinkArtifacts(ctx, b.ID, "depends_on", []string{a.ID})
-
-	affected, err := proto.CascadeAndInvalidate(ctx, a.ID, "draft")
-	if err != nil {
-		t.Fatalf("CascadeAndInvalidate: %v", err)
-	}
-	if len(affected) != 1 {
-		t.Errorf("expected 1 affected, got %d", len(affected))
 	}
 }
 

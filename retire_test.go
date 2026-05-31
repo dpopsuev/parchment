@@ -132,11 +132,11 @@ func TestVacuum_SkipsRetired(t *testing.T) {
 		UpdatedAt: old,
 	})
 
-	deleted, err := proto.Vacuum(ctx, 30, "", false)
+	result, err := proto.Vacuum(ctx, 30, "", false)
 	if err != nil {
 		t.Fatalf("Vacuum: %v", err)
 	}
-	for _, id := range deleted {
+	for _, id := range result.Deleted {
 		if id == "TSK-RETIRED-1" {
 			t.Error("Vacuum deleted a retired artifact — retired must be permanent")
 		}
@@ -154,12 +154,12 @@ func TestVacuum_DeletesOldArchived(t *testing.T) {
 		UpdatedAt: old,
 	})
 
-	deleted, err := proto.Vacuum(ctx, 30, "", true) // force=true: task kind is not Protected
+	result, err := proto.Vacuum(ctx, 30, "", true) // force=true: task kind is not Protected
 	if err != nil {
 		t.Fatalf("Vacuum: %v", err)
 	}
 	found := false
-	for _, id := range deleted {
+	for _, id := range result.Deleted {
 		if id == "TSK-ARCH-1" {
 			found = true
 		}
@@ -183,11 +183,11 @@ func TestVacuum_SkipsNonVacuumableKind(t *testing.T) {
 		UpdatedAt: old,
 	})
 
-	deleted, err := proto.Vacuum(ctx, 30, "", true)
+	result, err := proto.Vacuum(ctx, 30, "", true)
 	if err != nil {
 		t.Fatalf("Vacuum: %v", err)
 	}
-	for _, id := range deleted {
+	for _, id := range result.Deleted {
 		if id == "NOT-1" {
 			t.Error("Vacuum deleted a knowledge artifact (note) — knowledge kinds must not be vacuumed")
 		}

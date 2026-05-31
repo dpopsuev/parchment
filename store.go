@@ -30,6 +30,11 @@ type ArtifactStore interface {
 	// PatchArtifact atomically appends to slices and merges maps without a
 	// read-modify-write in application code. Safe for concurrent stigmergic writes.
 	PatchArtifact(ctx context.Context, id string, patch ArtifactPatch) error
+	// BulkPut inserts or replaces multiple artifacts in a single transaction.
+	// Returns one error slot per input artifact (nil = success). A failure on
+	// one artifact does not abort the batch — the caller decides how to retry.
+	// reconcileEdgesSQL is skipped; callers handle edges via AddEdge separately.
+	BulkPut(ctx context.Context, arts []*Artifact) []error
 	Get(ctx context.Context, id string) (*Artifact, error)
 	GetByAlias(ctx context.Context, alias string) (*Artifact, error)
 	Delete(ctx context.Context, id string) error

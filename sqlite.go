@@ -522,6 +522,107 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 // current updated_at matches expectedUpdatedAt before writing. Returns
 // ErrConflict if the artifact was modified since the caller last read it.
 // The caller must retry with fresh state on ErrConflict.
+// BulkPut inserts or replaces multiple artifacts in a single transaction.
+// Returns one error slot per artifact (nil = success). Failures on individual
+// artifacts do not abort the batch. FTS5 and label junction are maintained.
+// reconcileEdgesSQL is skipped — callers emit edges via AddEdge separately.
+func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { //nolint:gocyclo,funlen // batch path mirrors Put complexity
+	errs := make([]error, len(arts))
+	if len(arts) == 0 {
+		return errs
+	}
+
+	now := time.Now().UTC()
+	tx, err := s.writer.BeginTx(ctx, nil)
+	if err != nil {
+		for i := range errs {
+			errs[i] = err
+		}
+		return errs
+	}
+	defer tx.Rollback() //nolint:errcheck // deferred rollback
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO artifacts (uid, id, alias, kind, scope, status, parent, title, goal,
+			depends_on, labels, priority, sprint, sections, features, criteria, links,
+			extra, components, annotations, created_at, updated_at, inserted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(uid) DO UPDATE SET
+			id=excluded.id, alias=excluded.alias, kind=excluded.kind, scope=excluded.scope,
+			status=excluded.status, parent=excluded.parent, title=excluded.title,
+			goal=excluded.goal, depends_on=excluded.depends_on, labels=excluded.labels,
+			priority=excluded.priority, sprint=excluded.sprint, sections=excluded.sections,
+			features=excluded.features, criteria=excluded.criteria, links=excluded.links,
+			extra=excluded.extra, components=excluded.components,
+			annotations=excluded.annotations, updated_at=excluded.updated_at`)
+	if err != nil {
+		for i := range errs {
+			errs[i] = err
+		}
+		return errs
+	}
+	defer stmt.Close() //nolint:errcheck // prepared statement cleanup
+
+	for i, art := range arts {
+		if art.ID == "" {
+			errs[i] = ErrArtifactIDRequired
+			continue
+		}
+		if art.UID == "" {
+			art.UID = generateUID()
+		}
+		if art.CreatedAt.IsZero() {
+			art.CreatedAt = now
+		}
+		art.UpdatedAt = now
+		if art.InsertedAt.IsZero() {
+			art.InsertedAt = now
+		}
+
+		dependsOn, _ := json.Marshal(art.DependsOn)
+		labels, _ := json.Marshal(art.Labels)
+		sections, _ := json.Marshal(art.Sections)
+		features, _ := json.Marshal(art.Features)
+		criteria, _ := json.Marshal(art.Criteria)
+		links, _ := json.Marshal(art.Links)
+		extra, _ := json.Marshal(art.Extra)
+		components, _ := json.Marshal(art.Components)
+		annotations, _ := json.Marshal(art.Annotations)
+
+		_, execErr := stmt.ExecContext(ctx,
+			art.UID, art.ID, art.Alias, art.Kind, art.Scope, art.Status, art.Parent,
+			art.Title, art.Goal, string(dependsOn), string(labels), art.Priority, art.Sprint,
+			string(sections), string(features), string(criteria), string(links), string(extra),
+			string(components), string(annotations),
+			art.CreatedAt.Format(time.RFC3339Nano),
+			art.UpdatedAt.Format(time.RFC3339Nano),
+			art.InsertedAt.Format(time.RFC3339Nano),
+		)
+		if execErr != nil {
+			errs[i] = execErr
+			continue
+		}
+
+		if labelErr := syncLabelsInTx(ctx, tx, art.ID, art.Labels); labelErr != nil {
+			slog.WarnContext(ctx, "BulkPut: label sync failed (non-fatal)",
+				slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, labelErr))
+		}
+		if ftsErr := syncFTSInTx(ctx, tx, nil, art); ftsErr != nil {
+			slog.WarnContext(ctx, "BulkPut: FTS5 sync failed (non-fatal)",
+				slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, ftsErr))
+		}
+	}
+
+	if commitErr := tx.Commit(); commitErr != nil {
+		for i := range errs {
+			if errs[i] == nil {
+				errs[i] = commitErr
+			}
+		}
+	}
+	return errs
+}
+
 func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedUpdatedAt time.Time) error {
 	if art.ID == "" {
 		return ErrArtifactIDRequired

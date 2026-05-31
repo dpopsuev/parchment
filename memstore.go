@@ -568,6 +568,15 @@ func (m *MemoryStore) SearchSemantic(_ context.Context, model string, query []fl
 
 // --- New store interface methods ---
 
+// BulkPut inserts or replaces multiple artifacts. Sequential Put calls under a single lock.
+func (m *MemoryStore) BulkPut(ctx context.Context, arts []*Artifact) []error {
+	errs := make([]error, len(arts))
+	for i, art := range arts {
+		errs[i] = m.Put(ctx, art)
+	}
+	return errs
+}
+
 func (m *MemoryStore) PutIfVersion(ctx context.Context, art *Artifact, expectedUpdatedAt time.Time) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

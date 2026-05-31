@@ -622,6 +622,11 @@ func (s *Schema) MergeDefaults(defaults *Schema) {
 }
 
 // DefaultSchema returns the built-in schema with the canonical kind vocabulary.
+//
+// Deprecated: prefer passing nil to Protocol.New, which calls loadSchema to
+// populate kinds from definition artifacts stored in the database. This function
+// remains public for tests and one-off use; it will be made private once all
+// callers migrate to the store-backed schema (PRC-TSK-56).
 func DefaultSchema() *Schema {
 	return &Schema{
 		Kinds: map[string]KindDef{
@@ -722,14 +727,22 @@ func DefaultSchema() *Schema {
 				SkipGuards: true,
 				Children:   []string{},
 			},
-			"template": {Prefix: "TPL", Code: "TPL", Protected: true, Family: FamilySupport,
-				MustSections: []string{"content"},
-				Children:     []string{},
-				Relations: KindRelations{
-					Incoming: []string{RelSatisfies},
-				},
+		"template": {Prefix: "TPL", Code: "TPL", Protected: true, Family: FamilySupport,
+			MustSections: []string{"content"},
+			Children:     []string{},
+			Relations: KindRelations{
+				Incoming: []string{RelSatisfies},
 			},
 		},
+		// definition is the meta-kind. Every other kind is stored as a definition
+		// artifact in SchemaScope. This is the only compiled-in kind — all others
+		// are loaded from the store at startup via loadSchema.
+		KindDefinition: {Prefix: "DEF", Code: "DEF", Protected: true, Family: FamilySupport,
+			SkipGuards:    true,
+			DefaultStatus: StatusActive,
+			Children:      []string{},
+		},
+	},
 		Statuses: []string{
 			"draft", "active", "current", "open",
 			"mature", "allocated", "in_progress", "in_review",
@@ -792,7 +805,7 @@ func taskTransitions() map[string][]string {
 	}
 }
 
-// KnowledgeSchema returns a schema that extends DefaultSchema with the
+// KnowledgeSchema returns a schema that extends defaultSchema with the
 // knowledge layer: note/journal/source/concept/context kinds,
 // fleeting/evergreen statuses, and cites/elaborates/contradicts/
 // synthesises/remembers relations.
@@ -808,6 +821,9 @@ func taskTransitions() map[string][]string {
 //
 // Lifecycle: fleeting → active → evergreen (or directly fleeting → evergreen)
 // Evergreen is NOT readonly — permanent notes remain editable in Zettelkasten.
+// KnowledgeSchema is exported for backward compatibility with Scribe config
+// and for SeedDefinitions. Will be made private once all external callers
+// migrate to loadSchema (via Protocol.New with nil schema).
 func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inherently long
 	s := &Schema{
 		Kinds: map[string]KindDef{

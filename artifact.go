@@ -70,10 +70,14 @@ type Criterion struct {
 }
 
 // Edge represents a directed relationship between two artifacts.
+// Weight is 0.0 for boolean existence edges (the default for all work-tracking
+// edges). Code-mapping and stigmergy paths set Weight to coupling strength,
+// fan-in score, or traversal frequency.
 type Edge struct {
-	From     string `json:"from"`
-	To       string `json:"to"`
-	Relation string `json:"relation"`
+	From     string  `json:"from"`
+	To       string  `json:"to"`
+	Relation string  `json:"relation"`
+	Weight   float64 `json:"weight,omitempty"`
 }
 
 // Well-known edge relations — work tracking.
@@ -110,6 +114,20 @@ type Annotation struct {
 	Comment string `json:"comment"`
 }
 
+// ArtifactPatch describes an atomic, append-only mutation to an artifact.
+// All operations are performed in a single transaction with no read-modify-write
+// in application code — the database engine performs the merge.
+type ArtifactPatch struct {
+	// AppendAnnotations appends entries to the annotations JSON array.
+	AppendAnnotations []Annotation
+	// AppendSections merges by name: updates existing section text if the name
+	// already exists, appends a new section otherwise.
+	AppendSections []Section
+	// SetExtra merges the provided keys into the extra JSON object.
+	// Existing keys not present in SetExtra are left unchanged.
+	SetExtra map[string]any
+}
+
 // ScopePolicy defines per-scope constraints enforced at artifact creation.
 type ScopePolicy struct {
 	AllowedKinds    []string `json:"allowed_kinds,omitempty" yaml:"allowed_kinds,omitempty"`
@@ -132,8 +150,13 @@ type Filter struct {
 	Kind            string
 	ExcludeKind     string
 	ExcludeStatus   string // exclude artifacts with this status
+	ExcludeScope    string // exclude artifacts with this scope (used to hide _schema)
 	IDPrefix        string // match artifacts whose ID starts with this prefix
 	Scope           string
+	// ScopePrefix enables hierarchical scope matching: Scope='org/project' matches
+	// 'org/project' and any 'org/project/*' sub-scope. Strict (false) is the default
+	// exact-match behavior.
+	ScopePrefix     bool
 	Scopes          []string // multi-scope IN filter (takes precedence over Scope when non-empty)
 	Status          string
 	Parent          string
@@ -148,6 +171,16 @@ type Filter struct {
 	UpdatedBefore   string
 	InsertedAfter   string
 	InsertedBefore  string
+	// Pagination — used by ListPage. Limit=0 with no Cursor returns all (existing behavior).
+	Limit  int
+	Cursor string // opaque; encodes (inserted_at, id) from the previous page's last element
+}
+
+// Page is the result of a paginated ListPage query.
+type Page struct {
+	Artifacts  []*Artifact `json:"artifacts"`
+	NextCursor string      `json:"next_cursor,omitempty"` // empty when there are no more pages
+	Total      int         `json:"total"`                 // COUNT(*) for the same filter (no pagination)
 }
 
 // Matches reports whether art satisfies all non-zero filter fields.
@@ -166,6 +199,9 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop // filter has many
 	if f.ExcludeStatus != "" && art.Status == f.ExcludeStatus {
 		return false
 	}
+	if f.ExcludeScope != "" && art.Scope == f.ExcludeScope {
+		return false
+	}
 	if f.Kind != "" && art.Kind != f.Kind {
 		return false
 	}
@@ -180,8 +216,14 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop // filter has many
 		if !found {
 			return false
 		}
-	} else if f.Scope != "" && art.Scope != f.Scope {
-		return false
+	} else if f.Scope != "" {
+		if f.ScopePrefix {
+			if art.Scope != f.Scope && !strings.HasPrefix(art.Scope, f.Scope+"/") {
+				return false
+			}
+		} else if art.Scope != f.Scope {
+			return false
+		}
 	}
 	if f.Status != "" && art.Status != f.Status {
 		return false

@@ -1,6 +1,7 @@
 package parchment
 
 import (
+	"context"
 	"errors"
 )
 
@@ -96,7 +97,15 @@ type Protocol struct {
 // optional vocabulary for kind enforcement, and ID generation config.
 func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *Protocol {
 	if schema == nil {
-		schema = DefaultSchema()
+		if s != nil {
+			// Ensure built-in kinds are seeded as definition artifacts, then
+			// load the schema from the store.
+			SeedDefinitions(context.Background(), s)
+			schema, _ = loadSchema(context.Background(), s)
+		}
+		if schema == nil {
+			schema = KnowledgeSchema()
+		}
 	}
 	if len(vocab) == 0 {
 		vocab = schema.KindNames()

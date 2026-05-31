@@ -2,6 +2,7 @@ package parchment
 
 import (
 	"context"
+	"time"
 )
 
 // Direction constrains edge traversal.
@@ -22,10 +23,22 @@ type WalkFn func(depth int, edge Edge) (cont bool)
 // ArtifactStore handles artifact CRUD, keyword search, and semantic search.
 type ArtifactStore interface {
 	Put(ctx context.Context, art *Artifact) error
+	// PutIfVersion is an optimistic-locking write. It returns ErrConflict if
+	// the artifact's updated_at has changed since the caller last read it.
+	// Use this on all agent read-modify-write paths to prevent silent clobbers.
+	PutIfVersion(ctx context.Context, art *Artifact, expectedUpdatedAt time.Time) error
+	// PatchArtifact atomically appends to slices and merges maps without a
+	// read-modify-write in application code. Safe for concurrent stigmergic writes.
+	PatchArtifact(ctx context.Context, id string, patch ArtifactPatch) error
 	Get(ctx context.Context, id string) (*Artifact, error)
 	GetByAlias(ctx context.Context, alias string) (*Artifact, error)
 	Delete(ctx context.Context, id string) error
 	List(ctx context.Context, f Filter) ([]*Artifact, error)
+	// ListPage returns a single page of artifacts using cursor-based pagination.
+	// Filter.Cursor and Filter.Limit control the page. Filter.Limit=0 with no
+	// Cursor falls back to returning all results (same as List). The returned
+	// Page.NextCursor is empty when there are no further pages.
+	ListPage(ctx context.Context, f Filter) (Page, error)
 	Children(ctx context.Context, parentID string) ([]*Artifact, error)
 	Search(ctx context.Context, query string) ([]string, error)
 	// Embedding operations — optional semantic layer over FTS5.
@@ -38,6 +51,9 @@ type ArtifactStore interface {
 type GraphStore interface {
 	AddEdge(ctx context.Context, e Edge) error
 	RemoveEdge(ctx context.Context, e Edge) error
+	// UpdateEdgeWeight sets the weight on an existing edge. The edge must
+	// already exist. Callers pass 0.0 to reset to boolean-existence semantics.
+	UpdateEdgeWeight(ctx context.Context, from, to, relation string, weight float64) error
 	Neighbors(ctx context.Context, id, rel string, dir Direction) ([]Edge, error)
 	Walk(ctx context.Context, root string, rel string, dir Direction, maxDepth int, fn WalkFn) error
 }
@@ -68,6 +84,7 @@ type Store interface {
 	GraphStore
 	SequenceStore
 	ScopeStore
+	EventStore
 	Close() error
 }
 

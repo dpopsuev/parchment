@@ -116,14 +116,19 @@ func (p *Protocol) cascadeOverlaps(ctx context.Context, changed *Artifact, affec
 	for _, f := range changed.Components.Files {
 		changedFiles[f] = true
 	}
-	if len(changedFiles) == 0 {
+	changedSymbols := make(map[string]bool, len(changed.Components.Symbols))
+	for _, sym := range changed.Components.Symbols {
+		changedSymbols[sym] = true
+	}
+	if len(changedFiles) == 0 && len(changedSymbols) == 0 {
 		return
 	}
 
-	// Scan all artifacts for file overlap. This is O(n) — acceptable for
-	// artifact counts typical in Scribe (< 10K). For larger scales, build
-	// a file→artifact index.
-	all, err := p.store.List(ctx, Filter{})
+	// Scan all artifacts for file and symbol overlap. O(n) — acceptable for
+	// artifact counts typical in Scribe (< 10K). With the artifact_properties
+	// index (PRC-TSK-46) this becomes O(log n) for symbol lookups.
+	// Exclude SchemaScope — definition artifacts are not work artifacts.
+	all, err := p.store.List(ctx, Filter{ExcludeScope: SchemaScope})
 	if err != nil {
 		return
 	}
@@ -135,6 +140,14 @@ func (p *Protocol) cascadeOverlaps(ctx context.Context, changed *Artifact, affec
 			if changedFiles[f] {
 				affected[art.ID] = true
 				break
+			}
+		}
+		if !affected[art.ID] {
+			for _, sym := range art.Components.Symbols {
+				if changedSymbols[sym] {
+					affected[art.ID] = true
+					break
+				}
 			}
 		}
 	}

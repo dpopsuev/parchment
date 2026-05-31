@@ -269,6 +269,12 @@ func (p *Protocol) GetArtifact(ctx context.Context, id string) (*Artifact, error
 	return art, nil
 }
 
+// PatchArtifact delegates to ArtifactStore.PatchArtifact — atomic append-only
+// delta write without a read-modify-write cycle in application code.
+func (p *Protocol) PatchArtifact(ctx context.Context, id string, patch ArtifactPatch) error {
+	return p.store.PatchArtifact(ctx, id, patch)
+}
+
 // recordAccess increments the access counter when the store supports MetricsStore.
 func (p *Protocol) recordAccess(ctx context.Context, id string) {
 	if ms, ok := p.store.(MetricsStore); ok {
@@ -350,6 +356,7 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 		IDPrefix:       in.IDPrefix,
 		ExcludeKind:    in.ExcludeKind,
 		ExcludeStatus:  in.ExcludeStatus,
+		ExcludeScope:   SchemaScope, // definition artifacts are never in user-facing results
 		Labels:         in.Labels,
 		LabelsOr:       in.LabelsOr,
 		ExcludeLabels:  in.ExcludeLabels,

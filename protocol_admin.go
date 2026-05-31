@@ -409,7 +409,7 @@ func (p *Protocol) ListKindCodes() map[string]string {
 // Each line is a complete artifact with sections, edges, and metadata.
 func (p *Protocol) Export(ctx context.Context, w io.Writer, scope string) (int, error) {
 	slog.InfoContext(ctx, "export start", slog.String(LogKeyScope, scope))
-	filter := Filter{}
+	filter := Filter{ExcludeScope: SchemaScope}
 	if scope != "" {
 		filter.Scope = scope
 	}
@@ -551,7 +551,7 @@ type CheckReport struct {
 
 // Check walks all artifacts and validates each against the resolved schema.
 func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error) { //nolint:gocyclo,funlen // pre-existing complexity, moved from protocol.go
-	f := Filter{}
+	f := Filter{ExcludeScope: SchemaScope}
 	if scope != "" {
 		f.Scope = scope
 	} else if len(p.scopes) > 0 {

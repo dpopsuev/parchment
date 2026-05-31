@@ -565,3 +565,97 @@ func (m *MemoryStore) SearchSemantic(_ context.Context, model string, query []fl
 	}
 	return ids, nil
 }
+
+// --- New store interface methods ---
+
+func (m *MemoryStore) PutIfVersion(ctx context.Context, art *Artifact, expectedUpdatedAt time.Time) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	existing, ok := m.artifacts[art.ID]
+	if !ok {
+		return ErrArtifactNotFound
+	}
+	if !existing.UpdatedAt.Equal(expectedUpdatedAt) {
+		return ErrConflict
+	}
+	m.putLocked(art)
+	return nil
+}
+
+func (m *MemoryStore) PatchArtifact(_ context.Context, id string, patch ArtifactPatch) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	art, ok := m.artifacts[id]
+	if !ok {
+		return ErrArtifactNotFound
+	}
+	art.Annotations = append(art.Annotations, patch.AppendAnnotations...)
+	byName := make(map[string]int, len(art.Sections))
+	for i, sec := range art.Sections {
+		byName[sec.Name] = i
+	}
+	for _, sec := range patch.AppendSections {
+		if idx, exists := byName[sec.Name]; exists {
+			art.Sections[idx].Text = sec.Text
+		} else {
+			art.Sections = append(art.Sections, sec)
+		}
+	}
+	if art.Extra == nil {
+		art.Extra = make(map[string]any)
+	}
+	for k, v := range patch.SetExtra {
+		art.Extra[k] = v
+	}
+	art.UpdatedAt = time.Now().UTC()
+	return nil
+}
+
+func (m *MemoryStore) ListPage(_ context.Context, f Filter) (Page, error) { //nolint:gocritic // hugeParam: Filter matches Store interface; pointer would require changing the interface
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var results []*Artifact
+	for _, art := range m.artifacts {
+		if f.Matches(art) {
+			cp := *art
+			results = append(results, &cp)
+		}
+	}
+	return Page{Artifacts: results, Total: len(results)}, nil
+}
+
+func (m *MemoryStore) UpdateEdgeWeight(_ context.Context, from, to, relation string, weight float64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := from + "|" + relation + "|" + to
+	e, ok := m.edges[key]
+	if !ok {
+		return fmt.Errorf("%w: %s -[%s]-> %s", ErrEdgeNotFound, from, relation, to)
+	}
+	e.Weight = weight
+	m.edges[key] = e
+	return nil
+}
+
+func (m *MemoryStore) AppendEvent(_ context.Context, _ Event) error { return nil }
+
+func (m *MemoryStore) GetEvents(_ context.Context, _ time.Time, _ EventFilter) ([]Event, error) {
+	return nil, nil
+}
+
+// putLocked writes art while the write lock is already held.
+func (m *MemoryStore) putLocked(art *Artifact) {
+	now := time.Now().UTC()
+	if art.CreatedAt.IsZero() {
+		art.CreatedAt = now
+	}
+	art.UpdatedAt = now
+	if art.InsertedAt.IsZero() {
+		art.InsertedAt = now
+	}
+	cp := *art
+	m.artifacts[art.ID] = &cp
+	if art.Alias != "" {
+		m.aliases[art.Alias] = art.ID
+	}
+}

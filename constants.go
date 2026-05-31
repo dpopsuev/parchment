@@ -9,6 +9,9 @@ var (
 	ErrStampsRequired        = errors.New("stamps section required for in_review transition")
 	ErrMissingRequiredFields = errors.New("missing required fields for activation")
 	ErrMissingSections       = errors.New("missing sections for activation")
+	ErrConflict              = errors.New("version conflict: artifact was modified since last read")
+	ErrEdgeNotFound          = errors.New("edge not found")
+	ErrArtifactIDRequired    = errors.New("artifact ID is required")
 )
 
 // Artifact statuses — work tracking.
@@ -33,6 +36,12 @@ const (
 	StatusFleeting  = "fleeting"  // quick capture, unprocessed; Zettelkasten: fleeting note
 	StatusEvergreen = "evergreen" // mature, permanent, well-connected; Zettelkasten: permanent note
 )
+
+// SchemaScope is the reserved scope for ArtifactDefinition artifacts.
+// Definition artifacts in this scope are loaded at startup to populate the
+// runtime schema. They are excluded from all regular queries unless the caller
+// explicitly filters scope=SchemaScope.
+const SchemaScope = "_schema"
 
 // Artifact kinds — work tracking.
 const (
@@ -68,6 +77,11 @@ const (
 	FamilyKnowledge = "knowledge" // note, journal, source, concept, context — what we learn
 	FamilySupport   = "support"   // template, config, mirror, doc, ref — infrastructure
 )
+
+// KindDefinition is the meta-kind. Every other kind is stored as a
+// KindDefinition artifact in SchemaScope. It is the only kind that is
+// compiled in — all others are loaded from the store at startup.
+const KindDefinition = "definition"
 
 // Artifact kinds — knowledge layer.
 // These extend the work kinds via KnowledgeSchema().
@@ -114,6 +128,7 @@ const (
 	LogKeyCascade  = "cascade"
 	LogKeyForce    = "force"
 	LogKeyTitle    = "title"
+	LogKeyEventType = "event_type"
 	LogKeyDryRun    = "dry_run"
 	LogKeyProject   = "project"
 	LogKeyOverlaps  = "overlaps"

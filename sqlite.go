@@ -45,16 +45,19 @@ CREATE TABLE IF NOT EXISTS artifacts (
 	updated_at  TEXT NOT NULL,
 	inserted_at TEXT NOT NULL DEFAULT ''
 );
-CREATE INDEX IF NOT EXISTS idx_art_kind   ON artifacts(kind);
-CREATE INDEX IF NOT EXISTS idx_art_scope  ON artifacts(scope);
-CREATE INDEX IF NOT EXISTS idx_art_status ON artifacts(status);
-CREATE INDEX IF NOT EXISTS idx_art_parent ON artifacts(parent);
-CREATE INDEX IF NOT EXISTS idx_art_sprint ON artifacts(sprint);
+CREATE INDEX IF NOT EXISTS idx_art_kind            ON artifacts(kind);
+CREATE INDEX IF NOT EXISTS idx_art_scope           ON artifacts(scope);
+CREATE INDEX IF NOT EXISTS idx_art_status          ON artifacts(status);
+CREATE INDEX IF NOT EXISTS idx_art_parent          ON artifacts(parent);
+CREATE INDEX IF NOT EXISTS idx_art_sprint          ON artifacts(sprint);
+CREATE INDEX IF NOT EXISTS idx_art_scope_inserted  ON artifacts(scope, inserted_at);
+CREATE INDEX IF NOT EXISTS idx_art_scope_updated   ON artifacts(scope, updated_at);
 
 CREATE TABLE IF NOT EXISTS edges (
 	from_id  TEXT NOT NULL,
 	relation TEXT NOT NULL,
 	to_id    TEXT NOT NULL,
+	weight   REAL NOT NULL DEFAULT 0.0,
 	PRIMARY KEY (from_id, relation, to_id)
 );
 CREATE INDEX IF NOT EXISTS idx_edges_rev ON edges(to_id, relation, from_id);
@@ -91,6 +94,22 @@ CREATE TABLE IF NOT EXISTS artifact_metrics (
 	access_count  INTEGER NOT NULL DEFAULT 0,
 	last_accessed TEXT NOT NULL DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS artifact_labels (
+	artifact_id TEXT NOT NULL,
+	label       TEXT NOT NULL,
+	PRIMARY KEY (artifact_id, label)
+);
+CREATE INDEX IF NOT EXISTS idx_artifact_labels_label ON artifact_labels(label, artifact_id);
+
+CREATE TABLE IF NOT EXISTS artifact_properties (
+	artifact_id TEXT NOT NULL,
+	key         TEXT NOT NULL,
+	value_text  TEXT NOT NULL DEFAULT '',
+	value_num   REAL,
+	PRIMARY KEY (artifact_id, key)
+);
+CREATE INDEX IF NOT EXISTS idx_artifact_properties_key ON artifact_properties(key, value_text);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS artifacts_fts USING fts5(
 	id, title, goal, sections,
@@ -203,11 +222,43 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 		"CREATE UNIQUE INDEX IF NOT EXISTS idx_art_alias ON artifacts(alias) WHERE alias != ''")
 	writer.ExecContext(context.Background(), //nolint:errcheck // migration: column may already exist
 		"ALTER TABLE artifacts ADD COLUMN annotations TEXT NOT NULL DEFAULT '[]'")
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: index may already exist
+		"CREATE INDEX IF NOT EXISTS idx_art_scope_inserted ON artifacts(scope, inserted_at)")
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: index may already exist
+		"CREATE INDEX IF NOT EXISTS idx_art_scope_updated ON artifacts(scope, updated_at)")
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
+		"ALTER TABLE edges ADD COLUMN weight REAL NOT NULL DEFAULT 0.0")
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: table may already exist
+		`CREATE TABLE IF NOT EXISTS artifact_labels (
+			artifact_id TEXT NOT NULL,
+			label       TEXT NOT NULL,
+			PRIMARY KEY (artifact_id, label)
+		)`)
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: index may already exist
+		"CREATE INDEX IF NOT EXISTS idx_artifact_labels_label ON artifact_labels(label, artifact_id)")
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: table may already exist
+		`CREATE TABLE IF NOT EXISTS artifact_properties (
+			artifact_id TEXT NOT NULL,
+			key         TEXT NOT NULL,
+			value_text  TEXT NOT NULL DEFAULT '',
+			value_num   REAL,
+			PRIMARY KEY (artifact_id, key)
+		)`)
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: index may already exist
+		"CREATE INDEX IF NOT EXISTS idx_artifact_properties_key ON artifact_properties(key, value_text)")
+	// Backfill artifact_labels from existing artifacts JSON column.
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: best-effort backfill
+		`INSERT OR IGNORE INTO artifact_labels (artifact_id, label)
+		 SELECT a.id, json_each.value
+		 FROM artifacts a, json_each(a.labels)
+		 WHERE json_each.value != ''`)
 
 	// Reseed scoped sequences to avoid ID collisions with existing artifacts.
 	if err := reseedScopedSequences(writer); err != nil {
 		log.Warn("reseed scoped sequences failed", "error", err)
 	}
+
+	ensureEventSchema(writer)
 
 	// Always rebuild FTS5 on startup. If the shadow tables are corrupt (e.g.
 	// from a hard kill mid-write), drop and recreate them before rebuilding.
@@ -458,8 +509,172 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	if err := reconcileEdgesSQL(ctx, tx, old, art); err != nil {
 		return err
 	}
+	if err := syncLabelsInTx(ctx, tx, art.ID, art.Labels); err != nil {
+		slog.WarnContext(ctx, "label junction sync failed (non-fatal)", slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, err))
+	}
 	if err := syncFTSInTx(ctx, tx, old, art); err != nil {
-		slog.WarnContext(ctx, "FTS5 sync failed (non-fatal)", slog.String(LogKeyID, art.ID), slog.Any("error", err))
+		slog.WarnContext(ctx, "FTS5 sync failed (non-fatal)", slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, err))
+	}
+	return tx.Commit()
+}
+
+// PutIfVersion is an optimistic-locking write. It verifies that the artifact's
+// current updated_at matches expectedUpdatedAt before writing. Returns
+// ErrConflict if the artifact was modified since the caller last read it.
+// The caller must retry with fresh state on ErrConflict.
+func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedUpdatedAt time.Time) error {
+	if art.ID == "" {
+		return ErrArtifactIDRequired
+	}
+
+	tx, err := s.writer.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck // deferred rollback
+
+	// Read current updated_at inside the transaction to guard against TOCTOU.
+	var currentUpdatedAt string
+	err = tx.QueryRowContext(ctx,
+		"SELECT updated_at FROM artifacts WHERE id = ?", art.ID).Scan(&currentUpdatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrArtifactNotFound
+		}
+		return err
+	}
+
+	current, err := time.Parse(time.RFC3339Nano, currentUpdatedAt)
+	if err != nil {
+		return fmt.Errorf("parse updated_at: %w", err)
+	}
+	if !current.Equal(expectedUpdatedAt) {
+		return ErrConflict
+	}
+
+	// Version matches — proceed with the write. Reuse Put logic inline so we
+	// keep the same transaction rather than starting a nested one.
+	if art.UID == "" {
+		art.UID = generateUID()
+	}
+	now := time.Now().UTC()
+	art.UpdatedAt = now
+
+	dependsOn, _ := json.Marshal(art.DependsOn)
+	labels, _ := json.Marshal(art.Labels)
+	sections, _ := json.Marshal(art.Sections)
+	features, _ := json.Marshal(art.Features)
+	criteria, _ := json.Marshal(art.Criteria)
+	links, _ := json.Marshal(art.Links)
+	extra, _ := json.Marshal(art.Extra)
+	components, _ := json.Marshal(art.Components)
+	annotations, _ := json.Marshal(art.Annotations)
+
+	old, _ := scanArtifact(tx.QueryRowContext(ctx, "SELECT "+artifactColumns+" FROM artifacts WHERE id = ?", art.ID))
+
+	_, err = tx.ExecContext(ctx, `
+		UPDATE artifacts SET
+			alias=?, kind=?, scope=?, status=?, parent=?, title=?, goal=?,
+			depends_on=?, labels=?, priority=?, sprint=?,
+			sections=?, features=?, criteria=?, links=?,
+			extra=?, components=?, annotations=?, updated_at=?
+		WHERE id=?`,
+		art.Alias, art.Kind, art.Scope, art.Status, art.Parent, art.Title, art.Goal,
+		string(dependsOn), string(labels), art.Priority, art.Sprint,
+		string(sections), string(features), string(criteria), string(links),
+		string(extra), string(components), string(annotations),
+		art.UpdatedAt.Format(time.RFC3339Nano),
+		art.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("update %s: %w", art.ID, err)
+	}
+
+	if err := reconcileEdgesSQL(ctx, tx, old, art); err != nil {
+		return err
+	}
+	if err := syncLabelsInTx(ctx, tx, art.ID, art.Labels); err != nil {
+		slog.WarnContext(ctx, "label junction sync failed (non-fatal)", slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, err))
+	}
+	if err := syncFTSInTx(ctx, tx, old, art); err != nil {
+		slog.WarnContext(ctx, "FTS5 sync failed (non-fatal)", slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, err))
+	}
+	return tx.Commit()
+}
+
+// PatchArtifact atomically appends to the annotations array, merges sections by
+// name, and merges extra keys — all in a single transaction with no application-
+// level read-modify-write. Safe for concurrent stigmergic writes.
+func (s *SQLiteStore) PatchArtifact(ctx context.Context, id string, patch ArtifactPatch) error {
+	if id == "" {
+		return ErrArtifactIDRequired
+	}
+	if len(patch.AppendAnnotations) == 0 && len(patch.AppendSections) == 0 && len(patch.SetExtra) == 0 {
+		return nil // no-op
+	}
+
+	tx, err := s.writer.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck // deferred rollback
+
+	// Load current state — we need the full artifact for section merge and FTS sync.
+	art, err := scanArtifact(tx.QueryRowContext(ctx, "SELECT "+artifactColumns+" FROM artifacts WHERE id = ?", id))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrArtifactNotFound
+		}
+		return fmt.Errorf("patch load %s: %w", id, err)
+	}
+	old := *art // shallow copy for FTS diff
+
+	now := time.Now().UTC()
+	art.UpdatedAt = now
+
+	// Merge annotations.
+	art.Annotations = append(art.Annotations, patch.AppendAnnotations...)
+
+	// Merge sections by name.
+	if len(patch.AppendSections) > 0 {
+		byName := make(map[string]int, len(art.Sections))
+		for i, sec := range art.Sections {
+			byName[sec.Name] = i
+		}
+		for _, sec := range patch.AppendSections {
+			if idx, exists := byName[sec.Name]; exists {
+				art.Sections[idx].Text = sec.Text
+			} else {
+				art.Sections = append(art.Sections, sec)
+			}
+		}
+	}
+
+	// Merge extra keys.
+	if len(patch.SetExtra) > 0 {
+		if art.Extra == nil {
+			art.Extra = make(map[string]any, len(patch.SetExtra))
+		}
+		for k, v := range patch.SetExtra {
+			art.Extra[k] = v
+		}
+	}
+
+	annotations, _ := json.Marshal(art.Annotations)
+	sections, _ := json.Marshal(art.Sections)
+	extra, _ := json.Marshal(art.Extra)
+
+	_, err = tx.ExecContext(ctx,
+		`UPDATE artifacts SET annotations=?, sections=?, extra=?, updated_at=? WHERE id=?`,
+		string(annotations), string(sections), string(extra),
+		art.UpdatedAt.Format(time.RFC3339Nano), id,
+	)
+	if err != nil {
+		return fmt.Errorf("patch update %s: %w", id, err)
+	}
+
+	if err := syncFTSInTx(ctx, tx, &old, art); err != nil {
+		slog.WarnContext(ctx, "FTS5 sync failed (non-fatal)", slog.String(LogKeyID, id), slog.Any(LogKeyError, err))
 	}
 	return tx.Commit()
 }
@@ -723,6 +938,10 @@ func (s *SQLiteStore) List(ctx context.Context, f Filter) ([]*Artifact, error) {
 		clauses = append(clauses, "status != ?")
 		args = append(args, f.ExcludeStatus)
 	}
+	if f.ExcludeScope != "" {
+		clauses = append(clauses, "scope != ?")
+		args = append(args, f.ExcludeScope)
+	}
 	if len(f.Scopes) > 0 {
 		placeholders := make([]string, len(f.Scopes))
 		for i, sc := range f.Scopes {
@@ -731,8 +950,13 @@ func (s *SQLiteStore) List(ctx context.Context, f Filter) ([]*Artifact, error) {
 		}
 		clauses = append(clauses, "scope IN ("+strings.Join(placeholders, ",")+")")
 	} else if f.Scope != "" {
-		clauses = append(clauses, "scope = ?")
-		args = append(args, f.Scope)
+		if f.ScopePrefix {
+			clauses = append(clauses, "(scope = ? OR scope LIKE ? || '/%')")
+			args = append(args, f.Scope, f.Scope)
+		} else {
+			clauses = append(clauses, "scope = ?")
+			args = append(args, f.Scope)
+		}
 	}
 	if f.Status != "" {
 		clauses = append(clauses, "status = ?")
@@ -771,6 +995,32 @@ func (s *SQLiteStore) List(ctx context.Context, f Filter) ([]*Artifact, error) {
 		args = append(args, f.InsertedBefore)
 	}
 
+	// SQL-side label filtering via artifact_labels junction table.
+	// Only applied when scope label expansion is not in use — scope expansion
+	// requires post-scan to match artifacts whose scope carries the label.
+	sqlLabels := len(f.ScopeLabelIndex) == 0
+	if sqlLabels {
+		for _, label := range f.Labels {
+			clauses = append(clauses,
+				"EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
+			args = append(args, label)
+		}
+		if len(f.LabelsOr) > 0 {
+			ph := make([]string, len(f.LabelsOr))
+			for i, label := range f.LabelsOr {
+				ph[i] = "?"
+				args = append(args, label)
+			}
+			clauses = append(clauses,
+				"EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label IN ("+strings.Join(ph, ",")+")")
+		}
+		for _, label := range f.ExcludeLabels {
+			clauses = append(clauses,
+				"NOT EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
+			args = append(args, label)
+		}
+	}
+
 	q := "SELECT " + artifactColumns + " FROM artifacts"
 	if len(clauses) > 0 {
 		q += " WHERE " + strings.Join(clauses, " AND ")
@@ -790,7 +1040,9 @@ func (s *SQLiteStore) List(ctx context.Context, f Filter) ([]*Artifact, error) {
 			slog.WarnContext(ctx, "list: scan row failed, skipping artifact", slog.Any("err", err)) //nolint:sloglint // consistent with existing patterns in this file
 			continue
 		}
-		if !f.MatchLabels(art) {
+		// Post-scan label check: only needed when scope label expansion is active.
+		// When sqlLabels=true the SQL WHERE already filtered correctly.
+		if !sqlLabels && !f.MatchLabels(art) {
 			continue
 		}
 		results = append(results, art)
@@ -798,11 +1050,198 @@ func (s *SQLiteStore) List(ctx context.Context, f Filter) ([]*Artifact, error) {
 	return results, rows.Err()
 }
 
+// ListPage returns a cursor-paginated page of artifacts. The cursor encodes
+// (inserted_at, id) from the last element of the previous page; decoding is
+// done entirely in SQL via WHERE (inserted_at, id) > (cursor_ts, cursor_id).
+// Stable under concurrent inserts: new artifacts appear on later pages only.
+func (s *SQLiteStore) ListPage(ctx context.Context, f Filter) (page Page, err error) { //nolint:gocyclo,funlen,gocritic // complex filter builder; Filter size constrained by Store interface
+	// Delegate to List when pagination is not requested (backward compat).
+	if f.Limit <= 0 && f.Cursor == "" {
+		var arts []*Artifact
+		arts, err = s.List(ctx, f)
+		return Page{Artifacts: arts, Total: len(arts)}, err
+	}
+
+	var clauses []string
+	var args []any
+
+	// Reuse the same WHERE-clause construction as List.
+	if f.IDPrefix != "" {
+		clauses = append(clauses, "id LIKE ?")
+		args = append(args, f.IDPrefix+"%")
+	}
+	if f.Kind != "" {
+		clauses = append(clauses, "kind = ?")
+		args = append(args, f.Kind)
+	}
+	if f.ExcludeKind != "" {
+		clauses = append(clauses, "kind != ?")
+		args = append(args, f.ExcludeKind)
+	}
+	if f.ExcludeStatus != "" {
+		clauses = append(clauses, "status != ?")
+		args = append(args, f.ExcludeStatus)
+	}
+	if f.ExcludeScope != "" {
+		clauses = append(clauses, "scope != ?")
+		args = append(args, f.ExcludeScope)
+	}
+	if len(f.Scopes) > 0 {
+		ph := make([]string, len(f.Scopes))
+		for i, sc := range f.Scopes {
+			ph[i] = "?"
+			args = append(args, sc)
+		}
+		clauses = append(clauses, "scope IN ("+strings.Join(ph, ",")+")")
+	} else if f.Scope != "" {
+		if f.ScopePrefix {
+			clauses = append(clauses, "(scope = ? OR scope LIKE ? || '/%')")
+			args = append(args, f.Scope, f.Scope)
+		} else {
+			clauses = append(clauses, "scope = ?")
+			args = append(args, f.Scope)
+		}
+	}
+	if f.Status != "" {
+		clauses = append(clauses, "status = ?")
+		args = append(args, f.Status)
+	}
+	if f.Parent != "" {
+		clauses = append(clauses, "parent = ?")
+		args = append(args, f.Parent)
+	}
+	if f.Sprint != "" {
+		clauses = append(clauses, "sprint = ?")
+		args = append(args, f.Sprint)
+	}
+	if f.InsertedAfter != "" {
+		clauses = append(clauses, "inserted_at >= ?")
+		args = append(args, f.InsertedAfter)
+	}
+	if f.InsertedBefore != "" {
+		clauses = append(clauses, "inserted_at < ?")
+		args = append(args, f.InsertedBefore)
+	}
+
+	// Label filtering via junction table (scope label expansion not supported in paginated path).
+	for _, label := range f.Labels {
+		clauses = append(clauses, "EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
+		args = append(args, label)
+	}
+	if len(f.LabelsOr) > 0 {
+		ph := make([]string, len(f.LabelsOr))
+		for i, label := range f.LabelsOr {
+			ph[i] = "?"
+			args = append(args, label)
+		}
+		clauses = append(clauses, "EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label IN ("+strings.Join(ph, ",")+")")
+	}
+	for _, label := range f.ExcludeLabels {
+		clauses = append(clauses, "NOT EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
+		args = append(args, label)
+	}
+
+	// Cursor: decode as "inserted_at\x00id" — zero byte separator is safe since
+	// neither field contains null bytes.
+	if f.Cursor != "" {
+		cursorArgs := decodeCursor(f.Cursor)
+		if len(cursorArgs) == 2 {
+			clauses = append(clauses, "(inserted_at, id) > (?, ?)")
+			args = append(args, cursorArgs[0], cursorArgs[1])
+		}
+	}
+
+	whereSQL := ""
+	if len(clauses) > 0 {
+		whereSQL = " WHERE " + strings.Join(clauses, " AND ")
+	}
+
+	// COUNT for Total — same filter minus cursor and limit.
+	var total int
+	countArgs := make([]any, len(args))
+	copy(countArgs, args)
+	if f.Cursor != "" {
+		// Strip the cursor clause from the count (last 2 args + clause).
+		countArgs = countArgs[:len(countArgs)-2]
+	}
+	_ = s.reader.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM artifacts"+whereSQL, countArgs...).Scan(&total)
+
+	// Data query with ORDER BY (inserted_at, id) for stable cursor pagination.
+	q := "SELECT " + artifactColumns + " FROM artifacts" + whereSQL +
+		" ORDER BY inserted_at, id"
+	if f.Limit > 0 {
+		q += fmt.Sprintf(" LIMIT %d", f.Limit+1) //nolint:gosec // limit is an integer, not user string input
+	}
+
+	var rows *sql.Rows
+	rows, err = s.reader.QueryContext(ctx, q, args...)
+	if err != nil {
+		return Page{}, err
+	}
+	defer func() {
+		if cerr := rows.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
+
+	var results []*Artifact
+	for rows.Next() {
+		art, serr := scanArtifactRows(rows)
+		if serr != nil {
+			slog.WarnContext(ctx, "list_page: scan row failed", slog.Any(LogKeyError, serr))
+			continue
+		}
+		results = append(results, art)
+	}
+	if err = rows.Err(); err != nil { //nolint:gocritic // named return err must be assigned, not shadowed
+		return Page{}, err
+	}
+
+	var nextCursor string
+	if f.Limit > 0 && len(results) > f.Limit {
+		results = results[:f.Limit]
+		last := results[len(results)-1]
+		nextCursor = encodeCursor(last.InsertedAt.Format(time.RFC3339Nano), last.ID)
+	}
+
+	return Page{Artifacts: results, NextCursor: nextCursor, Total: total}, nil
+}
+
+// encodeCursor packs (inserted_at, id) into an opaque string.
+func encodeCursor(insertedAt, id string) string {
+	return insertedAt + "\x00" + id
+}
+
+// decodeCursor unpacks the cursor into [insertedAt, id]. Returns nil on invalid input.
+func decodeCursor(cursor string) []string {
+	for i, b := range cursor {
+		if b == 0 {
+			return []string{cursor[:i], cursor[i+1:]}
+		}
+	}
+	return nil
+}
+
 func (s *SQLiteStore) AddEdge(ctx context.Context, e Edge) error {
 	_, err := s.writer.ExecContext(ctx,
-		"INSERT OR IGNORE INTO edges (from_id, relation, to_id) VALUES (?, ?, ?)",
-		e.From, e.Relation, e.To)
+		"INSERT OR IGNORE INTO edges (from_id, relation, to_id, weight) VALUES (?, ?, ?, ?)",
+		e.From, e.Relation, e.To, e.Weight)
 	return err
+}
+
+func (s *SQLiteStore) UpdateEdgeWeight(ctx context.Context, from, to, relation string, weight float64) error {
+	res, err := s.writer.ExecContext(ctx,
+		"UPDATE edges SET weight = ? WHERE from_id = ? AND relation = ? AND to_id = ?",
+		weight, from, relation, to)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("%w: %s -[%s]-> %s", ErrEdgeNotFound, from, relation, to)
+	}
+	return nil
 }
 
 func (s *SQLiteStore) RemoveEdge(ctx context.Context, e Edge) error {
@@ -816,7 +1255,7 @@ func (s *SQLiteStore) Neighbors(ctx context.Context, id, rel string, dir Directi
 	var edges []Edge
 
 	if dir == Outgoing || dir == Both {
-		q := "SELECT from_id, relation, to_id FROM edges WHERE from_id = ?"
+		q := "SELECT from_id, relation, to_id, weight FROM edges WHERE from_id = ?"
 		args := []any{id}
 		if rel != "" {
 			q += " AND relation = ?"
@@ -828,7 +1267,7 @@ func (s *SQLiteStore) Neighbors(ctx context.Context, id, rel string, dir Directi
 		}
 		for rows.Next() {
 			var e Edge
-			if err := rows.Scan(&e.From, &e.Relation, &e.To); err == nil {
+			if err := rows.Scan(&e.From, &e.Relation, &e.To, &e.Weight); err == nil {
 				edges = append(edges, e)
 			}
 		}
@@ -836,7 +1275,7 @@ func (s *SQLiteStore) Neighbors(ctx context.Context, id, rel string, dir Directi
 	}
 
 	if dir == Incoming || dir == Both {
-		q := "SELECT from_id, relation, to_id FROM edges WHERE to_id = ?"
+		q := "SELECT from_id, relation, to_id, weight FROM edges WHERE to_id = ?"
 		args := []any{id}
 		if rel != "" {
 			q += " AND relation = ?"
@@ -848,7 +1287,7 @@ func (s *SQLiteStore) Neighbors(ctx context.Context, id, rel string, dir Directi
 		}
 		for rows.Next() {
 			var e Edge
-			if err := rows.Scan(&e.From, &e.Relation, &e.To); err == nil {
+			if err := rows.Scan(&e.From, &e.Relation, &e.To, &e.Weight); err == nil {
 				edges = append(edges, e)
 			}
 		}
@@ -1171,13 +1610,33 @@ func scanRow(s rowScanner) (*Artifact, error) {
 	return &art, nil
 }
 
+// syncLabelsInTx replaces the artifact_labels rows for art.ID inside the
+// caller's transaction. Called from Put and PutIfVersion after the artifact row
+// is written.
+func syncLabelsInTx(ctx context.Context, tx *sql.Tx, id string, labels []string) error {
+	if _, err := tx.ExecContext(ctx,
+		"DELETE FROM artifact_labels WHERE artifact_id = ?", id); err != nil {
+		return err
+	}
+	for _, label := range labels {
+		if label == "" {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx,
+			"INSERT OR IGNORE INTO artifact_labels (artifact_id, label) VALUES (?, ?)", id, label); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func deleteEdge(ctx context.Context, tx *sql.Tx, from, rel, to string) error {
 	_, err := tx.ExecContext(ctx, "DELETE FROM edges WHERE from_id = ? AND relation = ? AND to_id = ?", from, rel, to)
 	return err
 }
 
 func addEdge(ctx context.Context, tx *sql.Tx, from, rel, to string) error {
-	_, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO edges (from_id, relation, to_id) VALUES (?, ?, ?)", from, rel, to)
+	_, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO edges (from_id, relation, to_id, weight) VALUES (?, ?, ?, 0.0)", from, rel, to)
 	return err
 }
 

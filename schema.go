@@ -890,18 +890,7 @@ func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inher
 				},
 			},
 
-			"rule": {
-				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "RUL", Code: "RUL"},
-				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
-				KindSections:  KindSections{MustSections: []string{"content"}},
-				Children:      []string{},
-			},
-			"skill": {
-				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "SKL", Code: "SKL"},
-				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
-				KindSections:  KindSections{MustSections: []string{"content"}},
-				Children:      []string{},
-			},
+	
 		},
 
 		// Knowledge statuses added on top of the work statuses.

@@ -1,40 +1,39 @@
 package parchment
 
-import (
-	"context"
-	"log/slog"
-)
+import "strings"
 
-// defaultLabelParents is the seed taxonomy: child → parent.
-// Authors write semantic labels (lang:go, domain:auth). The taxonomy lets
-// artifact(list, labels=[lang]) return rules labeled lang:go, lang:ts, etc.
-// Extend by calling PutLabelParent — no code change required.
-var defaultLabelParents = [][2]string{
-	{"lang:go", "lang"},
-	{"lang:ts", "lang"},
-	{"lang:js", "lang"},
-	{"lang:py", "lang"},
-	{"lang:rust", "lang"},
-	{"lang:proto", "lang"},
-	{"lang:java", "lang"},
-	{"lang:c", "lang"},
-	{"lang:cpp", "lang"},
-	{"lang:ruby", "lang"},
-	{"lang:swift", "lang"},
-	{"lang:kotlin", "lang"},
-	{"lang:go-test", "lang:go"},
-	{"lang:go-test", "testing"},
-}
-
-// SeedLabelTaxonomy writes the default label parent relationships.
-// Idempotent — uses INSERT OR IGNORE.
-func SeedLabelTaxonomy(ctx context.Context, s Store) {
-	for _, pair := range defaultLabelParents {
-		if err := s.PutLabelParent(ctx, pair[0], pair[1]); err != nil {
-			slog.WarnContext(ctx, "seed label taxonomy: put failed",
-				slog.String(LogKeyFrom, pair[0]),
-				slog.String(LogKeyTo, pair[1]),
-				slog.Any(LogKeyError, err))
+// ExpandLabels returns each label plus all its dot-separated ancestor prefixes.
+//
+// Labels use dot-separated namespacing to encode hierarchy. A dot in a label
+// name means "is a subtype of". The expansion is derived purely from the name:
+//
+//	"lang.go"       → ["lang.go", "lang"]
+//	"lang.go.test"  → ["lang.go.test", "lang.go", "lang"]
+//	"refactoring"   → ["refactoring"]
+//	"always"        → ["always"]
+//
+// The colon ':' is NOT a hierarchy separator — "source:github.com" is atomic.
+// Only '.' denotes hierarchy. Duplicates in the input are deduplicated.
+func ExpandLabels(labels []string) []string {
+	seen := make(map[string]struct{}, len(labels)*2)
+	for _, label := range labels {
+		if label == "" {
+			continue
+		}
+		seen[label] = struct{}{}
+		// Labels containing ':' are atomic (namespace:value format — e.g. source:github.com).
+		// Only pure dot-notation labels (no colon) encode hierarchy.
+		if strings.ContainsRune(label, ':') {
+			continue
+		}
+		parts := strings.Split(label, ".")
+		for depth := len(parts) - 1; depth >= 1; depth-- {
+			seen[strings.Join(parts[:depth], ".")] = struct{}{}
 		}
 	}
+	out := make([]string, 0, len(seen))
+	for l := range seen {
+		out = append(out, l)
+	}
+	return out
 }

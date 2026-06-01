@@ -101,7 +101,6 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 			// Ensure built-in kinds are seeded as definition artifacts, then
 			// load the schema from the store.
 			SeedDefinitions(context.Background(), s)
-			SeedLabelTaxonomy(context.Background(), s)
 			schema, _ = loadSchema(context.Background(), s)
 		}
 		if schema == nil {

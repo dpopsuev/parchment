@@ -16,14 +16,13 @@ import (
 // Suitable for lightweight consumers (CLI tools, agent workspaces)
 // that don't need SQLite's concurrency or FTS5.
 type MemoryStore struct {
-	mu           sync.RWMutex
-	artifacts    map[string]*Artifact
-	aliases      map[string]string // alias → artifact ID
-	edges        map[string]Edge   // key: "from|rel|to"
-	sequences    map[string]int64
-	scopeKeys    map[string]scopeKeyEntry
-	scopeLabels  map[string][]string
-	labelParents map[string][]string // child → []parent
+	mu          sync.RWMutex
+	artifacts   map[string]*Artifact
+	aliases     map[string]string // alias → artifact ID
+	edges       map[string]Edge   // key: "from|rel|to"
+	sequences   map[string]int64
+	scopeKeys   map[string]scopeKeyEntry
+	scopeLabels map[string][]string
 	// embeddings["artifactID:model"] = vector
 	embeddings map[string][]float32
 	// metrics tracks access counts and timestamps per artifact ID.
@@ -41,67 +40,15 @@ var _ Store = (*MemoryStore)(nil)
 // NewMemoryStore creates an empty in-memory store.
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		artifacts:    make(map[string]*Artifact),
-		aliases:      make(map[string]string),
-		edges:        make(map[string]Edge),
-		sequences:    make(map[string]int64),
-		scopeKeys:    make(map[string]scopeKeyEntry),
-		scopeLabels:  make(map[string][]string),
-		labelParents: make(map[string][]string),
-		embeddings:   make(map[string][]float32),
-		metrics:      make(map[string]ArtifactMetrics),
+		artifacts:   make(map[string]*Artifact),
+		aliases:     make(map[string]string),
+		edges:       make(map[string]Edge),
+		sequences:   make(map[string]int64),
+		scopeKeys:   make(map[string]scopeKeyEntry),
+		scopeLabels: make(map[string][]string),
+		embeddings:  make(map[string][]float32),
+		metrics:     make(map[string]ArtifactMetrics),
 	}
-}
-
-func (m *MemoryStore) PutLabelParent(_ context.Context, child, parent string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, p := range m.labelParents[child] {
-		if p == parent {
-			return nil
-		}
-	}
-	m.labelParents[child] = append(m.labelParents[child], parent)
-	return nil
-}
-
-func (m *MemoryStore) DeleteLabelParent(_ context.Context, child, parent string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	parents := m.labelParents[child]
-	for i, p := range parents {
-		if p == parent {
-			m.labelParents[child] = append(parents[:i], parents[i+1:]...)
-			return nil
-		}
-	}
-	return nil
-}
-
-func (m *MemoryStore) ExpandLabels(_ context.Context, labels []string) ([]string, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	seen := make(map[string]bool, len(labels)*2)
-	queue := make([]string, len(labels))
-	copy(queue, labels)
-	for _, l := range labels {
-		seen[l] = true
-	}
-	for len(queue) > 0 {
-		cur := queue[0]
-		queue = queue[1:]
-		for _, p := range m.labelParents[cur] {
-			if !seen[p] {
-				seen[p] = true
-				queue = append(queue, p)
-			}
-		}
-	}
-	out := make([]string, 0, len(seen))
-	for l := range seen {
-		out = append(out, l)
-	}
-	return out, nil
 }
 
 // RecordAccess increments the access counter for the artifact.

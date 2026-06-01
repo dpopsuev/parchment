@@ -83,15 +83,6 @@ type ScopeStore interface {
 	ListScopeInfo(ctx context.Context) ([]ScopeInfo, error)
 }
 
-// LabelTaxonomyStore handles the label parent hierarchy used for label expansion.
-// A label hierarchy is a DAG: lang:go → lang → behavioral-constraint.
-// ExpandLabels returns the transitive closure upward from the given labels.
-type LabelTaxonomyStore interface {
-	PutLabelParent(ctx context.Context, child, parent string) error
-	DeleteLabelParent(ctx context.Context, child, parent string) error
-	ExpandLabels(ctx context.Context, labels []string) ([]string, error)
-}
-
 // Store is the full persistence interface, composed from role-specific interfaces.
 type Store interface {
 	ArtifactStore
@@ -99,7 +90,6 @@ type Store interface {
 	SequenceStore
 	ScopeStore
 	EventStore
-	LabelTaxonomyStore
 	Close() error
 }
 

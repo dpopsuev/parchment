@@ -193,3 +193,31 @@ func TestVacuum_SkipsNonVacuumableKind(t *testing.T) {
 		}
 	}
 }
+
+func TestVacuum_SkipsProtectedLabelTrait(t *testing.T) {
+	ctx := context.Background()
+	store := parchment.NewMemoryStore()
+	// SeedLabelTraits runs inside New, giving 'rule' the protected trait.
+	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
+
+	old := time.Now().Add(-100 * 24 * time.Hour)
+	_ = store.Put(ctx, &parchment.Artifact{
+		ID:        "RUL-OLD-1",
+		Kind:      "rule",
+		Scope:     "global",
+		Status:    parchment.StatusArchived,
+		Title:     "old rule",
+		Labels:    []string{"rule"},
+		UpdatedAt: old,
+	})
+
+	result, err := proto.Vacuum(ctx, 30, "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range result.Deleted {
+		if id == "RUL-OLD-1" {
+			t.Error("Vacuum deleted a rule artifact — label trait protected must be respected")
+		}
+	}
+}

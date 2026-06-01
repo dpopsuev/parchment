@@ -111,6 +111,50 @@ func unionStrings(a, b []string) []string {
 	return a
 }
 
+// defaultLabelTraits is the seed set of label trait profiles.
+// Users extend this by creating kind=label_definition artifacts at runtime.
+var defaultLabelTraits = []struct {
+	label string
+	trait LabelTrait
+}{
+	{"always", LabelTrait{AlwaysApply: true}},
+	{"rule", LabelTrait{World: "behavioral", EvictionPolicy: "protected"}},
+	{"skill", LabelTrait{World: "behavioral", EvictionPolicy: "protected"}},
+	{"knowledge", LabelTrait{EvictionPolicy: "protected", HalfLifeDays: 180}},
+	{"lang", LabelTrait{World: "behavioral"}},
+}
+
+// SeedLabelTraits writes default label_definition artifacts into SchemaScope.
+// Idempotent — skips any label whose artifact already exists.
+// Called from Protocol.New after loadLabelTraits.
+func SeedLabelTraits(ctx context.Context, s Store) {
+	for _, entry := range defaultLabelTraits {
+		id := "LDEF-" + entry.label
+		if _, err := s.Get(ctx, id); err == nil {
+			continue
+		}
+		b, err := json.Marshal(entry.trait)
+		if err != nil {
+			continue
+		}
+		var extra map[string]any
+		if err := json.Unmarshal(b, &extra); err != nil {
+			continue
+		}
+		if err := s.Put(ctx, &Artifact{
+			ID:     id,
+			Kind:   KindLabelDefinition,
+			Scope:  SchemaScope,
+			Title:  entry.label,
+			Status: StatusActive,
+			Extra:  extra,
+		}); err != nil {
+			slog.WarnContext(ctx, "seed label traits: put failed",
+				slog.String(LogKeyTitle, entry.label), slog.Any(LogKeyError, err))
+		}
+	}
+}
+
 func extraToLabelTrait(extra map[string]any) (LabelTrait, error) {
 	b, err := json.Marshal(extra)
 	if err != nil {

@@ -53,6 +53,31 @@ func TestResolveTrait_AlwaysApply(t *testing.T) {
 	}
 }
 
+func TestSeedLabelTraits_DefaultsLoadViaProtocol(t *testing.T) {
+	t.Parallel()
+	store := parchment.NewMemoryStore()
+	// Protocol.New seeds label traits automatically
+	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
+
+	// 'always' label should have AlwaysApply=true
+	trait := proto.LabelTrait([]string{"always"})
+	if !trait.AlwaysApply {
+		t.Error("default 'always' trait should have AlwaysApply=true")
+	}
+
+	// 'rule' label should be protected
+	trait = proto.LabelTrait([]string{"rule"})
+	if trait.EvictionPolicy != "protected" {
+		t.Errorf("default 'rule' trait eviction_policy = %q, want protected", trait.EvictionPolicy)
+	}
+
+	// 'lang.go' expands to 'lang', which has world=behavioral
+	trait = proto.LabelTrait([]string{"lang.go"})
+	if trait.World != "behavioral" {
+		t.Errorf("lang.go should inherit lang trait world=behavioral, got %q", trait.World)
+	}
+}
+
 func TestResolveTrait_RequiredSectionsUnion(t *testing.T) {
 	t.Parallel()
 	traits := map[string]parchment.LabelTrait{

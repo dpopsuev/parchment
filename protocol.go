@@ -78,6 +78,7 @@ type ProtocolConfig struct {
 type Protocol struct {
 	store            Store
 	schema           *Schema
+	labelTraits      map[string]LabelTrait
 	scopes           []string
 	vocab            []string
 	idFormat         string
@@ -98,8 +99,6 @@ type Protocol struct {
 func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *Protocol {
 	if schema == nil {
 		if s != nil {
-			// Ensure built-in kinds are seeded as definition artifacts, then
-			// load the schema from the store.
 			SeedDefinitions(context.Background(), s)
 			schema, _ = loadSchema(context.Background(), s)
 		}
@@ -111,6 +110,9 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 		vocab = schema.KindNames()
 	}
 	p := &Protocol{store: s, schema: schema, scopes: scopes, vocab: vocab}
+	if s != nil {
+		p.labelTraits = loadLabelTraits(context.Background(), s)
+	}
 	p.idFormat = idc.IDFormat
 	p.idTemplate = idc.IDTemplate
 	p.scopeKeys = idc.ScopeKeys
@@ -134,5 +136,10 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 func (p *Protocol) Schema() *Schema    { return p.schema }
 func (p *Protocol) Store() Store       { return p.store }
 func (p *Protocol) Stash() *StashStore { return p.stash }
+
+// LabelTrait returns the merged trait profile for the given label set.
+func (p *Protocol) LabelTrait(labels []string) LabelTrait {
+	return ResolveTrait(p.labelTraits, labels)
+}
 
 // PromoteStash merges patch into a stashed artifact and creates it.

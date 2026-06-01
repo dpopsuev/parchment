@@ -223,10 +223,11 @@ type EvictionPolicy struct {
 // EvictionCandidate pairs an artifact with its computed tensor and derived label.
 // Returned by DetectEvictionCandidates for human review. Nothing is deleted.
 type EvictionCandidate struct {
-	Artifact *Artifact
-	Tensor   ValueTensor
-	Label    EvictionLabel
-	Reason   string
+	Artifact    *Artifact
+	Tensor      ValueTensor
+	Label       EvictionLabel
+	Reason      string
+	TraitPolicy string // eviction_policy from resolved label traits; "" = normal
 }
 
 // ─── Protocol method ──────────────────────────────────────────────────────────
@@ -261,37 +262,45 @@ func (p *Protocol) DetectEvictionCandidates(ctx context.Context, policy Eviction
 
 	var candidates []EvictionCandidate
 	for _, art := range arts {
-		// Age gate.
 		if policy.MinAgeDays > 0 && art.CreatedAt.After(cutoff) {
 			continue
 		}
-		// Pin annotation — never evict.
 		if isArtifactPinned(art) {
 			continue
 		}
 
-		// Gather metrics.
+		// Label trait check: protected artifacts are never surfaced.
+		trait := ResolveTrait(p.labelTraits, art.Labels)
+		if trait.EvictionPolicy == "protected" {
+			continue
+		}
+
 		var metrics ArtifactMetrics
 		if hasMetrics {
 			metrics, _ = ms.GetMetrics(ctx, art.ID)
 		}
 
-		// Incoming edge count.
 		edges, _ := p.store.Neighbors(ctx, art.ID, "", Incoming)
 
-		tensor := ComputeTensor(art, metrics, len(edges), window)
+		// Per-artifact half-life from trait overrides the policy default.
+		recencyWindow := window
+		if trait.HalfLifeDays > 0 {
+			recencyWindow = trait.HalfLifeDays
+		}
+
+		tensor := ComputeTensor(art, metrics, len(edges), recencyWindow)
 		label := tensor.Label()
 
-		// Only surface candidates, orphaned, and stale.
 		if label == EvictionLabelEvergreen || label == EvictionLabelActive {
 			continue
 		}
 
 		candidates = append(candidates, EvictionCandidate{
-			Artifact: art,
-			Tensor:   tensor,
-			Label:    label,
-			Reason:   evictionReason(label, tensor),
+			Artifact:    art,
+			Tensor:      tensor,
+			Label:       label,
+			Reason:      evictionReason(label, tensor),
+			TraitPolicy: trait.EvictionPolicy,
 		})
 	}
 

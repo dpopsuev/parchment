@@ -75,21 +75,18 @@ func (p *Protocol) Seed(ctx context.Context, dir string) (*SeedResult, error) {
 	return result, nil
 }
 
-// parseTemplateFile reads a markdown file with YAML frontmatter and H2 sections.
-// Frontmatter fields: id, title, scope, labels
-// H2 headings become section name/text pairs.
-func parseTemplateFile(path string) (*Artifact, error) {
+// ParseMDFile reads a markdown file with YAML frontmatter and ## H2 sections
+// into an Artifact. Kind defaults to "note" when not specified in frontmatter.
+// H2 headings become named sections; the full body before the first heading
+// is dropped (frontmatter carries the structured data).
+func ParseMDFile(path string) (*Artifact, error) { //nolint:gosec,gocyclo,cyclop // one case per frontmatter field; complexity is linear not nested
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 	content := strings.ReplaceAll(string(data), "\r\n", "\n")
-	art := &Artifact{
-		Kind:   KindTemplate,
-		Status: StatusActive,
-	}
+	art := &Artifact{Kind: KindNote, Status: StatusActive}
 
-	// Parse frontmatter
 	if strings.HasPrefix(content, "---\n") {
 		end := strings.Index(content[4:], "\n---")
 		if end >= 0 {
@@ -105,16 +102,30 @@ func parseTemplateFile(path string) (*Artifact, error) {
 				switch key {
 				case "id":
 					art.ID = val
+				case "kind":
+					art.Kind = val
 				case "title":
 					art.Title = val
 				case "scope":
 					art.Scope = val
+				case "status":
+					art.Status = val
+				case "priority":
+					art.Priority = val
+				case "parent":
+					art.Parent = val
 				case "labels":
 					val = strings.Trim(val, "[]")
 					for _, l := range strings.Split(val, ",") {
-						l = strings.TrimSpace(l)
-						if l != "" {
+						if l = strings.TrimSpace(strings.Trim(l, `"'`)); l != "" {
 							art.Labels = append(art.Labels, l)
+						}
+					}
+				case "depends_on":
+					val = strings.Trim(val, "[]")
+					for _, d := range strings.Split(val, ",") {
+						if d = strings.TrimSpace(strings.Trim(d, `"'`)); d != "" {
+							art.DependsOn = append(art.DependsOn, d)
 						}
 					}
 				}
@@ -122,18 +133,10 @@ func parseTemplateFile(path string) (*Artifact, error) {
 		}
 	}
 
-	if art.ID == "" {
-		// Derive ID from filename
-		base := strings.TrimSuffix(filepath.Base(path), ".md")
-		art.ID = "TPL-SEED-" + strings.ToUpper(strings.ReplaceAll(base, "-", "_"))
-	}
 	if art.Title == "" {
-		base := strings.TrimSuffix(filepath.Base(path), ".md")
-		art.Title = strings.ReplaceAll(base, "-", " ") + " Template"
+		art.Title = strings.ReplaceAll(strings.TrimSuffix(filepath.Base(path), ".md"), "-", " ")
 	}
 
-	// Parse H2 sections
-	art.Sections = append(art.Sections, Section{Name: "content", Text: content})
 	scanner := bufio.NewScanner(strings.NewReader(content))
 	var currentSection string
 	var currentText strings.Builder
@@ -160,6 +163,25 @@ func parseTemplateFile(path string) (*Artifact, error) {
 		})
 	}
 
+	return art, nil
+}
+
+// parseTemplateFile wraps ParseMDFile for backward compatibility within seed.go.
+func parseTemplateFile(path string) (*Artifact, error) {
+	art, err := ParseMDFile(path)
+	if err != nil {
+		return nil, err
+	}
+	art.Kind = KindTemplate
+	art.Status = StatusActive
+	if art.ID == "" {
+		base := strings.TrimSuffix(filepath.Base(path), ".md")
+		art.ID = "TPL-SEED-" + strings.ToUpper(strings.ReplaceAll(base, "-", "_"))
+	}
+	if art.Title == "" {
+		base := strings.TrimSuffix(filepath.Base(path), ".md")
+		art.Title = strings.ReplaceAll(base, "-", " ") + " Template"
+	}
 	return art, nil
 }
 

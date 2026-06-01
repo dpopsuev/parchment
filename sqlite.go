@@ -111,6 +111,13 @@ CREATE TABLE IF NOT EXISTS artifact_properties (
 );
 CREATE INDEX IF NOT EXISTS idx_artifact_properties_key ON artifact_properties(key, value_text);
 
+CREATE TABLE IF NOT EXISTS label_parents (
+	child  TEXT NOT NULL,
+	parent TEXT NOT NULL,
+	PRIMARY KEY (child, parent)
+);
+CREATE INDEX IF NOT EXISTS idx_label_parents_parent ON label_parents(parent);
+
 CREATE VIRTUAL TABLE IF NOT EXISTS artifacts_fts USING fts5(
 	id, title, goal, sections,
 	content='artifacts',
@@ -2000,3 +2007,70 @@ func (s *SQLiteStore) BulkGetMetrics(ctx context.Context, ids []string) (map[str
 
 // Compile-time MetricsStore verification.
 var _ MetricsStore = (*SQLiteStore)(nil)
+
+// --- LabelTaxonomyStore ---
+
+func (s *SQLiteStore) PutLabelParent(ctx context.Context, child, parent string) error {
+	_, err := s.writer.ExecContext(ctx,
+		`INSERT OR IGNORE INTO label_parents (child, parent) VALUES (?, ?)`,
+		child, parent)
+	return err
+}
+
+func (s *SQLiteStore) DeleteLabelParent(ctx context.Context, child, parent string) error {
+	_, err := s.writer.ExecContext(ctx,
+		`DELETE FROM label_parents WHERE child = ? AND parent = ?`,
+		child, parent)
+	return err
+}
+
+func (s *SQLiteStore) ExpandLabels(ctx context.Context, labels []string) ([]string, error) {
+	if len(labels) == 0 {
+		return labels, nil
+	}
+	// Build JSON array for json_each binding.
+	labelsJSON := `["` + joinLabels(labels) + `"]`
+	rows, err := s.reader.QueryContext(ctx, `
+		WITH RECURSIVE expanded(label) AS (
+			SELECT value FROM json_each(?)
+			UNION
+			SELECT lp.parent
+			FROM label_parents lp
+			JOIN expanded e ON lp.child = e.label
+		)
+		SELECT DISTINCT label FROM expanded`, labelsJSON)
+	if err != nil {
+		return labels, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []string
+	for rows.Next() {
+		var l string
+		if err := rows.Scan(&l); err != nil {
+			continue
+		}
+		out = append(out, l)
+	}
+	if err := rows.Err(); err != nil {
+		return labels, err
+	}
+	if len(out) == 0 {
+		return labels, nil
+	}
+	return out, nil
+}
+
+func joinLabels(labels []string) string {
+	escaped := make([]string, len(labels))
+	for i, l := range labels {
+		escaped[i] = strings.ReplaceAll(l, `"`, `\"`)
+	}
+	result := ""
+	for i, l := range escaped {
+		if i > 0 {
+			result += `","` //nolint:gocritic // string concat intentional — no fmt needed
+		}
+		result += l
+	}
+	return result
+}

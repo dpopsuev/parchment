@@ -396,8 +396,14 @@ func (s *Schema) ValidPriority(priority string) bool {
 	return false
 }
 
+// ChildrenWildcard is the sentinel value in KindDef.Children meaning "any
+// artifact kind may be a child". User-defined kinds default to this when
+// Children is not specified and the kind is not marked as a leaf.
+const ChildrenWildcard = "*"
+
 // ValidChild checks whether childKind can be a direct child of parentKind.
 // Returns ("", true) if allowed. Kinds with nil Children are unconstrained.
+// Kinds with Children == ["*"] accept any child kind (open nesting).
 // Kinds with an explicit empty Children slice are leaves (no children allowed).
 func (s *Schema) ValidChild(parentKind, childKind string) (string, bool) {
 	kd, ok := s.Kinds[parentKind]
@@ -408,7 +414,7 @@ func (s *Schema) ValidChild(parentKind, childKind string) (string, bool) {
 		return "", true
 	}
 	for _, c := range kd.Children {
-		if c == childKind {
+		if c == ChildrenWildcard || c == childKind {
 			return "", true
 		}
 	}
@@ -525,6 +531,9 @@ func (s *Schema) Lint() []LintResult {
 
 		if kd.Children != nil {
 			for _, ch := range kd.Children {
+				if ch == ChildrenWildcard {
+					continue // wildcard: any kind allowed, no validation needed
+				}
 				if _, ok := s.Kinds[ch]; !ok {
 					results = append(results, LintResult{"error",
 						fmt.Sprintf("kind %q: children reference unknown kind %q", name, ch)})
@@ -729,6 +738,22 @@ func DefaultSchema() *Schema {
 			"config": {
 				KindIdentity: KindIdentity{Prefix: "CFG", Code: "CFG", Protected: true, Family: FamilySupport},
 				Children:     []string{},
+			},
+			// section and paragraph enable the recursive artifact model.
+			// A section is a named region within a parent artifact — it can
+			// contain sub-sections or paragraphs. Children=[*] means any kind
+			// may be nested, giving users full control over depth.
+			"section": {
+				KindIdentity:  KindIdentity{Prefix: "SEC", Code: "SEC", Family: FamilySupport},
+				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
+				Children:      []string{ChildrenWildcard},
+			},
+			// paragraph is the floor of the recursive model for users who
+			// need block-level graph identity. Children=[] makes it a leaf.
+			"paragraph": {
+				KindIdentity:  KindIdentity{Prefix: "PAR", Code: "PAR", Family: FamilySupport},
+				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
+				Children:      []string{},
 			},
 			"mirror": {
 				KindIdentity: KindIdentity{Prefix: "MIR", Code: "MIR", Protected: true, Family: FamilySupport, SkipGuards: true},

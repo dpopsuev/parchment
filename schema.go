@@ -911,6 +911,25 @@ func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inher
 					Outgoing: []string{RelRemembers},
 				},
 			},
+
+			// rule: a behavioral constraint or convention injected into agent context.
+			// Synced from lexicon sources. Always-apply rules have label "always".
+			"rule": {
+				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "RUL", Code: "RUL"},
+				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
+				KindSections:  KindSections{MustSections: []string{"content"}},
+				Children:      []string{},
+			},
+
+			// skill: an invocable capability description for agents.
+			// Synced from lexicon sources. Invoked by name when the agent
+			// recognizes a task matching the skill's trigger description.
+			"skill": {
+				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "SKL", Code: "SKL"},
+				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
+				KindSections:  KindSections{MustSections: []string{"content"}},
+				Children:      []string{},
+			},
 		},
 
 		// Knowledge statuses added on top of the work statuses.

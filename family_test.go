@@ -7,7 +7,7 @@ import (
 
 // TestKindDef_Family verifies the Family field is present on KindDef.
 func TestKindDef_Family(t *testing.T) {
-	kd := KindDef{Prefix: "TST", Family: FamilyIntent}
+	kd := KindDef{KindIdentity: KindIdentity{Prefix: "TST", Family: FamilyIntent}}
 	if kd.Family != FamilyIntent {
 		t.Errorf("KindDef.Family = %q, want %q", kd.Family, FamilyIntent)
 	}

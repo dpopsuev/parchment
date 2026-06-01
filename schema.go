@@ -23,37 +23,51 @@ type KindRelations struct {
 }
 
 // KindDef describes a known artifact kind.
-type KindDef struct {
-	Family string `json:"family,omitempty" yaml:"family,omitempty"` // intent | effort | knowledge | support
-	Prefix           string   `json:"prefix" yaml:"prefix"`
-	Code             string   `json:"code,omitempty" yaml:"code,omitempty"`
-	Protected        bool     `json:"protected,omitempty" yaml:"protected,omitempty"`
-	DefaultStatus    string   `json:"default_status,omitempty" yaml:"default_status,omitempty"`
+// KindIdentity holds the naming and access flags for a kind.
+type KindIdentity struct {
+	Family     string `json:"family,omitempty" yaml:"family,omitempty"` // intent | effort | knowledge | support
+	Prefix     string `json:"prefix" yaml:"prefix"`
+	Code       string `json:"code,omitempty" yaml:"code,omitempty"`
+	Protected  bool   `json:"protected,omitempty" yaml:"protected,omitempty"`
+	SkipGuards bool   `json:"skip_guards,omitempty" yaml:"skip_guards,omitempty"`
+	// Vacuumable controls whether Vacuum may permanently delete this kind's
+	// archived artifacts. False by default — knowledge kinds and protected
+	// kinds are never vacuumed. Set true on work kinds (task, bug) where
+	// old archived artifacts carry little long-term value.
+	Vacuumable bool `json:"vacuumable,omitempty" yaml:"vacuumable,omitempty"`
+}
+
+// KindLifecycle holds status, transition, and automation flags for a kind.
+type KindLifecycle struct {
+	DefaultStatus                string              `json:"default_status,omitempty" yaml:"default_status,omitempty"`
+	ActiveStatus                 string              `json:"active_status,omitempty" yaml:"active_status,omitempty"`
+	TriggerStatus                string              `json:"trigger_status,omitempty" yaml:"trigger_status,omitempty"`
+	IsGoalKind                   bool                `json:"is_goal_kind,omitempty" yaml:"is_goal_kind,omitempty"`
+	TrackInMotd                  bool                `json:"track_in_motd,omitempty" yaml:"track_in_motd,omitempty"`
+	ActivationRequiresSections   bool                `json:"activation_requires_sections,omitempty" yaml:"activation_requires_sections,omitempty"`
+	AutoArchiveOnJustifyComplete bool                `json:"auto_archive_on_justify_complete,omitempty" yaml:"auto_archive_on_justify_complete,omitempty"`
+	Transitions                  map[string][]string `json:"transitions,omitempty" yaml:"transitions,omitempty"`
+	CompletionGates              []string            `json:"completion_gates,omitempty" yaml:"completion_gates,omitempty"`
+}
+
+// KindSections defines which sections are required, recommended, or allowed.
+type KindSections struct {
 	ExpectedSections []string `json:"expected_sections,omitempty" yaml:"expected_sections,omitempty"`
 	MustSections     []string `json:"must_sections,omitempty" yaml:"must_sections,omitempty"`
 	ShouldSections   []string `json:"should_sections,omitempty" yaml:"should_sections,omitempty"`
 	CouldSections    []string `json:"could_sections,omitempty" yaml:"could_sections,omitempty"`
 	RequiredFields   []string `json:"required_fields,omitempty" yaml:"required_fields,omitempty"`
-	IsGoalKind       bool     `json:"is_goal_kind,omitempty" yaml:"is_goal_kind,omitempty"`
-	ActiveStatus     string   `json:"active_status,omitempty" yaml:"active_status,omitempty"`
-	TrackInMotd      bool     `json:"track_in_motd,omitempty" yaml:"track_in_motd,omitempty"`
+}
 
-	CompletionGates []string `json:"completion_gates,omitempty" yaml:"completion_gates,omitempty"`
-
-	TriggerStatus                string `json:"trigger_status,omitempty" yaml:"trigger_status,omitempty"`
-	ActivationRequiresSections   bool   `json:"activation_requires_sections,omitempty" yaml:"activation_requires_sections,omitempty"`
-	AutoArchiveOnJustifyComplete bool   `json:"auto_archive_on_justify_complete,omitempty" yaml:"auto_archive_on_justify_complete,omitempty"`
-
-	Transitions map[string][]string `json:"transitions,omitempty" yaml:"transitions,omitempty"`
-
-	Relations  KindRelations `json:"relations,omitempty" yaml:"relations,omitempty"`
-	Children   []string      `json:"children,omitempty" yaml:"children,omitempty"`
-	SkipGuards bool          `json:"skip_guards,omitempty" yaml:"skip_guards,omitempty"`
-	// Vacuumable controls whether Vacuum may permanently delete this kind's
-	// archived artifacts. False by default — knowledge kinds and protected
-	// kinds are never vacuumed. Set true on work kinds (task, bug) where
-	// old archived artifacts carry little long-term value.
-	Vacuumable bool          `json:"vacuumable,omitempty" yaml:"vacuumable,omitempty"`
+// KindDef is the full definition of a kind. Embedding promotes all fields to
+// the top level so JSON/YAML serialization is identical to a flat struct —
+// existing Artifact.Extra values round-trip without migration.
+type KindDef struct {
+	KindIdentity
+	KindLifecycle
+	KindSections
+	Relations KindRelations `json:"relations,omitempty" yaml:"relations,omitempty"`
+	Children  []string      `json:"children,omitempty" yaml:"children,omitempty"`
 }
 
 // Schema is the single source of truth for the Scribe data model.
@@ -621,119 +635,122 @@ func (s *Schema) MergeDefaults(defaults *Schema) {
 func DefaultSchema() *Schema {
 	return &Schema{
 		Kinds: map[string]KindDef{
-			"goal": {Prefix: "GOAL", Code: "GOL", Protected: true, Vacuumable: true, Family: FamilyEffort,
-				IsGoalKind: true, ActiveStatus: "current", TrackInMotd: true,
-				AutoArchiveOnJustifyComplete: true,
-				Children:                     []string{"task", "spec", "bug", "need", "ref", "doc", "decision"},
+			"goal": {
+				KindIdentity: KindIdentity{Prefix: "GOAL", Code: "GOL", Protected: true, Vacuumable: true, Family: FamilyEffort},
+				KindLifecycle: KindLifecycle{IsGoalKind: true, ActiveStatus: "current", TrackInMotd: true, AutoArchiveOnJustifyComplete: true},
+				Children: []string{"task", "spec", "bug", "need", "ref", "doc", "decision"},
 				Relations: KindRelations{
 					Incoming: []string{RelParentOf},
 					Outgoing: []string{RelSatisfies},
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"task": {Prefix: "TASK", Code: "TSK", Family: FamilyEffort, Vacuumable: true,
-				TriggerStatus:              "complete",
-				ActivationRequiresSections: true,
-				MustSections:               []string{"context"},
-				ShouldSections:             []string{"checklist", "acceptance"},
-				CouldSections:              []string{"current_architecture", "desired_architecture"},
-				RequiredFields:             []string{FieldPriority},
-				Children:                   []string{},
-				Transitions:                taskTransitions(),
+			"task": {
+				KindIdentity:  KindIdentity{Prefix: "TASK", Code: "TSK", Family: FamilyEffort, Vacuumable: true},
+				KindLifecycle: KindLifecycle{TriggerStatus: "complete", ActivationRequiresSections: true, Transitions: taskTransitions()},
+				KindSections:  KindSections{MustSections: []string{"context"}, ShouldSections: []string{"checklist", "acceptance"}, CouldSections: []string{"current_architecture", "desired_architecture"}, RequiredFields: []string{FieldPriority}},
+				Children:      []string{},
 				Relations: KindRelations{
 					Outgoing: []string{RelImplements, RelDependsOn, RelSatisfies},
 					Targets:  map[string][]string{RelImplements: {"spec", "bug"}, RelSatisfies: {"template"}},
 				},
 			},
-			"spec": {Prefix: "SPEC", Code: "SPC", Protected: true, Family: FamilyIntent, Transitions: intentTransitions(),
-				ActivationRequiresSections: true,
-				MustSections:               []string{"problem"},
-				ShouldSections:             []string{"decision", "acceptance"},
-				CouldSections:              []string{"architecture", "current_architecture", "desired_architecture"},
-				Children:                   []string{},
+			"spec": {
+				KindIdentity:  KindIdentity{Prefix: "SPEC", Code: "SPC", Protected: true, Family: FamilyIntent},
+				KindLifecycle: KindLifecycle{ActivationRequiresSections: true, Transitions: intentTransitions()},
+				KindSections:  KindSections{MustSections: []string{"problem"}, ShouldSections: []string{"decision", "acceptance"}, CouldSections: []string{"architecture", "current_architecture", "desired_architecture"}},
+				Children:      []string{},
 				Relations: KindRelations{
 					Incoming: []string{RelImplements, RelJustifies},
 					Outgoing: []string{RelSatisfies},
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"bug": {Prefix: "BUG", Code: "BUG", Protected: true, Family: FamilyIntent, Vacuumable: true, Transitions: intentTransitions(),
-				MustSections:   []string{"observed"},
-				ShouldSections: []string{"reproduction"},
-				Children:       []string{},
+			"bug": {
+				KindIdentity:  KindIdentity{Prefix: "BUG", Code: "BUG", Protected: true, Family: FamilyIntent, Vacuumable: true},
+				KindLifecycle: KindLifecycle{Transitions: intentTransitions()},
+				KindSections:  KindSections{MustSections: []string{"observed"}, ShouldSections: []string{"reproduction"}},
+				Children:      []string{},
 				Relations: KindRelations{
 					Incoming: []string{RelImplements},
 					Outgoing: []string{RelSatisfies},
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"need": {Prefix: "NEED", Code: "NED", Protected: true, Family: FamilyIntent, Transitions: intentTransitions(),
-				MustSections:   []string{"problem"},
-				ShouldSections: []string{"value", "acceptance"},
-				Children:       []string{},
+			"need": {
+				KindIdentity:  KindIdentity{Prefix: "NEED", Code: "NED", Protected: true, Family: FamilyIntent},
+				KindLifecycle: KindLifecycle{Transitions: intentTransitions()},
+				KindSections:  KindSections{MustSections: []string{"problem"}, ShouldSections: []string{"value", "acceptance"}},
+				Children:      []string{},
 				Relations: KindRelations{
 					Outgoing: []string{RelJustifies, RelSatisfies},
 					Targets:  map[string][]string{RelJustifies: {"spec"}, RelSatisfies: {"template"}},
 				},
 			},
-			"ref": {Prefix: "REF", Code: "REF", Protected: true, Family: FamilySupport,
-				ShouldSections: []string{"summary", "source"},
-				Children:       []string{},
+			"ref": {
+				KindIdentity: KindIdentity{Prefix: "REF", Code: "REF", Protected: true, Family: FamilySupport},
+				KindSections: KindSections{ShouldSections: []string{"summary", "source"}},
+				Children:     []string{},
 				Relations: KindRelations{
 					Outgoing:         []string{RelDocuments, RelSatisfies},
 					ExpectedOutgoing: []string{RelDocuments},
 					Targets:          map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"doc": {Prefix: "DOC", Code: "DOC", Protected: true, Family: FamilySupport,
-				ShouldSections: []string{"overview"},
-				CouldSections:  []string{"content"},
-				Children:       []string{},
+			"doc": {
+				KindIdentity: KindIdentity{Prefix: "DOC", Code: "DOC", Protected: true, Family: FamilySupport},
+				KindSections: KindSections{ShouldSections: []string{"overview"}, CouldSections: []string{"content"}},
+				Children:     []string{},
 				Relations: KindRelations{
 					Outgoing:         []string{RelDocuments, RelSatisfies},
 					ExpectedOutgoing: []string{RelDocuments},
 					Targets:          map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"decision": {Prefix: "ADR", Code: "ADR", Protected: true, Family: FamilyIntent, Transitions: intentTransitions(), Children: []string{},
+			"decision": {
+				KindIdentity:  KindIdentity{Prefix: "ADR", Code: "ADR", Protected: true, Family: FamilyIntent},
+				KindLifecycle: KindLifecycle{Transitions: intentTransitions()},
+				Children:      []string{},
 				Relations: KindRelations{
 					Outgoing: []string{RelSatisfies},
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"campaign": {Prefix: "CMP", Code: "CMP", Protected: true, Family: FamilyEffort,
-				ActiveStatus: "active", TrackInMotd: true,
-				MustSections:   []string{"mission"},
-				ShouldSections: []string{"goals", "success_criteria"},
-				Children:       []string{"goal"},
+			"campaign": {
+				KindIdentity:  KindIdentity{Prefix: "CMP", Code: "CMP", Protected: true, Family: FamilyEffort},
+				KindLifecycle: KindLifecycle{ActiveStatus: "active", TrackInMotd: true},
+				KindSections:  KindSections{MustSections: []string{"mission"}, ShouldSections: []string{"goals", "success_criteria"}},
+				Children:      []string{"goal"},
 				Relations: KindRelations{
 					Outgoing: []string{RelParentOf, RelSatisfies},
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
 			},
-			"config": {Prefix: "CFG", Code: "CFG", Protected: true, Family: FamilySupport,
-				Children: []string{},
+			"config": {
+				KindIdentity: KindIdentity{Prefix: "CFG", Code: "CFG", Protected: true, Family: FamilySupport},
+				Children:     []string{},
 			},
-			"mirror": {Prefix: "MIR", Code: "MIR", Protected: true, Family: FamilySupport,
-				SkipGuards: true,
-				Children:   []string{},
+			"mirror": {
+				KindIdentity: KindIdentity{Prefix: "MIR", Code: "MIR", Protected: true, Family: FamilySupport, SkipGuards: true},
+				Children:     []string{},
 			},
-		"template": {Prefix: "TPL", Code: "TPL", Protected: true, Family: FamilySupport,
-			MustSections: []string{"content"},
-			Children:     []string{},
-			Relations: KindRelations{
-				Incoming: []string{RelSatisfies},
+			"template": {
+				KindIdentity: KindIdentity{Prefix: "TPL", Code: "TPL", Protected: true, Family: FamilySupport},
+				KindSections: KindSections{MustSections: []string{"content"}},
+				Children:     []string{},
+				Relations: KindRelations{
+					Incoming: []string{RelSatisfies},
+				},
+			},
+			// definition is the meta-kind. Every other kind is stored as a definition
+			// artifact in SchemaScope. This is the only compiled-in kind — all others
+			// are loaded from the store at startup via loadSchema.
+			KindDefinition: {
+				KindIdentity:  KindIdentity{Prefix: "DEF", Code: "DEF", Protected: true, Family: FamilySupport, SkipGuards: true},
+				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
+				Children:      []string{},
 			},
 		},
-		// definition is the meta-kind. Every other kind is stored as a definition
-		// artifact in SchemaScope. This is the only compiled-in kind — all others
-		// are loaded from the store at startup via loadSchema.
-		KindDefinition: {Prefix: "DEF", Code: "DEF", Protected: true, Family: FamilySupport,
-			SkipGuards:    true,
-			DefaultStatus: StatusActive,
-			Children:      []string{},
-		},
-	},
 		Statuses: []string{
 			"draft", "active", "current", "open",
 			"mature", "allocated", "in_progress", "in_review",
@@ -821,17 +838,9 @@ func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inher
 			// note: the core knowledge unit.
 			// Lifecycle mirrors Zettelkasten: fleeting capture → active processing → evergreen permanence.
 			KindNote: {
-				Family:        FamilyKnowledge,
-				Prefix:        "NOT",
-				Code:          "n",
-				DefaultStatus: StatusFleeting,
-				ShouldSections: []string{"body", "connections", "sources"},
-				Transitions: map[string][]string{
-					StatusFleeting:  {StatusActive, StatusEvergreen, StatusArchived},
-					StatusActive:    {StatusEvergreen, StatusFleeting, StatusArchived},
-					StatusEvergreen: {StatusActive, StatusArchived},
-					StatusArchived:  {},
-				},
+				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "NOT", Code: "n"},
+				KindLifecycle: KindLifecycle{DefaultStatus: StatusFleeting, Transitions: map[string][]string{StatusFleeting: {StatusActive, StatusEvergreen, StatusArchived}, StatusActive: {StatusEvergreen, StatusFleeting, StatusArchived}, StatusEvergreen: {StatusActive, StatusArchived}, StatusArchived: {}}},
+				KindSections:  KindSections{ShouldSections: []string{"body", "connections", "sources"}},
 				Relations: KindRelations{
 					Outgoing: []string{RelCites, RelElaborates, RelSynthesises, RelDocuments},
 					Incoming: []string{RelSynthesises, RelRemembers, RelContradicts},
@@ -839,54 +848,40 @@ func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inher
 			},
 
 			// journal: daily dated entry. One per day, idempotent create.
-			// Equivalent to Obsidian daily note / Logseq journal page.
 			KindJournal: {
-				Family:        FamilyKnowledge,
-				Prefix:        "JRN",
-				Code:          "j",
-				DefaultStatus: StatusActive,
-				ShouldSections: []string{"body"},
+				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "JRN", Code: "j"},
+				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
+				KindSections:  KindSections{ShouldSections: []string{"body"}},
 				Relations: KindRelations{
 					Outgoing: []string{RelCites, RelDocuments},
 				},
 			},
 
 			// source: ingested external material.
-			// URL, book, article, podcast — the raw input agents process.
 			KindSource: {
-				Family:        FamilyKnowledge,
-				Prefix:        "SRC",
-				Code:          "s",
-				DefaultStatus: StatusActive,
-				MustSections:  []string{"summary"},
-				ShouldSections: []string{"key-insights", "provenance"},
+				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "SRC", Code: "s"},
+				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
+				KindSections:  KindSections{MustSections: []string{"summary"}, ShouldSections: []string{"key-insights", "provenance"}},
 				Relations: KindRelations{
 					Incoming: []string{RelCites},
 				},
 			},
 
 			// concept: atomic definition or idea.
-			// Zettelkasten atomic note: one idea, fully expressed, linked.
 			KindConcept: {
-				Family:        FamilyKnowledge,
-				Prefix:        "CON",
-				Code:          "c",
-				DefaultStatus: StatusActive,
-				ShouldSections: []string{"definition", "principles", "examples", "applications"},
+				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "CON", Code: "c"},
+				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
+				KindSections:  KindSections{ShouldSections: []string{"definition", "principles", "examples", "applications"}},
 				Relations: KindRelations{
 					Incoming: []string{RelElaborates},
 				},
 			},
 
 			// context: agent's persistent memory about a person, project, or workflow.
-			// Protected — agents write, humans read. Survives session boundaries.
 			KindContext: {
-				Family:        FamilyKnowledge,
-				Prefix:        "CTX",
-				Code:          "x",
-				DefaultStatus: StatusActive,
-				Protected:     true,
-				ShouldSections: []string{"content", "scope", "confidence"},
+				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "CTX", Code: "x", Protected: true},
+				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
+				KindSections:  KindSections{ShouldSections: []string{"content", "scope", "confidence"}},
 				Relations: KindRelations{
 					Outgoing: []string{RelRemembers},
 				},

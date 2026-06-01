@@ -110,11 +110,8 @@ func TestProperty_Schema_TransitionRejectsUnknown(t *testing.T) {
 	s := &Schema{
 		Kinds: map[string]KindDef{
 			"workflow": {
-				Prefix: "WFL",
-				Transitions: map[string][]string{
-					"draft":  {"active"},
-					"active": {"complete"},
-				},
+				KindIdentity:  KindIdentity{Prefix: "WFL"},
+				KindLifecycle: KindLifecycle{Transitions: map[string][]string{"draft": {"active"}, "active": {"complete"}}},
 			},
 		},
 		Statuses: []string{"draft", "active", "complete"},

@@ -739,17 +739,11 @@ func DefaultSchema() *Schema {
 				KindIdentity: KindIdentity{Prefix: "CFG", Code: "CFG", Protected: true, Family: FamilySupport},
 				Children:     []string{},
 			},
-			// section and paragraph enable the recursive artifact model.
-			// A section is a named region within a parent artifact — it can
-			// contain sub-sections or paragraphs. Children=[*] means any kind
-			// may be nested, giving users full control over depth.
 			"section": {
 				KindIdentity:  KindIdentity{Prefix: "SEC", Code: "SEC", Family: FamilySupport},
 				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
 				Children:      []string{ChildrenWildcard},
 			},
-			// paragraph is the floor of the recursive model for users who
-			// need block-level graph identity. Children=[] makes it a leaf.
 			"paragraph": {
 				KindIdentity:  KindIdentity{Prefix: "PAR", Code: "PAR", Family: FamilySupport},
 				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
@@ -838,25 +832,9 @@ func taskTransitions() map[string][]string {
 	}
 }
 
-// KnowledgeSchema returns a schema that extends defaultSchema with the
-// knowledge layer: note/journal/source/concept/context kinds,
-// fleeting/evergreen statuses, and cites/elaborates/contradicts/
-// synthesises/remembers relations.
-//
-// It is additive — all work kinds (task, spec, bug, etc.) are preserved.
-// Pass this to Protocol.New() in Scribe to enable both work tracking and
-// knowledge management in the same store.
-//
-// Design rationale (from Zettelkasten / PKM research):
-//
-//	fleeting  = quick capture, unprocessed ("take the note, process later")
-//	evergreen = mature, permanent, well-connected ("this idea has landed")
-//
-// Lifecycle: fleeting → active → evergreen (or directly fleeting → evergreen)
-// Evergreen is NOT readonly — permanent notes remain editable in Zettelkasten.
-// KnowledgeSchema is exported for backward compatibility with Scribe config
-// and for SeedDefinitions. Will be made private once all external callers
-// migrate to loadSchema (via Protocol.New with nil schema).
+// KnowledgeSchema extends DefaultSchema with knowledge kinds (note, journal,
+// source, concept, context, rule, skill), fleeting/evergreen statuses, and
+// knowledge relations. Additive — all work kinds are preserved.
 func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inherently long
 	s := &Schema{
 		Kinds: map[string]KindDef{
@@ -912,18 +890,12 @@ func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inher
 				},
 			},
 
-			// rule: a behavioral constraint or convention injected into agent context.
-			// Synced from lexicon sources. Always-apply rules have label "always".
 			"rule": {
 				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "RUL", Code: "RUL"},
 				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
 				KindSections:  KindSections{MustSections: []string{"content"}},
 				Children:      []string{},
 			},
-
-			// skill: an invocable capability description for agents.
-			// Synced from lexicon sources. Invoked by name when the agent
-			// recognizes a task matching the skill's trigger description.
 			"skill": {
 				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "SKL", Code: "SKL"},
 				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
@@ -941,25 +913,14 @@ func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inher
 		},
 	}
 
-	// Merge: knowledge kinds + relations + statuses layer on top of the full
-	// work schema. MergeDefaults fills gaps; we extend the slices manually
-	// for statuses and relations since MergeDefaults only fills empty slices.
 	base := DefaultSchema()
-
-	// Merge kinds: knowledge kinds take precedence, work kinds fill gaps.
 	for k, v := range base.Kinds {
 		if _, exists := s.Kinds[k]; !exists {
 			s.Kinds[k] = v
 		}
 	}
-
-	// Extend statuses: prepend knowledge statuses before work statuses.
 	s.Statuses = append(s.Statuses, base.Statuses...)
-
-	// Extend relations: append knowledge relations to work relations.
 	s.Relations = append(base.Relations, s.Relations...)
-
-	// Inherit the rest from base.
 	s.TerminalStatuses = base.TerminalStatuses
 	s.ReadonlyStatuses = base.ReadonlyStatuses
 	s.Guards = base.Guards

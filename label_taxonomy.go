@@ -2,18 +2,8 @@ package parchment
 
 import "strings"
 
-// ExpandLabels returns each label plus all its dot-separated ancestor prefixes.
-//
-// Labels use dot-separated namespacing to encode hierarchy. A dot in a label
-// name means "is a subtype of". The expansion is derived purely from the name:
-//
-//	"lang.go"       → ["lang.go", "lang"]
-//	"lang.go.test"  → ["lang.go.test", "lang.go", "lang"]
-//	"refactoring"   → ["refactoring"]
-//	"always"        → ["always"]
-//
-// The colon ':' is NOT a hierarchy separator — "source:github.com" is atomic.
-// Only '.' denotes hierarchy. Duplicates in the input are deduplicated.
+// ExpandLabels returns each label plus all dot-separated ancestor prefixes.
+// Labels containing ':' are atomic — "source:github.com" does not expand.
 func ExpandLabels(labels []string) []string {
 	seen := make(map[string]struct{}, len(labels)*2)
 	for _, label := range labels {

@@ -1020,153 +1020,12 @@ func (s *SQLiteStore) cleanDanglingRefs(ctx context.Context, tx *sql.Tx, deleted
 	return nil
 }
 
-func (s *SQLiteStore) List(ctx context.Context, f Filter) ([]*Artifact, error) { //nolint:gocyclo,gocritic // pre-existing complexity, moved from protocol/; hugeParam: value semantics intentional
+// buildWhereClause constructs the WHERE clause and bound args from a Filter.
+// Returns (clauses, args, sqlLabels) where sqlLabels=true means label filtering
+// was pushed to SQL; false means post-scan filtering is required.
+func buildWhereClause(f Filter) ([]string, []any, bool) { //nolint:cyclop,gocyclo,gocritic // hugeParam: value semantics match List/ListPage callers; complexity linear not nested
 	var clauses []string
 	var args []any
-	if f.IDPrefix != "" {
-		clauses = append(clauses, "id LIKE ?")
-		args = append(args, f.IDPrefix+"%")
-	}
-	if f.Kind != "" {
-		clauses = append(clauses, "kind = ?")
-		args = append(args, f.Kind)
-	}
-	if f.ExcludeKind != "" {
-		clauses = append(clauses, "kind != ?")
-		args = append(args, f.ExcludeKind)
-	}
-	if f.ExcludeStatus != "" {
-		clauses = append(clauses, "status != ?")
-		args = append(args, f.ExcludeStatus)
-	}
-	if f.ExcludeScope != "" {
-		clauses = append(clauses, "scope != ?")
-		args = append(args, f.ExcludeScope)
-	}
-	if len(f.Scopes) > 0 {
-		placeholders := make([]string, len(f.Scopes))
-		for i, sc := range f.Scopes {
-			placeholders[i] = "?"
-			args = append(args, sc)
-		}
-		clauses = append(clauses, "scope IN ("+strings.Join(placeholders, ",")+")")
-	} else if f.Scope != "" {
-		if f.ScopePrefix {
-			clauses = append(clauses, "(scope = ? OR scope LIKE ? || '/%')")
-			args = append(args, f.Scope, f.Scope)
-		} else {
-			clauses = append(clauses, "scope = ?")
-			args = append(args, f.Scope)
-		}
-	}
-	if f.Status != "" {
-		clauses = append(clauses, "status = ?")
-		args = append(args, f.Status)
-	}
-	if f.Parent != "" {
-		clauses = append(clauses, "parent = ?")
-		args = append(args, f.Parent)
-	}
-	if f.Sprint != "" {
-		clauses = append(clauses, "sprint = ?")
-		args = append(args, f.Sprint)
-	}
-	if f.CreatedAfter != "" {
-		clauses = append(clauses, "created_at >= ?")
-		args = append(args, f.CreatedAfter)
-	}
-	if f.CreatedBefore != "" {
-		clauses = append(clauses, "created_at < ?")
-		args = append(args, f.CreatedBefore)
-	}
-	if f.UpdatedAfter != "" {
-		clauses = append(clauses, "updated_at >= ?")
-		args = append(args, f.UpdatedAfter)
-	}
-	if f.UpdatedBefore != "" {
-		clauses = append(clauses, "updated_at < ?")
-		args = append(args, f.UpdatedBefore)
-	}
-	if f.InsertedAfter != "" {
-		clauses = append(clauses, "inserted_at >= ?")
-		args = append(args, f.InsertedAfter)
-	}
-	if f.InsertedBefore != "" {
-		clauses = append(clauses, "inserted_at < ?")
-		args = append(args, f.InsertedBefore)
-	}
-
-	// SQL-side label filtering via artifact_labels junction table.
-	// Only applied when scope label expansion is not in use — scope expansion
-	// requires post-scan to match artifacts whose scope carries the label.
-	sqlLabels := len(f.ScopeLabelIndex) == 0
-	if sqlLabels {
-		for _, label := range f.Labels {
-			clauses = append(clauses,
-				"EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
-			args = append(args, label)
-		}
-		if len(f.LabelsOr) > 0 {
-			ph := make([]string, len(f.LabelsOr))
-			for i, label := range f.LabelsOr {
-				ph[i] = "?"
-				args = append(args, label)
-			}
-			clauses = append(clauses,
-				"EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label IN ("+strings.Join(ph, ",")+")")
-		}
-		for _, label := range f.ExcludeLabels {
-			clauses = append(clauses,
-				"NOT EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
-			args = append(args, label)
-		}
-	}
-
-	q := "SELECT " + artifactColumns + " FROM artifacts"
-	if len(clauses) > 0 {
-		q += " WHERE " + strings.Join(clauses, " AND ")
-	}
-	q += " ORDER BY id"
-
-	rows, err := s.reader.QueryContext(ctx, q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var results []*Artifact
-	for rows.Next() {
-		art, err := scanArtifactRows(rows)
-		if err != nil {
-			slog.WarnContext(ctx, "list: scan row failed, skipping artifact", slog.Any("err", err)) //nolint:sloglint // consistent with existing patterns in this file
-			continue
-		}
-		// Post-scan label check: only needed when scope label expansion is active.
-		// When sqlLabels=true the SQL WHERE already filtered correctly.
-		if !sqlLabels && !f.MatchLabels(art) {
-			continue
-		}
-		results = append(results, art)
-	}
-	return results, rows.Err()
-}
-
-// ListPage returns a cursor-paginated page of artifacts. The cursor encodes
-// (inserted_at, id) from the last element of the previous page; decoding is
-// done entirely in SQL via WHERE (inserted_at, id) > (cursor_ts, cursor_id).
-// Stable under concurrent inserts: new artifacts appear on later pages only.
-func (s *SQLiteStore) ListPage(ctx context.Context, f Filter) (page Page, err error) { //nolint:gocyclo,funlen,gocritic // complex filter builder; Filter size constrained by Store interface
-	// Delegate to List when pagination is not requested (backward compat).
-	if f.Limit <= 0 && f.Cursor == "" {
-		var arts []*Artifact
-		arts, err = s.List(ctx, f)
-		return Page{Artifacts: arts, Total: len(arts)}, err
-	}
-
-	var clauses []string
-	var args []any
-
-	// Reuse the same WHERE-clause construction as List.
 	if f.IDPrefix != "" {
 		clauses = append(clauses, "id LIKE ?")
 		args = append(args, f.IDPrefix+"%")
@@ -1215,6 +1074,22 @@ func (s *SQLiteStore) ListPage(ctx context.Context, f Filter) (page Page, err er
 		clauses = append(clauses, "sprint = ?")
 		args = append(args, f.Sprint)
 	}
+	if f.CreatedAfter != "" {
+		clauses = append(clauses, "created_at >= ?")
+		args = append(args, f.CreatedAfter)
+	}
+	if f.CreatedBefore != "" {
+		clauses = append(clauses, "created_at < ?")
+		args = append(args, f.CreatedBefore)
+	}
+	if f.UpdatedAfter != "" {
+		clauses = append(clauses, "updated_at >= ?")
+		args = append(args, f.UpdatedAfter)
+	}
+	if f.UpdatedBefore != "" {
+		clauses = append(clauses, "updated_at < ?")
+		args = append(args, f.UpdatedBefore)
+	}
 	if f.InsertedAfter != "" {
 		clauses = append(clauses, "inserted_at >= ?")
 		args = append(args, f.InsertedAfter)
@@ -1224,23 +1099,78 @@ func (s *SQLiteStore) ListPage(ctx context.Context, f Filter) (page Page, err er
 		args = append(args, f.InsertedBefore)
 	}
 
-	// Label filtering via junction table (scope label expansion not supported in paginated path).
-	for _, label := range f.Labels {
-		clauses = append(clauses, "EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
-		args = append(args, label)
-	}
-	if len(f.LabelsOr) > 0 {
-		ph := make([]string, len(f.LabelsOr))
-		for i, label := range f.LabelsOr {
-			ph[i] = "?"
+	// SQL-side label filtering. Not applied when scope label expansion is active —
+	// scope expansion requires post-scan to match artifacts whose scope carries the label.
+	sqlLabels := len(f.ScopeLabelIndex) == 0
+	if sqlLabels {
+		for _, label := range f.Labels {
+			clauses = append(clauses,
+				"EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
 			args = append(args, label)
 		}
-		clauses = append(clauses, "EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label IN ("+strings.Join(ph, ",")+")")
+		if len(f.LabelsOr) > 0 {
+			ph := make([]string, len(f.LabelsOr))
+			for i, label := range f.LabelsOr {
+				ph[i] = "?"
+				args = append(args, label)
+			}
+			clauses = append(clauses,
+				"EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label IN ("+strings.Join(ph, ",")+")")
+		}
+		for _, label := range f.ExcludeLabels {
+			clauses = append(clauses,
+				"NOT EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
+			args = append(args, label)
+		}
 	}
-	for _, label := range f.ExcludeLabels {
-		clauses = append(clauses, "NOT EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
-		args = append(args, label)
+	return clauses, args, sqlLabels
+}
+
+func (s *SQLiteStore) List(ctx context.Context, f Filter) ([]*Artifact, error) { //nolint:gocritic // hugeParam: value semantics intentional
+	clauses, args, sqlLabels := buildWhereClause(f)
+
+	q := "SELECT " + artifactColumns + " FROM artifacts"
+	if len(clauses) > 0 {
+		q += " WHERE " + strings.Join(clauses, " AND ")
 	}
+	q += " ORDER BY id"
+
+	rows, err := s.reader.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []*Artifact
+	for rows.Next() {
+		art, err := scanArtifactRows(rows)
+		if err != nil {
+			slog.WarnContext(ctx, "list: scan row failed, skipping artifact", slog.Any("err", err)) //nolint:sloglint // consistent with existing patterns in this file
+			continue
+		}
+		// Post-scan label check: only needed when scope label expansion is active.
+		// When sqlLabels=true the SQL WHERE already filtered correctly.
+		if !sqlLabels && !f.MatchLabels(art) {
+			continue
+		}
+		results = append(results, art)
+	}
+	return results, rows.Err()
+}
+
+// ListPage returns a cursor-paginated page of artifacts. The cursor encodes
+// (inserted_at, id) from the last element of the previous page; decoding is
+// done entirely in SQL via WHERE (inserted_at, id) > (cursor_ts, cursor_id).
+// Stable under concurrent inserts: new artifacts appear on later pages only.
+func (s *SQLiteStore) ListPage(ctx context.Context, f Filter) (page Page, err error) { //nolint:gocyclo,funlen,gocritic // complex filter builder; Filter size constrained by Store interface
+	// Delegate to List when pagination is not requested (backward compat).
+	if f.Limit <= 0 && f.Cursor == "" {
+		var arts []*Artifact
+		arts, err = s.List(ctx, f)
+		return Page{Artifacts: arts, Total: len(arts)}, err
+	}
+
+	clauses, args, _ := buildWhereClause(f)
 
 	// Cursor: decode as "inserted_at\x00id" — zero byte separator is safe since
 	// neither field contains null bytes.

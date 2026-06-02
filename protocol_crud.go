@@ -671,7 +671,6 @@ func (p *Protocol) ArchiveArtifact(ctx context.Context, ids []string, dryRun boo
 		slog.Int(LogKeyCount, len(ids)),
 		slog.Bool(LogKeyDryRun, dryRun))
 	if dryRun {
-		slog.DebugContext(ctx, "archive dry-run — no mutation")
 		results := make([]Result, len(ids))
 		for i, id := range ids {
 			results[i] = Result{ID: id, OK: true}

@@ -167,6 +167,13 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 		return nil, fmt.Errorf("unknown relation %q; valid: %s", relation, strings.Join(p.schema.Relations, ", ")) //nolint:err113 // pre-existing
 	}
 
+	if trait := p.ResolveEdgeTrait(relation); trait.MaxOutgoing > 0 {
+		existing, _ := p.store.Neighbors(ctx, sourceID, relation, Outgoing)
+		if len(existing)+len(targetIDs) > trait.MaxOutgoing {
+			return nil, fmt.Errorf("%s already has %d outgoing %q edge(s); max is %d", sourceID, len(existing), relation, trait.MaxOutgoing) //nolint:err113 // domain constraint
+		}
+	}
+
 	if relation == RelDependsOn {
 		for _, tid := range targetIDs {
 			if cycle, path := p.wouldCycle(ctx, sourceID, tid); cycle {

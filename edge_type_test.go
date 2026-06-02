@@ -50,6 +50,38 @@ func TestResolveEdgeTrait_ReturnsTraitForKnownRelation(t *testing.T) {
 	_ = trait // non-nil return sufficient
 }
 
+func TestBond_RejectsWhenMaxOutgoingExceeded(t *testing.T) {
+	// Given an edge type "owns" with MaxOutgoing=1
+	// When a second "owns" edge is added from the same source
+	// Then it is rejected
+	ctx := context.Background()
+	proto, s := newProto(t)
+
+	now := time.Now().UTC()
+	if err := s.Put(ctx, &parchment.Artifact{
+		ID: "EDT-owns", Kind: parchment.KindEdgeTypeDefinition,
+		Scope: parchment.SchemaScope, Title: "owns",
+		Status: parchment.StatusActive,
+		Extra:  map[string]any{"max_outgoing": float64(1)},
+		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	proto2 := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
+	a := mustCreate(t, proto2, parchment.CreateInput{Kind: "task", Title: "A", Scope: "test"})
+	b := mustCreate(t, proto, parchment.CreateInput{Kind: "task", Title: "B", Scope: "test"})
+	c := mustCreate(t, proto, parchment.CreateInput{Kind: "task", Title: "C", Scope: "test"})
+
+	if _, err := proto2.LinkArtifacts(ctx, a.ID, "owns", []string{b.ID}); err != nil {
+		t.Fatalf("first link should succeed: %v", err)
+	}
+	_, err := proto2.LinkArtifacts(ctx, a.ID, "owns", []string{c.ID})
+	if err == nil {
+		t.Fatal("expected error when MaxOutgoing=1 is exceeded")
+	}
+}
+
 func TestValidRelation_AcceptsRegisteredEdgeType(t *testing.T) {
 	// Given a custom edge type "mentors" is seeded in _schema
 	// When LinkArtifacts is called with relation="mentors"

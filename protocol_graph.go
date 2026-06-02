@@ -163,7 +163,7 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 	if len(targetIDs) == 0 {
 		return nil, fmt.Errorf("at least one target ID is required") //nolint:err113 // pre-existing
 	}
-	if !p.schema.ValidRelation(relation) {
+	if !p.schema.ValidRelation(relation) && !p.isRegisteredEdgeType(relation) {
 		return nil, fmt.Errorf("unknown relation %q; valid: %s", relation, strings.Join(p.schema.Relations, ", ")) //nolint:err113 // pre-existing
 	}
 
@@ -303,7 +303,7 @@ func (p *Protocol) ArtifactTree(ctx context.Context, in TreeInput) (*TreeNode, e
 	if rel == "" {
 		rel = RelParentOf
 	}
-	if !p.schema.ValidRelation(rel) {
+	if !p.schema.ValidRelation(rel) && !p.isRegisteredEdgeType(rel) {
 		return nil, fmt.Errorf("unknown relation %q; valid: %s, *", rel, strings.Join(p.schema.Relations, ", ")) //nolint:err113 // pre-existing
 	}
 

@@ -3,6 +3,7 @@ package parchment_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	parchment "github.com/dpopsuev/parchment"
 )
@@ -47,6 +48,34 @@ func TestResolveEdgeTrait_ReturnsTraitForKnownRelation(t *testing.T) {
 
 	trait := proto.ResolveEdgeTrait("parent_of")
 	_ = trait // non-nil return sufficient
+}
+
+func TestValidRelation_AcceptsRegisteredEdgeType(t *testing.T) {
+	// Given a custom edge type "mentors" is seeded in _schema
+	// When LinkArtifacts is called with relation="mentors"
+	// Then it is accepted (open world — not in hardcoded list but in registry)
+	ctx := context.Background()
+	proto, s := newProto(t)
+
+	// Seed a custom edge type
+	now := time.Now().UTC()
+	if err := s.Put(ctx, &parchment.Artifact{
+		ID: "EDT-mentors", Kind: parchment.KindEdgeTypeDefinition,
+		Scope: parchment.SchemaScope, Title: "mentors",
+		Status: parchment.StatusActive, CreatedAt: now, UpdatedAt: now, InsertedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Reload so protocol picks up the new edge type
+	proto2 := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
+	a := mustCreate(t, proto2, parchment.CreateInput{Kind: "task", Title: "A", Scope: "test"})
+	b := mustCreate(t, proto, parchment.CreateInput{Kind: "task", Title: "B", Scope: "test"})
+
+	_, err := proto2.LinkArtifacts(ctx, a.ID, "mentors", []string{b.ID})
+	if err != nil {
+		t.Errorf("expected custom edge type 'mentors' to be accepted, got: %v", err)
+	}
 }
 
 func TestResolveEdgeTrait_ReturnsZeroForUnknown(t *testing.T) {

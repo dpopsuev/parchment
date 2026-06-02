@@ -612,7 +612,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		}
 
 		for rel, targets := range art.Links {
-			if !p.schema.ValidRelation(rel) {
+			if !p.schema.ValidRelation(rel) && !p.isRegisteredEdgeType(rel) {
 				report.Violations = append(report.Violations, CheckViolation{
 					ID: art.ID, Kind: art.Kind, Title: art.Title,
 					Category: "invalid_relation",
@@ -838,7 +838,7 @@ func (p *Protocol) CheckFix(ctx context.Context, scope string) (*CheckReport, []
 			}
 			changed := false
 			for rel, targets := range art.Links {
-				if !p.schema.ValidRelation(rel) {
+				if !p.schema.ValidRelation(rel) && !p.isRegisteredEdgeType(rel) {
 					delete(art.Links, rel)
 					fixes = append(fixes, fmt.Sprintf("removed unknown relation %q from %s", rel, v.ID))
 					changed = true

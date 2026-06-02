@@ -107,3 +107,11 @@ func (p *Protocol) ResolveEdgeTrait(relation string) EdgeTypeTrait {
 	}
 	return p.edgeTypeTraits[relation]
 }
+
+func (p *Protocol) isRegisteredEdgeType(relation string) bool {
+	if p.edgeTypeTraits == nil {
+		return false
+	}
+	_, ok := p.edgeTypeTraits[relation]
+	return ok
+}

@@ -89,7 +89,10 @@ func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 {
 }
 
 type SetFieldOptions struct {
-	Force bool // bypass transition validation for status changes
+	Force        bool // bypass transition validation for status changes
+	BypassGuards bool // skip transitionGuards and quality gates (archive semantics)
+	Cascade      bool // apply status transition recursively to children
+	DryRun       bool // preview without mutation
 }
 
 func (p *Protocol) SetField(ctx context.Context, ids []string, field, value string, opts ...SetFieldOptions) ([]Result, error) {
@@ -109,10 +112,27 @@ func (p *Protocol) SetField(ctx context.Context, ids []string, field, value stri
 		opt = opts[0]
 	}
 
+	if opt.DryRun {
+		results := make([]Result, len(ids))
+		for i, id := range ids {
+			results[i] = Result{ID: id, OK: true}
+		}
+		return results, nil
+	}
+
 	results := make([]Result, 0, len(ids))
 	for _, id := range ids {
 		r := p.setFieldSingle(ctx, id, field, value, opt)
 		results = append(results, r)
+		if r.OK && opt.Cascade && field == FieldStatus {
+			children, err := p.store.Children(ctx, id)
+			if err == nil {
+				for _, ch := range children {
+					cr := p.setFieldSingle(ctx, ch.ID, field, value, opt)
+					results = append(results, cr)
+				}
+			}
+		}
 	}
 	return results, nil
 }
@@ -123,7 +143,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		return Result{ID: id, Error: err.Error()}
 	}
 
-	if p.schema.Guards.ArchivedReadonly && p.schema.IsReadonly(art.Status) {
+	if !opt.BypassGuards && p.schema.Guards.ArchivedReadonly && p.schema.IsReadonly(art.Status) {
 		return Result{ID: id, Error: fmt.Sprintf("%s: %s", ErrArchived, id)}
 	}
 
@@ -151,7 +171,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		}
 		art.Scope = value
 	case FieldStatus:
-		return p.setStatusForce(ctx, art, value, opt.Force)
+		return p.setStatusForce(ctx, art, value, opt.Force || opt.BypassGuards)
 	case FieldParent:
 		if value != "" {
 			if parent, err := p.store.Get(ctx, value); err == nil {
@@ -410,7 +430,7 @@ func (p *Protocol) transitionGuards() []transitionGuard {
 	// Archive: children must be readonly
 	if p.schema.Guards.ArchivedReadonly {
 		guards = append(guards, transitionGuard{
-			name: "children_readonly", when: StatusArchived,
+			name: "children_readonly", when: StatusArchived, forceable: true,
 			check: func(ctx context.Context, p *Protocol, art *Artifact) error {
 				children, err := p.store.Children(ctx, art.ID)
 				if err != nil {

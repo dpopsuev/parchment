@@ -113,6 +113,7 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 	p := &Protocol{store: s, schema: schema, scopes: scopes, vocab: vocab}
 	if s != nil {
 		SeedLabelTraits(context.Background(), s)
+		SeedEdgeTypeTraits(context.Background(), s)
 		p.labelTraits = loadLabelTraits(context.Background(), s)
 		p.edgeTypeTraits = loadEdgeTypeTraits(context.Background(), s)
 	}

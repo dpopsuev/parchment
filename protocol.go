@@ -79,6 +79,7 @@ type Protocol struct {
 	store            Store
 	schema           *Schema
 	labelTraits      map[string]LabelTrait
+	edgeTypeTraits   map[string]EdgeTypeTrait
 	scopes           []string
 	vocab            []string
 	idFormat         string
@@ -113,6 +114,7 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 	if s != nil {
 		SeedLabelTraits(context.Background(), s)
 		p.labelTraits = loadLabelTraits(context.Background(), s)
+		p.edgeTypeTraits = loadEdgeTypeTraits(context.Background(), s)
 	}
 	p.idFormat = idc.IDFormat
 	p.idTemplate = idc.IDTemplate

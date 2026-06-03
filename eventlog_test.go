@@ -129,6 +129,91 @@ func TestEventLog_LinkArtifacts_EmitsLinked(t *testing.T) {
 	}
 }
 
+func TestProtocol_GetEvents_ReturnsCreatedEvents(t *testing.T) {
+	// Protocol.GetEvents wraps store.GetEvents; verify the wrapper reaches the store.
+	t.Parallel()
+	store := parchment.NewMemoryStore()
+	proto := parchment.New(store, parchment.KnowledgeSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
+	ctx := context.Background()
+
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
+		Kind: parchment.KindTask, Title: "GetEvents test", Scope: "test",
+	})
+
+	events, err := proto.GetEvents(ctx, time.Time{}, parchment.EventFilter{ArtifactID: art.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) == 0 {
+		t.Fatal("Protocol.GetEvents should return events for the created artifact")
+	}
+	if events[0].EventType != parchment.EventCreated {
+		t.Errorf("first event type = %q, want %q", events[0].EventType, parchment.EventCreated)
+	}
+}
+
+func TestEventLog_GetEvents_FilterByEventType(t *testing.T) {
+	// EventFilter.EventTypes filters to only the requested event types.
+	t.Parallel()
+	store := parchment.NewMemoryStore()
+	proto := parchment.New(store, parchment.KnowledgeSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
+	ctx := context.Background()
+
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
+		Kind: parchment.KindTask, Title: "filter test", Scope: "test",
+	})
+	_, _ = proto.SetField(ctx, []string{art.ID}, "title", "updated title")
+
+	// Request only "updated" events
+	events, _ := store.GetEvents(ctx, time.Time{}, parchment.EventFilter{
+		ArtifactID: art.ID,
+		EventTypes: []string{parchment.EventUpdated},
+	})
+	for _, e := range events {
+		if e.EventType != parchment.EventUpdated {
+			t.Errorf("got event type %q with EventTypes filter for %q", e.EventType, parchment.EventUpdated)
+		}
+	}
+	if len(events) == 0 {
+		t.Fatal("expected at least one updated event")
+	}
+}
+
+func TestEventLog_SQLite_GetEvents_FilterByEventType(t *testing.T) {
+	// SQLiteStore.GetEvents with EventTypes filter — covers joinStrings + SQL path.
+	t.Parallel()
+	dir := t.TempDir()
+	s, err := parchment.OpenSQLite(dir + "/events.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	proto := parchment.New(s, parchment.KnowledgeSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
+	ctx := context.Background()
+
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
+		Kind: parchment.KindTask, Title: "sqlite filter", Scope: "test",
+	})
+	_, _ = proto.SetField(ctx, []string{art.ID}, "title", "new title")
+
+	events, err := s.GetEvents(ctx, time.Time{}, parchment.EventFilter{
+		ArtifactID: art.ID,
+		EventTypes: []string{parchment.EventCreated},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range events {
+		if e.EventType != parchment.EventCreated {
+			t.Errorf("event_type filter returned %q, want only %q", e.EventType, parchment.EventCreated)
+		}
+	}
+	if len(events) == 0 {
+		t.Fatal("expected at least one created event from SQLite")
+	}
+}
+
 func TestEventLog_GetEvents_FilterByScope(t *testing.T) {
 	// Given: artifacts in two different scopes
 	// When: GetEvents with scope filter

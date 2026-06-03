@@ -164,7 +164,7 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 		return nil, fmt.Errorf("at least one target ID is required") //nolint:err113 // pre-existing
 	}
 	if !p.schema.ValidRelation(relation) && !p.isRegisteredEdgeType(relation) {
-		return nil, fmt.Errorf("unknown relation %q; valid: %s", relation, strings.Join(p.schema.Relations, ", ")) //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("unknown relation %q; valid: %s", relation, strings.Join(p.RegisteredRelations(), ", ")) //nolint:err113 // pre-existing
 	}
 
 	if trait := p.ResolveEdgeTrait(relation); trait.MaxOutgoing > 0 {

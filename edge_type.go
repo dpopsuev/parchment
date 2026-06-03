@@ -3,6 +3,7 @@ package parchment
 import (
 	"context"
 	"log/slog"
+	"sort"
 	"time"
 )
 
@@ -106,6 +107,24 @@ func (p *Protocol) ResolveEdgeTrait(relation string) EdgeTypeTrait {
 		return EdgeTypeTrait{}
 	}
 	return p.edgeTypeTraits[relation]
+}
+
+// RegisteredRelations returns the sorted union of hardcoded schema relations
+// and dynamically registered EdgeTypeTrait names.
+func (p *Protocol) RegisteredRelations() []string {
+	seen := make(map[string]struct{}, len(p.schema.Relations)+len(p.edgeTypeTraits))
+	for _, r := range p.schema.Relations {
+		seen[r] = struct{}{}
+	}
+	for r := range p.edgeTypeTraits {
+		seen[r] = struct{}{}
+	}
+	out := make([]string, 0, len(seen))
+	for r := range seen {
+		out = append(out, r)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func (p *Protocol) isRegisteredEdgeType(relation string) bool {

@@ -2,6 +2,7 @@ package parchment_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -107,6 +108,71 @@ func TestValidRelation_AcceptsRegisteredEdgeType(t *testing.T) {
 	_, err := proto2.LinkArtifacts(ctx, a.ID, "mentors", []string{b.ID})
 	if err != nil {
 		t.Errorf("expected custom edge type 'mentors' to be accepted, got: %v", err)
+	}
+}
+
+func TestLinkArtifacts_ErrorListsRegisteredRelations(t *testing.T) {
+	// Given a custom edge type "sponsors" is in the registry
+	// When LinkArtifacts is called with an unknown relation
+	// Then the error message lists "sponsors" alongside hardcoded relations
+	ctx := context.Background()
+	_, s := newProto(t)
+	now := time.Now().UTC()
+	if err := s.Put(ctx, &parchment.Artifact{
+		ID: "EDT-sponsors", Kind: parchment.KindEdgeTypeDefinition,
+		Scope: parchment.SchemaScope, Title: "sponsors",
+		Status: parchment.StatusActive, CreatedAt: now, UpdatedAt: now, InsertedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	proto2 := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
+	a := mustCreate(t, proto2, parchment.CreateInput{Kind: "task", Title: "A", Scope: "test"})
+
+	_, err := proto2.LinkArtifacts(ctx, a.ID, "imaginary_xyz", []string{"x"})
+	if err == nil {
+		t.Fatal("expected error for unknown relation")
+	}
+	if !strings.Contains(err.Error(), "sponsors") {
+		t.Errorf("error should list registered relation 'sponsors', got: %s", err.Error())
+	}
+}
+
+func TestProtocol_RegisteredRelations_IncludesTraits(t *testing.T) {
+	// Given a custom edge type "coaches" is in the registry
+	// When RegisteredRelations() is called
+	// Then it includes both hardcoded schema relations and "coaches"
+	ctx := context.Background()
+	_, s := newProto(t)
+	now := time.Now().UTC()
+	if err := s.Put(ctx, &parchment.Artifact{
+		ID: "EDT-coaches", Kind: parchment.KindEdgeTypeDefinition,
+		Scope: parchment.SchemaScope, Title: "coaches",
+		Status: parchment.StatusActive, CreatedAt: now, UpdatedAt: now, InsertedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	proto2 := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
+	rels := proto2.RegisteredRelations()
+	found := false
+	for _, r := range rels {
+		if r == "coaches" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("RegisteredRelations() should include 'coaches', got: %v", rels)
+	}
+	// Must also include at least one hardcoded schema relation
+	foundHardcoded := false
+	for _, r := range rels {
+		if r == "depends_on" {
+			foundHardcoded = true
+			break
+		}
+	}
+	if !foundHardcoded {
+		t.Errorf("RegisteredRelations() should include hardcoded 'depends_on', got: %v", rels)
 	}
 }
 

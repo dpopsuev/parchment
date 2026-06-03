@@ -119,13 +119,24 @@ CREATE VIRTUAL TABLE IF NOT EXISTS artifacts_fts USING fts5(
 `
 
 // DefaultSQLitePath returns the default database path.
-// Resolution: $SCRIBE_ROOT/scribe.sqlite > ~/.scribe/scribe.sqlite.
+// Resolution order:
+//  1. $SCRIBE_ROOT/scribe.sqlite
+//  2. ~/.scribe/scribe.sqlite  (legacy — used if the file already exists there)
+//  3. $XDG_DATA_HOME/scribe/scribe.sqlite  (default: ~/.local/share/scribe/scribe.sqlite)
 func DefaultSQLitePath() string {
 	if root := os.Getenv("SCRIBE_ROOT"); root != "" {
 		return filepath.Join(root, "scribe.sqlite")
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".scribe", "scribe.sqlite")
+	legacy := filepath.Join(home, ".scribe", "scribe.sqlite")
+	if _, err := os.Stat(legacy); err == nil {
+		return legacy
+	}
+	dataHome := os.Getenv("XDG_DATA_HOME")
+	if dataHome == "" {
+		dataHome = filepath.Join(home, ".local", "share")
+	}
+	return filepath.Join(dataHome, "scribe", "scribe.sqlite")
 }
 
 // SQLiteConfig holds tunable parameters for the SQLite store.

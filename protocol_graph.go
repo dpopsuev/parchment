@@ -125,8 +125,8 @@ func (p *Protocol) cascadeOverlaps(ctx context.Context, changed *Artifact, affec
 	}
 
 	// Scan all artifacts for file and symbol overlap. O(n) — acceptable for
-	// artifact counts typical in Scribe (< 10K). With the artifact_properties
-	// index (PRC-TSK-46) this becomes O(log n) for symbol lookups.
+	// artifact counts typical in Scribe (< 10K). SQL-side component indexing
+	// would make this O(log n) but is deferred until code-mapping scale demands it.
 	// Exclude SchemaScope — definition artifacts are not work artifacts.
 	all, err := p.store.List(ctx, Filter{ExcludeScope: SchemaScope})
 	if err != nil {

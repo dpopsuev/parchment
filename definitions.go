@@ -79,7 +79,7 @@ func SeedDefinitions(ctx context.Context, s Store) {
 // loadSchema reconstructs a *Schema by reading definition artifacts from
 // SchemaScope. The Kinds map is populated entirely from the store. All other
 // schema fields (Statuses, Relations, Guards, Priorities) are taken from the
-// KnowledgeSchema baseline — they will be externalized in a follow-up.
+// KnowledgeSchema baseline — Statuses/Relations/Guards externalization is deferred (PRC-TSK-73).
 //
 // Falls back to the full KnowledgeSchema if the store has no definitions,
 // so a fresh database before SeedDefinitions runs still works.

@@ -639,8 +639,7 @@ func (s *Schema) MergeDefaults(defaults *Schema) {
 //
 // Deprecated: prefer passing nil to Protocol.New, which calls loadSchema to
 // populate kinds from definition artifacts stored in the database. This function
-// remains public for tests and one-off use; it will be made private once all
-// callers migrate to the store-backed schema (PRC-TSK-56).
+// remains public for tests and one-off use only.
 func DefaultSchema() *Schema { //nolint:funlen // data initializer; cannot be shorter without obscuring the schema definition
 	return &Schema{
 		Kinds: map[string]KindDef{

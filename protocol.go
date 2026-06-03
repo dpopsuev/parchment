@@ -33,6 +33,7 @@ type Result struct {
 	ID    string `json:"id"`
 	OK    bool   `json:"ok"`
 	Error string `json:"error,omitempty"`
+	NewID string `json:"new_id,omitempty"` // populated when SetField(scope, rename_id=true) migrates the ID
 }
 
 // DefaultsProvider supplies tunable numeric parameters (vacuum days, dashboard stale, etc.).

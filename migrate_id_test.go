@@ -128,3 +128,48 @@ func TestMigrateID_UpdatesDependsOn(t *testing.T) {
 		t.Errorf("depends_on not updated: %v", dependent.DependsOn)
 	}
 }
+
+func TestSetField_ScopeWithRenameID_MigratesID(t *testing.T) {
+	// Given: scope "alpha" has key "ALP" and an artifact ALP-TSK-001
+	// When: SetField(scope=beta) with rename_id=true (scope "beta" has key "BET")
+	// Then: artifact is moved to scope "beta" with new ID starting with BET
+	t.Parallel()
+	dir := t.TempDir()
+	s, err := parchment.OpenSQLite(dir + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	ctx := context.Background()
+	_ = s.SetScopeKey(ctx, "alpha", "ALP", false)
+	_ = s.SetScopeKey(ctx, "beta", "BET", false)
+
+	proto := parchment.New(s, nil, []string{"alpha", "beta"}, nil, parchment.ProtocolConfig{})
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
+		Kind: parchment.KindTask, Title: "move me", Scope: "alpha",
+	})
+	oldID := art.ID
+
+	results, err := proto.SetField(ctx, []string{oldID}, parchment.FieldScope, "beta",
+		parchment.SetFieldOptions{RenameID: true})
+	if err != nil {
+		t.Fatalf("SetField(scope=beta, rename_id=true): %v", err)
+	}
+	if len(results) == 0 || !results[0].OK {
+		t.Fatalf("SetField failed: %+v", results)
+	}
+
+	// Artifact should now be in scope beta with a BET- prefixed ID.
+	newID := results[0].NewID
+	if newID == "" {
+		t.Fatal("Result.NewID should be populated when rename_id=true")
+	}
+	got, err := proto.GetArtifact(ctx, newID)
+	if err != nil {
+		t.Fatalf("migrated artifact not found at new ID %s: %v", newID, err)
+	}
+	if got.Scope != "beta" {
+		t.Errorf("scope = %q, want beta", got.Scope)
+	}
+}

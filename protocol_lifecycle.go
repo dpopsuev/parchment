@@ -93,6 +93,7 @@ type SetFieldOptions struct {
 	BypassGuards bool // skip transitionGuards and quality gates (archive semantics)
 	Cascade      bool // apply status transition recursively to children
 	DryRun       bool // preview without mutation
+	RenameID     bool // when field=scope: call MigrateID to rekey the artifact under the new scope
 }
 
 func (p *Protocol) SetField(ctx context.Context, ids []string, field, value string, opts ...SetFieldOptions) ([]Result, error) {
@@ -229,6 +230,31 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		return Result{ID: id, Error: err.Error()}
 	}
 	p.emitEvent(ctx, EventUpdated, art.ID, art.Scope, map[string]string{"field": field, "value": value})
+
+	// scope+rename_id: generate a new ID from the new scope's key and migrate.
+	if field == FieldScope && opt.RenameID { //nolint:nestif // scope key resolution has legitimate branching; splitting into helper would just move it
+		scopeKey, _, _ := p.store.GetScopeKey(ctx, value)
+		kindCode := p.resolveKindCode(art.Kind)
+		var newID string
+		var genErr error
+		if scopeKey != "" {
+			newID, genErr = p.store.NextScopedID(ctx, scopeKey, kindCode)
+		} else {
+			prefix := scopeKey + kindCode
+			if prefix == "" {
+				prefix = art.Kind
+			}
+			newID, genErr = p.store.NextID(ctx, prefix)
+		}
+		if genErr != nil {
+			return Result{ID: id, OK: true, Error: fmt.Sprintf("rename_id: generate new ID: %v", genErr)}
+		}
+		if migrateErr := p.MigrateID(ctx, id, newID); migrateErr != nil {
+			return Result{ID: id, OK: true, Error: fmt.Sprintf("rename_id: migrate: %v", migrateErr)}
+		}
+		return Result{ID: id, OK: true, NewID: newID}
+	}
+
 	return Result{ID: id, OK: true}
 }
 

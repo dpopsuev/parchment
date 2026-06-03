@@ -114,14 +114,29 @@ func unionStrings(a, b []string) []string {
 // defaultLabelTraits is the seed set of label trait profiles.
 // Users extend this by creating kind=label_definition artifacts at runtime.
 var defaultLabelTraits = []struct {
-	label string
-	trait LabelTrait
+	label        string
+	trait        LabelTrait
+	whenToApply  string
+	impliesText  string
 }{
-	{"always", LabelTrait{AlwaysApply: true}},
-	{"rule", LabelTrait{World: "behavioral", EvictionPolicy: "protected"}},
-	{"skill", LabelTrait{World: "behavioral", EvictionPolicy: "protected"}},
-	{"knowledge", LabelTrait{EvictionPolicy: "protected", HalfLifeDays: 180}},
-	{"lang", LabelTrait{World: "behavioral"}},
+	{"always", LabelTrait{AlwaysApply: true},
+		"Apply 'always' to rules or context notes that must be included in every agent context assembly, regardless of scope or query.",
+		"Bypasses eviction and recency filtering. The artifact is always present in context_read output."},
+	{"rule", LabelTrait{World: "behavioral", EvictionPolicy: "protected"},
+		"Apply 'rule' to notes that encode behavioral constraints — coding standards, commit policies, naming conventions, process gates. These are the agent's operating procedure.",
+		"Protected from eviction. Included in context_read as behavioral rules. Dot-namespaced: 'rule.security' inherits 'rule'."},
+	{"skill", LabelTrait{World: "behavioral", EvictionPolicy: "protected"},
+		"Apply 'skill' to notes that encode procedural knowledge — how to do X, step-by-step instructions, reusable procedures. Skills are the agent's procedural memory.",
+		"Protected from eviction. Included in context_read as procedural guidance. Searchable via recall(query=how to X)."},
+	{"knowledge", LabelTrait{EvictionPolicy: "protected", HalfLifeDays: 180},
+		"Apply 'knowledge' to notes that encode domain facts, concepts, or reference material that should survive beyond the session that created them.",
+		"Protected from eviction for 180 days. Included in evergreen knowledge queries. Not auto-evicted by the structural heat algorithm."},
+	{"lang", LabelTrait{World: "behavioral"},
+		"Apply 'lang.go', 'lang.ts', 'lang.python' etc. to scope rules and skills to a specific programming language. Use dot-namespacing: 'lang.go.test' inherits both 'lang.go' and 'lang'.",
+		"Dot-expanded: 'lang.go' also matches 'lang' queries. Behavioral world — affects context_read assembly for language-specific sessions."},
+	{"decision", LabelTrait{EvictionPolicy: "protected"},
+		"Apply 'decision' to notes created via admin(action=decision) — cached answers to recurring questions. Not the same as kind=decision (ADR); this is a lightweight key-value cache.",
+		"Protected from eviction. Queryable via admin(action=decision, snapshot_action=check, check=<key>)."},
 }
 
 // SeedLabelTraits writes default label_definition artifacts into SchemaScope.
@@ -141,14 +156,21 @@ func SeedLabelTraits(ctx context.Context, s Store) {
 		if err := json.Unmarshal(b, &extra); err != nil {
 			continue
 		}
-		if err := s.Put(ctx, &Artifact{
+		art := &Artifact{
 			ID:     id,
 			Kind:   KindLabelDefinition,
 			Scope:  SchemaScope,
 			Title:  entry.label,
 			Status: StatusActive,
 			Extra:  extra,
-		}); err != nil {
+		}
+		if entry.whenToApply != "" {
+			art.Sections = append(art.Sections, Section{Name: "when_to_apply", Text: entry.whenToApply})
+		}
+		if entry.impliesText != "" {
+			art.Sections = append(art.Sections, Section{Name: "implies", Text: entry.impliesText})
+		}
+		if err := s.Put(ctx, art); err != nil {
 			slog.WarnContext(ctx, "seed label traits: put failed",
 				slog.String(LogKeyTitle, entry.label), slog.Any(LogKeyError, err))
 		}

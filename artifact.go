@@ -22,8 +22,6 @@ type Artifact struct {
 	Priority    string              `json:"priority,omitempty"`
 	Sprint      string              `json:"sprint,omitempty"`
 	Sections    []Section           `json:"sections,omitempty"`
-	Features    []Feature           `json:"features,omitempty"`
-	Criteria    []Criterion         `json:"criteria,omitempty"`
 	Links       map[string][]string `json:"links,omitempty"`
 	Extra       map[string]any      `json:"extra,omitempty"`
 	Components  ComponentMap        `json:"components,omitempty"`
@@ -44,30 +42,7 @@ type Section struct {
 }
 
 // Feature is a Gherkin-style feature containing scenarios.
-type Feature struct {
-	Name      string     `json:"name"`
-	Scenarios []Scenario `json:"scenarios,omitempty"`
-}
 
-// Scenario is a single test scenario within a feature.
-type Scenario struct {
-	Name   string `json:"name"`
-	Status string `json:"status,omitempty"`
-	Steps  []Step `json:"steps,omitempty"`
-}
-
-// Step is a single Gherkin step (Given/When/Then/And/But).
-type Step struct {
-	Keyword string `json:"keyword"`
-	Text    string `json:"text"`
-}
-
-// Criterion is an acceptance criterion with optional verification method.
-type Criterion struct {
-	ID          string `json:"id"`
-	Description string `json:"description"`
-	VerifiedBy  string `json:"verified_by,omitempty"`
-}
 
 // Edge represents a directed relationship between two artifacts.
 // Weight is 0.0 for boolean existence edges (the default for all work-tracking

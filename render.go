@@ -55,36 +55,6 @@ func RenderMarkdown(art *Artifact) string { //nolint:gocyclo // display logic is
 		fmt.Fprintf(&b, "## %s\n\n%s\n\n", s.Name, s.Text)
 	}
 
-	if len(art.Features) > 0 {
-		b.WriteString("## Features\n\n")
-		for _, f := range art.Features {
-			fmt.Fprintf(&b, "### %s\n\n", f.Name)
-			for _, sc := range f.Scenarios {
-				status := ""
-				if sc.Status != "" {
-					status = " (" + sc.Status + ")"
-				}
-				fmt.Fprintf(&b, "**Scenario: %s%s**\n\n", sc.Name, status)
-				for _, step := range sc.Steps {
-					fmt.Fprintf(&b, "- **%s** %s\n", step.Keyword, step.Text)
-				}
-				b.WriteByte('\n')
-			}
-		}
-	}
-
-	if len(art.Criteria) > 0 {
-		b.WriteString("## Acceptance Criteria\n\n")
-		for _, c := range art.Criteria {
-			vb := ""
-			if c.VerifiedBy != "" {
-				vb = fmt.Sprintf(" (verified by: %s)", c.VerifiedBy)
-			}
-			fmt.Fprintf(&b, "- **[%s]** %s%s\n", c.ID, c.Description, vb)
-		}
-		b.WriteByte('\n')
-	}
-
 	return b.String()
 }
 

@@ -487,8 +487,8 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	dependsOn, _ := json.Marshal(art.DependsOn)
 	labels, _ := json.Marshal(art.Labels)
 	sections, _ := json.Marshal(art.Sections)
-	features, _ := json.Marshal(art.Features)
-	criteria, _ := json.Marshal(art.Criteria)
+	features := []byte("[]")
+	criteria := []byte("[]")
 	links, _ := json.Marshal(art.Links)
 	extra, _ := json.Marshal(art.Extra)
 	components, _ := json.Marshal(art.Components)
@@ -593,8 +593,8 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 		dependsOn, _ := json.Marshal(art.DependsOn)
 		labels, _ := json.Marshal(art.Labels)
 		sections, _ := json.Marshal(art.Sections)
-		features, _ := json.Marshal(art.Features)
-		criteria, _ := json.Marshal(art.Criteria)
+		features := []byte("[]")
+		criteria := []byte("[]")
 		links, _ := json.Marshal(art.Links)
 		extra, _ := json.Marshal(art.Extra)
 		components, _ := json.Marshal(art.Components)
@@ -675,8 +675,8 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 	dependsOn, _ := json.Marshal(art.DependsOn)
 	labels, _ := json.Marshal(art.Labels)
 	sections, _ := json.Marshal(art.Sections)
-	features, _ := json.Marshal(art.Features)
-	criteria, _ := json.Marshal(art.Criteria)
+	features := []byte("[]")
+	criteria := []byte("[]")
 	links, _ := json.Marshal(art.Links)
 	extra, _ := json.Marshal(art.Extra)
 	components, _ := json.Marshal(art.Components)
@@ -1695,8 +1695,6 @@ func scanRow(s rowScanner) (*Artifact, error) {
 		{dependsOn, &art.DependsOn, "depends_on"},
 		{labels, &art.Labels, "labels"},
 		{sections, &art.Sections, "sections"},
-		{features, &art.Features, "features"},
-		{criteria, &art.Criteria, "criteria"},
 		{links, &art.Links, "links"},
 		{extra, &art.Extra, "extra"},
 		{components, &art.Components, "components"},

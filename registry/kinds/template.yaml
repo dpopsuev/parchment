@@ -1,0 +1,18 @@
+name: template
+prefix: TPL
+code: TPL
+family: support
+protected: true
+skip_guards: true
+lifecycle:
+  default_status: active
+sections:
+  could: [context, guidance]
+when_to_create: |
+  Create a template to define required and recommended sections for a kind.
+  Templates are enforced at the satisfies link — an artifact that satisfies a
+  template must have all required sections before being promoted to active.
+agent_note: |
+  Templates drive section conformance. Required sections are prefixed with
+  "required:" in the template guidance text. MustSections on KindDef enforce
+  at activation; template sections enforce at satisfies-link creation.

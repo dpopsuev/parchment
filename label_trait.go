@@ -143,6 +143,10 @@ var defaultLabelTraits = []struct {
 // Idempotent — skips any label whose artifact already exists.
 // Called from Protocol.New after loadLabelTraits.
 func SeedLabelTraits(ctx context.Context, s Store) {
+	// Primary path: seed from embedded YAML registry.
+	seedLabelsFromRegistry(ctx, s)
+
+	// Fallback: seed any labels in defaultLabelTraits not covered by the registry.
 	for _, entry := range defaultLabelTraits {
 		id := "LDEF-" + entry.label
 		if _, err := s.Get(ctx, id); err == nil {

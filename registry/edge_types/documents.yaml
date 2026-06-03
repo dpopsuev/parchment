@@ -1,0 +1,5 @@
+name: documents
+when_to_use: |
+  Use documents when a doc or ref artifact describes another artifact.
+semantics: |
+  Documentation link. Surfaced in briefing. No structural enforcement.

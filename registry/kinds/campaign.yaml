@@ -1,0 +1,23 @@
+name: campaign
+prefix: CMP
+code: CMP
+family: effort
+protected: true
+lifecycle:
+  active_status: active
+  track_in_motd: true
+sections:
+  must: [mission]
+  should: [goals, success_criteria]
+children: [goal]
+relations:
+  outgoing: [parent_of, satisfies]
+  targets:
+    satisfies: [template]
+when_to_create: |
+  Create a campaign when you are coordinating a multi-week effort with multiple
+  goals toward a named outcome — a release, a refactor initiative, a feature
+  area. Campaigns group goals; they are not created for single tasks.
+agent_note: |
+  Campaigns contain goals (parent_of). Campaigns track in motd when active.
+  A campaign without at least one active goal is stalled. mission section is required.

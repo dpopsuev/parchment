@@ -1,0 +1,21 @@
+name: doc
+prefix: DOC
+code: DOC
+family: support
+protected: true
+sections:
+  should: [overview]
+  could: [content]
+relations:
+  outgoing: [documents, satisfies]
+  expected_outgoing: [documents]
+  targets:
+    satisfies: [template]
+when_to_create: |
+  Create a doc when you need human-readable documentation for an artifact —
+  a spec, a system, or a codebase component. Docs document; they do not decide.
+agent_note: |
+  Docs are distinct from specs: specs are design intent, docs are explanatory
+  prose. A doc without a documents edge is orphaned. Use ref for external sources.
+
+children: []

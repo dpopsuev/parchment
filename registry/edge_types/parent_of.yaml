@@ -1,0 +1,9 @@
+name: parent_of
+max_incoming: 1
+when_to_use: |
+  Use parent_of to place an artifact inside a container: a goal inside a
+  campaign, a task inside a goal. Each artifact has at most one parent.
+semantics: |
+  Structural containment. Drives tree/briefing traversal and auto-completion
+  propagation. A child completing does not block its parent — all children
+  must be terminal for the parent to auto-complete.

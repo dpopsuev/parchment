@@ -1,0 +1,5 @@
+name: cites
+when_to_use: |
+  Use cites when a note or concept draws from a source artifact.
+semantics: |
+  Knowledge provenance. Tracked by wikilinks. No structural enforcement.

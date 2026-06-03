@@ -1,0 +1,8 @@
+name: always
+always_apply: true
+when_to_apply: |
+  Apply "always" to rules or context notes that must be included in every
+  agent context assembly, regardless of scope or query.
+implies: |
+  Bypasses eviction and recency filtering. The artifact is always present
+  in context_read output.

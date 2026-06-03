@@ -1,0 +1,38 @@
+name: task
+prefix: TASK
+code: TSK
+family: effort
+vacuumable: true
+lifecycle:
+  trigger_status: complete
+  activation_requires_sections: true
+  transitions:
+    draft: [active, cancelled]
+    active: [mature, draft, cancelled]
+    mature: [allocated, active, cancelled]
+    allocated: [in_progress, mature, cancelled]
+    in_progress: [in_review, allocated, cancelled]
+    in_review: [complete, in_progress, cancelled]
+    complete: [retired, archived]
+    cancelled: [draft, retired, archived]
+    retired: []
+sections:
+  must: [context]
+  should: [checklist, acceptance]
+  could: [current_architecture, desired_architecture]
+  required_fields: [priority]
+relations:
+  outgoing: [implements, depends_on, satisfies]
+  targets:
+    implements: [spec, bug]
+    satisfies: [template]
+when_to_create: |
+  Create a task when work is discrete, time-bounded, and assigned to a single
+  effort. A task has clear done-criteria. If the work is too large to fit in
+  one effort, break it into multiple tasks under a goal.
+agent_note: |
+  Tasks block via depends_on — TopoSort respects this. Priority is required
+  before activation. A task implements a spec or bug (intent family). Completion
+  auto-propagates to the parent goal when all siblings are terminal.
+
+children: []

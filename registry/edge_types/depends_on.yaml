@@ -1,0 +1,9 @@
+name: depends_on
+when_to_use: |
+  Use depends_on when artifact B cannot begin until artifact A is complete.
+  This is a hard sequencing constraint — TopoSort respects it and cycle
+  detection enforces it. Use follows for a soft ordering preference.
+semantics: |
+  Blocking dependency. TopoSort produces a work order respecting depends_on
+  edges. Creating a cycle returns an error. Active artifacts with unresolved
+  depends_on are flagged by detect(check=orphans).

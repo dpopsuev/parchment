@@ -44,12 +44,17 @@ func extraToKindDef(extra map[string]any) (KindDef, error) {
 // SchemaScope. Idempotent — skips any kind whose definition artifact already
 // exists. Called from OpenSQLiteConfig after schema creation and migrations.
 func SeedDefinitions(ctx context.Context, s Store) {
+	// Primary path: seed from embedded YAML registry (data-driven, operator-overridable).
+	seedKindsFromRegistry(ctx, s)
+
+	// Fallback: seed any kinds present in KnowledgeSchema() but missing from the registry.
+	// This preserves backward compat for kinds not yet migrated to YAML.
 	schema := KnowledgeSchema()
 	now := time.Now().UTC()
 	for name := range schema.Kinds {
 		id := "DEF-" + name
 		if _, err := s.Get(ctx, id); err == nil {
-			continue // already seeded
+			continue // already seeded (by registry or previously)
 		}
 		kd := schema.Kinds[name]
 		extra, err := kindDefToExtra(&kd)
@@ -68,12 +73,6 @@ func SeedDefinitions(ctx context.Context, s Store) {
 			CreatedAt:  now,
 			UpdatedAt:  now,
 			InsertedAt: now,
-		}
-		if kd.WhenToCreate != "" {
-			art.Sections = append(art.Sections, Section{Name: "when_to_create", Text: kd.WhenToCreate})
-		}
-		if kd.AgentNote != "" {
-			art.Sections = append(art.Sections, Section{Name: "agent_note", Text: kd.AgentNote})
 		}
 		if err := s.Put(ctx, art); err != nil {
 			slog.WarnContext(ctx, "seed definitions: put failed",

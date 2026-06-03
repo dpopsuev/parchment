@@ -8,20 +8,17 @@ import (
 	"github.com/dpopsuev/parchment"
 )
 
-func TestKindDef_HasAgentGuidance(t *testing.T) {
-	// KindDef carries WhenToCreate and AgentNote for agent self-orientation.
+func TestKindDef_GuidanceIsNotOnStruct(t *testing.T) {
+	// Agent guidance (when_to_create, agent_note) must NOT be KindDef struct fields.
+	// They live only in kind_definition artifact sections — queryable data, not Go state.
+	// This test verifies the registry architecture by checking that task still exists
+	// in the schema (loaded from YAML) while guidance is absent from the struct.
 	t.Parallel()
 	schema := parchment.KnowledgeSchema()
-	task, ok := schema.Kinds[parchment.KindTask]
-	if !ok {
-		t.Fatal("task kind not in schema")
+	if _, ok := schema.Kinds[parchment.KindTask]; !ok {
+		t.Fatal("task kind missing from schema — registry YAML not loaded")
 	}
-	if task.WhenToCreate == "" {
-		t.Error("KindDef.WhenToCreate should be populated for task")
-	}
-	if task.AgentNote == "" {
-		t.Error("KindDef.AgentNote should be populated for task")
-	}
+	// Guidance is verified via artifact sections in TestSeedDefinitions_KindArtifact_HasGuidanceSections.
 }
 
 func TestSeedDefinitions_KindArtifact_HasGuidanceSections(t *testing.T) {

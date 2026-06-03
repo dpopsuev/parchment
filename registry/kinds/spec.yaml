@@ -1,0 +1,33 @@
+name: spec
+prefix: SPEC
+code: SPC
+family: intent
+protected: true
+lifecycle:
+  activation_requires_sections: true
+  transitions:
+    draft: [proposed, cancelled]
+    proposed: [accepted, rejected, deferred, draft]
+    accepted: []
+    rejected: []
+    deferred: [draft]
+    cancelled: []
+sections:
+  must: [problem]
+  should: [decision, acceptance]
+  could: [architecture, current_architecture, desired_architecture]
+relations:
+  incoming: [implements, justifies]
+  outgoing: [satisfies]
+  targets:
+    satisfies: [template]
+when_to_create: |
+  Create a spec when you need to design something before building it —
+  interface contracts, data models, architectural decisions, or any work where
+  the "what" must be agreed before the "how" begins.
+agent_note: |
+  Specs are intent artifacts (desired state). Tasks implement specs. A spec
+  without implementing tasks is unowned work. Lifecycle: draft → proposed →
+  accepted (immutable). Once accepted, content is authoritative.
+
+children: []

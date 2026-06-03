@@ -106,6 +106,10 @@ var defaultEdgeTypes = []struct {
 }
 
 func SeedEdgeTypeTraits(ctx context.Context, s Store) {
+	// Primary path: seed from embedded YAML registry.
+	seedEdgeTypesFromRegistry(ctx, s)
+
+	// Fallback: seed any edge types in defaultEdgeTypes not covered by the registry.
 	now := time.Now().UTC()
 	for _, et := range defaultEdgeTypes {
 		id := "EDT-" + et.name

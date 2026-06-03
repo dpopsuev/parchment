@@ -1,0 +1,5 @@
+name: elaborates
+when_to_use: |
+  Use elaborates when a note expands on a concept by adding examples or depth.
+semantics: |
+  Knowledge elaboration. Used in knowledge graph traversal. No structural enforcement.

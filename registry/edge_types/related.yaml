@@ -1,0 +1,9 @@
+name: related
+directionality: symmetric
+when_to_use: |
+  Use related for a generic bidirectional association when no more specific
+  relation fits. Prefer a specific relation (documents, cites, implements)
+  when one applies.
+semantics: |
+  Symmetric generic association. No structural or lifecycle enforcement.
+  Last resort when no semantic relation fits.

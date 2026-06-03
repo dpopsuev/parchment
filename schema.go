@@ -66,11 +66,10 @@ type KindDef struct {
 	KindIdentity
 	KindLifecycle
 	KindSections
-	Relations    KindRelations `json:"relations,omitempty" yaml:"relations,omitempty"`
-	Children     []string      `json:"children,omitempty" yaml:"children,omitempty"`
-	// Agent guidance — surfaced via kind_definition artifacts in _schema scope.
-	WhenToCreate string `json:"when_to_create,omitempty" yaml:"when_to_create,omitempty"`
-	AgentNote    string `json:"agent_note,omitempty" yaml:"agent_note,omitempty"`
+	Relations KindRelations `json:"relations,omitempty" yaml:"relations,omitempty"`
+	Children  []string      `json:"children,omitempty" yaml:"children,omitempty"`
+	// Agent guidance lives in kind_definition artifact sections (when_to_create, agent_note),
+	// not here. KindDef is runtime behavior only; guidance is queryable data in _schema.
 }
 
 // Schema is the single source of truth for the Scribe data model.
@@ -655,8 +654,6 @@ func DefaultSchema() *Schema { //nolint:funlen // data initializer; cannot be sh
 					Outgoing: []string{RelSatisfies},
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
-				WhenToCreate: "Create a goal when you have a measurable outcome that multiple tasks serve — a shipped feature, a passing test suite, a published release. Goals are the unit of strategic intent inside a campaign. Use admin(action=set_goal) to create a goal and archive the previous active goal atomically.",
-				AgentNote:    "Only one goal is current at a time per scope. set_goal archives existing current goals before creating the new one. Goals auto-archive when their justifying spec is complete. Tasks and specs live as children of the current goal.",
 			},
 			"task": {
 				KindIdentity:  KindIdentity{Prefix: "TASK", Code: "TSK", Family: FamilyEffort, Vacuumable: true},
@@ -667,8 +664,6 @@ func DefaultSchema() *Schema { //nolint:funlen // data initializer; cannot be sh
 					Outgoing: []string{RelImplements, RelDependsOn, RelSatisfies},
 					Targets:  map[string][]string{RelImplements: {"spec", "bug"}, RelSatisfies: {"template"}},
 				},
-				WhenToCreate: "Create a task when work is discrete, time-bounded, and assigned to a single effort. A task has clear done-criteria. If the work is too large to fit in one effort, break it into multiple tasks under a goal.",
-				AgentNote:    "Tasks block via depends_on — TopoSort respects this. Priority is required before activation. A task implements a spec or bug (intent family). Completion auto-propagates to the parent goal when all siblings are terminal.",
 			},
 			"spec": {
 				KindIdentity:  KindIdentity{Prefix: "SPEC", Code: "SPC", Protected: true, Family: FamilyIntent},
@@ -680,8 +675,6 @@ func DefaultSchema() *Schema { //nolint:funlen // data initializer; cannot be sh
 					Outgoing: []string{RelSatisfies},
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
-				WhenToCreate: "Create a spec when you need to design something before building it — interface contracts, data models, architectural decisions, or any work where the 'what' must be agreed before the 'how' begins.",
-				AgentNote:    "Specs are intent artifacts (desired state). Tasks implement specs. A spec without implementing tasks is unowned work. Lifecycle: draft → proposed → accepted (immutable). Once accepted, content is authoritative.",
 			},
 			"bug": {
 				KindIdentity:  KindIdentity{Prefix: "BUG", Code: "BUG", Protected: true, Family: FamilyIntent, Vacuumable: true},
@@ -693,8 +686,6 @@ func DefaultSchema() *Schema { //nolint:funlen // data initializer; cannot be sh
 					Outgoing: []string{RelSatisfies},
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
-				WhenToCreate: "Create a bug when observed behavior deviates from desired state — a crash, wrong output, missing guard, or broken contract. Bugs are intent artifacts: they describe a defect to be corrected, not the corrective work (that's a task that implements the bug).",
-				AgentNote:    "Bug family=intent. A task implements a bug to close it. Filing a bug does not schedule work — link a task via implements to make it actionable. observed section is required; reproduction is strongly recommended.",
 			},
 			"need": {
 				KindIdentity:  KindIdentity{Prefix: "NEED", Code: "NED", Protected: true, Family: FamilyIntent},
@@ -705,8 +696,6 @@ func DefaultSchema() *Schema { //nolint:funlen // data initializer; cannot be sh
 					Outgoing: []string{RelJustifies, RelSatisfies},
 					Targets:  map[string][]string{RelJustifies: {"spec"}, RelSatisfies: {"template"}},
 				},
-				WhenToCreate: "Create a need when you have identified a capability gap or a problem statement before any solution exists. A need captures the 'why' — the pressure that justifies downstream specs and tasks.",
-				AgentNote:    "Needs are the root of the intent chain: need → (justifies) → spec → (implements) → task. A need without a justifying spec is unresolved. A need without a task chain is unscheduled intent.",
 			},
 			"ref": {
 				KindIdentity: KindIdentity{Prefix: "REF", Code: "REF", Protected: true, Family: FamilySupport},
@@ -736,8 +725,6 @@ func DefaultSchema() *Schema { //nolint:funlen // data initializer; cannot be sh
 					Outgoing: []string{RelSatisfies},
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
-				WhenToCreate: "Create a decision (ADR) when you evaluate multiple options and choose one — a technology choice, an architectural pattern, a policy. The decision records what was chosen and why, so future agents don't re-litigate settled questions.",
-				AgentNote:    "Decisions are immutable once accepted. They document options considered and rationale. Accepted decisions are authoritative. Specs that build on a draft decision are building on sand — lint surfaces this as a warning.",
 			},
 			"campaign": {
 				KindIdentity:  KindIdentity{Prefix: "CMP", Code: "CMP", Protected: true, Family: FamilyEffort},
@@ -748,8 +735,6 @@ func DefaultSchema() *Schema { //nolint:funlen // data initializer; cannot be sh
 					Outgoing: []string{RelParentOf, RelSatisfies},
 					Targets:  map[string][]string{RelSatisfies: {"template"}},
 				},
-				WhenToCreate: "Create a campaign when you are coordinating a multi-week effort with multiple goals toward a named outcome — a release, a refactor initiative, a feature area. Campaigns group goals; they are not created for single tasks.",
-				AgentNote:    "Campaigns contain goals (parent_of). Campaigns track in motd when active. A campaign without at least one active goal is stalled. mission section is required.",
 			},
 			"config": {
 				KindIdentity: KindIdentity{Prefix: "CFG", Code: "CFG", Protected: true, Family: FamilySupport},
@@ -918,7 +903,14 @@ func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inher
 		},
 	}
 
+	// Merge registry kinds (YAML-defined, operator-overridable) — these take
+	// precedence over the compiled-in DefaultSchema for any kind they define.
+	for name, kd := range registrySchema() { //nolint:gocritic // rangeValCopy: KindDef map values; pointer map would require larger refactor
+		s.Kinds[name] = kd
+	}
+
 	base := DefaultSchema()
+	// Merge any DefaultSchema kinds not already in registry or knowledge kinds.
 	for k, v := range base.Kinds { //nolint:gocritic // rangeValCopy: KindDef map values; pointer map would require larger refactor
 		if _, exists := s.Kinds[k]; !exists {
 			s.Kinds[k] = v

@@ -1,0 +1,8 @@
+name: contradicts
+directionality: symmetric
+when_to_use: |
+  Use contradicts when two notes document a genuine disagreement. Symmetric:
+  A contradicts B implies B contradicts A.
+semantics: |
+  Symmetric disagreement marker. Surfaced by knowledge lint as a tension to
+  resolve. Does not block anything.

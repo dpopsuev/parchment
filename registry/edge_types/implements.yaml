@@ -1,0 +1,8 @@
+name: implements
+when_to_use: |
+  Use implements when a task or spec concretely realizes an intent artifact
+  (spec, bug, need). A task implements a bug to fix it. A spec implements a
+  need to fulfill it.
+semantics: |
+  Intent-to-execution bridge. detect(check=all) flags specs and bugs with no
+  implementing artifacts as unowned work.

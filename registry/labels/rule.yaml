@@ -1,0 +1,10 @@
+name: rule
+world: behavioral
+eviction_policy: protected
+when_to_apply: |
+  Apply "rule" to notes that encode behavioral constraints — coding standards,
+  commit policies, naming conventions, process gates. These are the agent's
+  operating procedure.
+implies: |
+  Protected from eviction. Included in context_read as behavioral rules.
+  Dot-namespaced: "rule.security" inherits "rule".

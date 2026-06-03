@@ -1,0 +1,9 @@
+name: knowledge
+eviction_policy: protected
+half_life_days: 180
+when_to_apply: |
+  Apply "knowledge" to notes that encode domain facts, concepts, or reference
+  material that should survive beyond the session that created them.
+implies: |
+  Protected from eviction for 180 days. Included in evergreen knowledge queries.
+  Not auto-evicted by the structural heat algorithm.

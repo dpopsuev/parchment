@@ -1,0 +1,23 @@
+name: note
+prefix: NOT
+code: "n"
+family: knowledge
+lifecycle:
+  default_status: fleeting
+  transitions:
+    fleeting: [active, evergreen, archived]
+    active: [evergreen, fleeting, archived]
+    evergreen: [active, archived]
+    archived: []
+sections:
+  could: [body, summary, source]
+when_to_create: |
+  Create a note to capture an idea, observation, or piece of knowledge during
+  a session. Start as fleeting (draft in transit). Promote to evergreen when
+  the insight has been validated across multiple contexts.
+agent_note: |
+  Notes are the primary knowledge artifact. recall() searches notes by FTS.
+  Wikilinks ([[note-title]]) are indexed automatically. Labels route notes
+  into the correct knowledge context (rule, skill, knowledge, decision).
+
+children: []

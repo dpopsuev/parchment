@@ -93,6 +93,12 @@ const (
 	KindContext = "context" // agent's persistent memory about a person or workflow
 )
 
+// KindRule is a schema-level artifact that encodes a lifecycle rule.
+// Rule artifacts live in SchemaScope and are evaluated by the RuleEvaluator
+// during status transitions. They replace compiled-in Go transitionGuards.
+// Sections: trigger (event type), when (predicate), action (block|warn|allow), message.
+const KindRule = "rule"
+
 // Artifact field names (for SetField, update, etc.).
 const (
 	FieldAlias     = "alias"

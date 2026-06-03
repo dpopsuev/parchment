@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:embed registry/kinds/*.yaml registry/edge_types/*.yaml registry/labels/*.yaml
+//go:embed registry/kinds/*.yaml registry/edge_types/*.yaml registry/labels/*.yaml registry/rules/*.yaml
 var registryFS embed.FS
 
 // kindYAML is the on-disk format for a kind definition.
@@ -407,6 +407,42 @@ func migrateLabelSections(ctx context.Context, s Store) { //nolint:dupl // paral
 			_ = s.Put(ctx, art)
 		}
 	}
+}
+
+// ruleYAML is the on-disk format for a rule definition.
+type ruleYAML struct {
+	Name    string `yaml:"name"`
+	Trigger string `yaml:"trigger"`
+	When    string `yaml:"when"`
+	Action  string `yaml:"action"`
+	Message string `yaml:"message"`
+}
+
+// loadRegistryRules parses all rule YAML files from the embedded registry.
+func loadRegistryRules() []ruleYAML { //nolint:dupl // parallel to other loadRegistry* funcs; generic helper would obscure embed path
+	entries, err := registryFS.ReadDir("registry/rules")
+	if err != nil {
+		return nil
+	}
+	var rules []ruleYAML
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".yaml") {
+			continue
+		}
+		data, err := registryFS.ReadFile("registry/rules/" + e.Name())
+		if err != nil {
+			continue
+		}
+		var r ruleYAML
+		if err := yaml.Unmarshal(data, &r); err != nil {
+			continue
+		}
+		if r.Name == "" {
+			r.Name = strings.TrimSuffix(filepath.Base(e.Name()), ".yaml")
+		}
+		rules = append(rules, r)
+	}
+	return rules
 }
 
 // registrySchema builds a Schema from the embedded kind registry YAML files.

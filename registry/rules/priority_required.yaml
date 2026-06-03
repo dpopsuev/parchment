@@ -1,0 +1,5 @@
+name: priority_required
+trigger: status_changed
+when: to=active AND kind=task AND priority==""
+action: block
+message: "priority is required before activation — set priority to low, medium, high, or critical"

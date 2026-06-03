@@ -121,3 +121,93 @@ func seedRulesFromRegistry(ctx context.Context, s Store) {
 		}
 	}
 }
+
+// RuleResult is returned by EvaluateRule when a rule fires.
+// nil means the rule did not fire (transition is allowed by this rule).
+type RuleResult struct {
+	RuleID  string
+	Action  string // "block" | "warn"
+	Message string
+}
+
+// EvaluateRule evaluates a RuleDef against an artifact and a target status.
+// Returns a RuleResult if the rule fires, nil if it does not.
+//
+// Predicate syntax (simple AND-chain, intentionally minimal):
+//   to=active                — matches toStatus == "active"
+//   kind=task                — matches art.Kind == "task"
+//   priority==""             — matches art.Priority == ""
+//   status=draft             — matches art.Status == "draft"
+//   AND                      — conjunction (all must match)
+//
+// This is a bootstrap evaluator. As rules become more complex,
+// the predicate language can be extended without changing callers.
+func EvaluateRule(rule *RuleDef, art *Artifact, toStatus string) *RuleResult {
+	if rule.Trigger != "status_changed" {
+		return nil // only status_changed supported in this evaluator version
+	}
+	if !matchesPredicate(rule.When, art, toStatus) {
+		return nil
+	}
+	action := rule.Action
+	if action == "" {
+		action = "block"
+	}
+	return &RuleResult{
+		RuleID:  rule.ID,
+		Action:  action,
+		Message: rule.Message,
+	}
+}
+
+// matchesPredicate evaluates a simple AND-chain predicate string.
+// Each term is: field=value or field=="" (empty test).
+// Unknown terms pass silently — conservative: only block when predicate is understood.
+func matchesPredicate(predicate string, art *Artifact, toStatus string) bool {
+	terms := strings.Split(predicate, " AND ")
+	for _, term := range terms {
+		term = strings.TrimSpace(term)
+		if term == "" {
+			continue
+		}
+		if !matchesTerm(term, art, toStatus) {
+			return false
+		}
+	}
+	return true
+}
+
+// matchesTerm evaluates a single predicate term.
+func matchesTerm(term string, art *Artifact, toStatus string) bool {
+	// Handle empty-string check: field==""
+	if strings.HasSuffix(term, `==""`) {
+		field := strings.TrimSuffix(term, `==""`)
+		return fieldValue(field, art, toStatus) == ""
+	}
+	// Handle equality: field=value
+	idx := strings.IndexByte(term, '=')
+	if idx < 0 {
+		return true // unrecognized term — pass
+	}
+	field := strings.TrimSpace(term[:idx])
+	value := strings.Trim(strings.TrimSpace(term[idx+1:]), `"`)
+	return fieldValue(field, art, toStatus) == value
+}
+
+// fieldValue maps a predicate field name to its value on the artifact or context.
+func fieldValue(field string, art *Artifact, toStatus string) string {
+	switch field {
+	case "to":
+		return toStatus
+	case FieldKind:
+		return art.Kind
+	case "status":
+		return art.Status
+	case "priority":
+		return art.Priority
+	case FieldScope:
+		return art.Scope
+	default:
+		return "" // unknown field — treated as empty
+	}
+}

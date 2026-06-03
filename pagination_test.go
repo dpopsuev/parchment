@@ -2,6 +2,7 @@ package parchment_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/dpopsuev/parchment"
@@ -86,6 +87,33 @@ func TestProtocol_ListPage_ZeroLimitReturnsAll(t *testing.T) {
 	}
 	if page.NextCursor != "" {
 		t.Errorf("NextCursor should be empty when Limit=0, got %q", page.NextCursor)
+	}
+}
+
+func TestProtocol_ListPage_TitleContains_Filters(t *testing.T) {
+	// Given: artifacts with different titles
+	// When: ListPage is called with TitleContains
+	// Then: only matching artifacts are returned — not silently dropped
+	t.Parallel()
+	store := parchment.NewMemoryStore()
+	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
+	ctx := context.Background()
+
+	proto.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindTask, Title: "fix authentication bug", Scope: "test"})     //nolint:errcheck // test setup
+	proto.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindTask, Title: "implement caching layer", Scope: "test"}) //nolint:errcheck // test setup
+	proto.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindTask, Title: "auth token refresh", Scope: "test"})      //nolint:errcheck // test setup
+
+	page, err := proto.ListPage(ctx, parchment.ListInput{Scope: "test", TitleContains: "auth"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Artifacts) != 2 {
+		t.Errorf("expected 2 artifacts matching 'auth', got %d", len(page.Artifacts))
+	}
+	for _, a := range page.Artifacts {
+		if !strings.Contains(strings.ToLower(a.Title), "auth") {
+			t.Errorf("artifact %q does not contain 'auth'", a.Title)
+		}
 	}
 }
 

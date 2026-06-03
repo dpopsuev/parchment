@@ -196,6 +196,14 @@ func (m *MemoryStore) Search(_ context.Context, query string) ([]string, error) 
 			strings.Contains(strings.ToLower(art.Goal), query) ||
 			strings.Contains(strings.ToLower(art.ID), query) {
 			ids = append(ids, art.ID)
+			continue
+		}
+		// Also search section text — mirrors SQLite FTS5 which indexes sections.
+		for _, sec := range art.Sections {
+			if strings.Contains(strings.ToLower(sec.Text), query) {
+				ids = append(ids, art.ID)
+				break
+			}
 		}
 	}
 	sort.Strings(ids)

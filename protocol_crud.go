@@ -434,7 +434,21 @@ func (p *Protocol) ListPage(ctx context.Context, in ListInput) (Page, error) { /
 	}
 	p.populateScopeLabelIndex(ctx, &f)
 	p.populateFamilyKinds(&f)
-	return p.store.ListPage(ctx, f)
+	page, err := p.store.ListPage(ctx, f)
+	if err != nil || in.TitleContains == "" {
+		return page, err
+	}
+	// Apply TitleContains post-fetch (same as ListArtifacts).
+	q := strings.ToLower(in.TitleContains)
+	filtered := page.Artifacts[:0]
+	for _, art := range page.Artifacts {
+		if strings.Contains(strings.ToLower(art.Title), q) {
+			filtered = append(filtered, art)
+		}
+	}
+	page.Artifacts = filtered
+	page.Total = len(filtered)
+	return page, nil
 }
 
 // populateFamilyKinds resolves the Family filter field into a FamilyKinds

@@ -262,17 +262,7 @@ func (p *Protocol) setStatus(ctx context.Context, art *Artifact, status string) 
 	return p.setStatusForce(ctx, art, status, false)
 }
 
-// transitionGuard is a composable pre-condition for status transitions.
-// When: target status to trigger on (empty = all)
-// What: the check function (returns error to block, nil to pass)
-// Where: kind filter (empty = all kinds)
-type transitionGuard struct {
-	name      string
-	when      string // target status ("complete", "active", ""), empty = always
-	where     string // kind filter ("task", "spec", ""), empty = all
-	forceable bool   // if true, force=true skips this guard
-	check     func(ctx context.Context, p *Protocol, art *Artifact) error
-}
+
 
 func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status string, force bool) Result { //nolint:gocyclo,funlen // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol.go
 	reason, valid := p.schema.ValidTransition(art.Kind, art.Status, status)
@@ -286,25 +276,6 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 			slog.String(LogKeyFrom, art.Status),
 			slog.String(LogKeyTo, status),
 			slog.String(LogKeyReason, reason))
-	}
-
-	// Composable pre-transition guards (skipped entirely for SkipGuards kinds like mirror)
-	if kd, ok := p.schema.Kinds[art.Kind]; !ok || !kd.SkipGuards {
-		guards := p.transitionGuards()
-		for _, g := range guards {
-			if force && g.forceable {
-				continue
-			}
-			if g.when != "" && g.when != status {
-				continue
-			}
-			if g.where != "" && g.where != art.Kind {
-				continue
-			}
-			if err := g.check(ctx, p, art); err != nil {
-				return Result{ID: art.ID, Error: err.Error()}
-			}
-		}
 	}
 
 	// Rule evaluator: check rule artifacts loaded from _schema.
@@ -422,24 +393,7 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 
 // transitionGuards returns the ordered list of composable pre-transition guards.
 // Each guard defines when (target status), where (kind), and what (check function).
-func (p *Protocol) transitionGuards() []transitionGuard {
-	var guards []transitionGuard
 
-	// children_complete migrated  → registry/rules/children_complete.yaml
-	// depends_on_complete migrated → registry/rules/depends_on_complete.yaml
-	// completion_gates migrated    → registry/rules/completion_gates.yaml
-	// template_conformance_promote migrated → registry/rules/template_conformance_promote.yaml
-	// template_conformance_complete migrated → registry/rules/template_conformance_complete.yaml
-
-	// Archive: children must be readonly
-	// All guards migrated to registry/rules/ YAML artifacts:
-	// children_readonly    → registry/rules/children_readonly.yaml
-	// worker_id_required   → registry/rules/worker_id_required.yaml
-	// stamps_required      → registry/rules/stamps_required.yaml
-	// required_sections    → registry/rules/required_sections.yaml
-
-	return guards
-}
 
 func (p *Protocol) guardDependsOnComplete(ctx context.Context, art *Artifact) error {
 	var incomplete []string

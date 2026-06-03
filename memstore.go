@@ -551,12 +551,13 @@ func (m *MemoryStore) SearchSemantic(_ context.Context, model string, query []fl
 		results = append(results, scored{artifactID, sim})
 	}
 
-	// Sort descending by cosine similarity.
-	for i := 1; i < len(results); i++ {
-		for j := i; j > 0 && results[j].score > results[j-1].score; j-- {
-			results[j], results[j-1] = results[j-1], results[j]
+	// Sort descending by score; break ties by ID ascending for determinism.
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].score != results[j].score {
+			return results[i].score > results[j].score
 		}
-	}
+		return results[i].id < results[j].id
+	})
 
 	if n > len(results) {
 		n = len(results)
@@ -625,6 +626,7 @@ func (m *MemoryStore) PatchArtifact(_ context.Context, id string, patch Artifact
 func (m *MemoryStore) ListPage(_ context.Context, f Filter) (Page, error) { //nolint:gocritic // hugeParam: Filter matches Store interface; pointer would require changing the interface
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
 	var results []*Artifact
 	for _, art := range m.artifacts {
 		if f.Matches(art) {
@@ -632,7 +634,46 @@ func (m *MemoryStore) ListPage(_ context.Context, f Filter) (Page, error) { //no
 			results = append(results, &cp)
 		}
 	}
-	return Page{Artifacts: results, Total: len(results)}, nil
+
+	// Stable sort by (InsertedAt, ID) — mirrors SQLite ORDER BY inserted_at, id.
+	sort.Slice(results, func(i, j int) bool {
+		ti, tj := results[i].InsertedAt, results[j].InsertedAt
+		if ti.Equal(tj) {
+			return results[i].ID < results[j].ID
+		}
+		return ti.Before(tj)
+	})
+
+	total := len(results)
+
+	// Apply cursor: skip all artifacts at or before (insertedAt, id).
+	if f.Cursor != "" {
+		parts := decodeCursor(f.Cursor)
+		if len(parts) == 2 {
+			cursorTs, cursorID := parts[0], parts[1]
+			cut := 0
+			for cut < len(results) {
+				art := results[cut]
+				ts := art.InsertedAt.Format(time.RFC3339Nano)
+				if ts < cursorTs || (ts == cursorTs && art.ID <= cursorID) {
+					cut++
+				} else {
+					break
+				}
+			}
+			results = results[cut:]
+		}
+	}
+
+	// Apply page limit.
+	var nextCursor string
+	if f.Limit > 0 && len(results) > f.Limit {
+		results = results[:f.Limit]
+		last := results[len(results)-1]
+		nextCursor = encodeCursor(last.InsertedAt.Format(time.RFC3339Nano), last.ID)
+	}
+
+	return Page{Artifacts: results, NextCursor: nextCursor, Total: total}, nil
 }
 
 func (m *MemoryStore) UpdateEdgeWeight(_ context.Context, from, to, relation string, weight float64) error {

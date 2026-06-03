@@ -27,15 +27,20 @@ func TestProtocol_ListPage_PaginatesCorrectly(t *testing.T) {
 	}
 
 	var all []string
+	pages := 0
 	cursor := ""
 	for {
 		page, err := proto.ListPage(ctx, parchment.ListInput{Scope: "test", Limit: 2, Cursor: cursor})
 		if err != nil {
 			t.Fatalf("ListPage: %v", err)
 		}
+		if len(page.Artifacts) > 2 {
+			t.Errorf("page %d has %d artifacts, want ≤2 (Limit=2)", pages+1, len(page.Artifacts))
+		}
 		for _, a := range page.Artifacts {
 			all = append(all, a.ID)
 		}
+		pages++
 		if page.NextCursor == "" {
 			break
 		}
@@ -43,6 +48,9 @@ func TestProtocol_ListPage_PaginatesCorrectly(t *testing.T) {
 	}
 	if len(all) != 5 {
 		t.Errorf("expected 5 total artifacts across pages, got %d: %v", len(all), all)
+	}
+	if pages < 3 {
+		t.Errorf("expected ≥3 pages for 5 artifacts with Limit=2, got %d", pages)
 	}
 	// No duplicates
 	seen := make(map[string]bool)

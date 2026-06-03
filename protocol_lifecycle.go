@@ -397,14 +397,14 @@ func (p *Protocol) transitionGuards() []transitionGuard {
 
 	// Template conformance on promotion: partial drafts are allowed at create time,
 	// required sections must be present before the artifact can go active.
-	guards = append(guards, transitionGuard{
+	guards = append(guards, transitionGuard{ //nolint:gocritic // appendCombine: separated intentionally for readability; each block has its own comment
 		name: "template_conformance_promote", when: StatusActive, forceable: true,
 		check: func(ctx context.Context, p *Protocol, art *Artifact) error {
 			// Enforce sections explicitly marked "required:" in the template guidance text,
 			// plus schema MustSections. Investigation-time sections (fix, root_cause, etc.)
 			// without a "required:" prefix are deferred to completion.
 			if err := p.checkTemplateConformancePromote(ctx, art); err != nil {
-				return fmt.Errorf("cannot promote to active: %w", err) //nolint:err113
+				return fmt.Errorf("cannot promote to active: %w", err) //nolint:err113 // wraps inner error; no standalone sentinel needed
 			}
 			return nil
 		},

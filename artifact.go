@@ -96,7 +96,7 @@ const (
 	RelCites       = "cites"       // note → source (this note draws from this source)
 	RelElaborates  = "elaborates"  // note → concept (expands on an atomic idea)
 	RelContradicts = "contradicts" // note ↔ note (documents disagreement)
-	RelSynthesises = "synthesises" // note → [note…] (is a synthesis of multiple notes)
+	RelSynthesises = "synthesises" //nolint:misspell // British spelling; changing the value would break existing stored edges
 	RelRemembers   = "remembers"   // context → note/concept (agent bookmarked this)
 )
 
@@ -184,7 +184,7 @@ type Page struct {
 }
 
 // Matches reports whether art satisfies all non-zero filter fields.
-func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop // filter has many independent fields
+func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic // hugeParam: Filter is read-only in all callers; pointer would complicate call sites
 	if f.Family != "" && len(f.FamilyKinds) > 0 {
 		if !f.FamilyKinds[art.Kind] {
 			return false
@@ -205,7 +205,7 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop // filter has many
 	if f.Kind != "" && art.Kind != f.Kind {
 		return false
 	}
-	if len(f.Scopes) > 0 {
+	if len(f.Scopes) > 0 { //nolint:nestif // scope filter has legitimate branching; splitting would reduce clarity
 		found := false
 		for _, s := range f.Scopes {
 			if art.Scope == s {
@@ -239,7 +239,7 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop // filter has many
 
 // MatchLabels returns true if the artifact passes all label-related filter checks
 // (Labels AND, LabelsOr OR, ExcludeLabels NOT) with scope label expansion.
-func (f Filter) MatchLabels(art *Artifact) bool {
+func (f Filter) MatchLabels(art *Artifact) bool { //nolint:gocritic // hugeParam: Filter is read-only in all callers; pointer would complicate call sites
 	if len(f.Labels) > 0 {
 		for _, want := range f.Labels {
 			if !f.labelCheck(want, art) {
@@ -248,14 +248,14 @@ func (f Filter) MatchLabels(art *Artifact) bool {
 		}
 	}
 	if len(f.LabelsOr) > 0 {
-		any := false
+		found := false //nolint:gocritic // builtinShadow: renamed from `any` to avoid shadowing builtin
 		for _, want := range f.LabelsOr {
 			if f.labelCheck(want, art) {
-				any = true
+				found = true
 				break
 			}
 		}
-		if !any {
+		if !found {
 			return false
 		}
 	}
@@ -271,7 +271,7 @@ func (f Filter) MatchLabels(art *Artifact) bool {
 
 // labelCheck returns true if the artifact has the label directly
 // or its scope carries the label (via the pre-populated ScopeLabelIndex).
-func (f Filter) labelCheck(label string, art *Artifact) bool {
+func (f Filter) labelCheck(label string, art *Artifact) bool { //nolint:gocritic // hugeParam: Filter is read-only in all callers; pointer would complicate call sites
 	for _, l := range art.Labels {
 		if l == label {
 			return true

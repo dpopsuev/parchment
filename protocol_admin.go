@@ -523,7 +523,7 @@ func (p *Protocol) generateTemplatedID(ctx context.Context, scope, kind string) 
 	tmpl := p.idTemplate
 	scopeKey := ""
 	for _, c := range tmpl.Components {
-		if c.Type == "scope" {
+		if c.Type == FieldScope {
 			var err error
 			scopeKey, err = p.resolveScopeKey(ctx, scope)
 			if err != nil {

@@ -453,7 +453,7 @@ func (m *MemoryStore) Save(path string) error {
 	}
 
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // store dir; 0755 is intentional for user readability
 		return fmt.Errorf("mkdir: %w", err)
 	}
 
@@ -462,7 +462,7 @@ func (m *MemoryStore) Save(path string) error {
 		return fmt.Errorf("write tmp: %w", err)
 	}
 	if err := os.Rename(tmp, path); err != nil {
-		os.Remove(tmp) //nolint:errcheck // best-effort cleanup
+		_ = os.Remove(tmp) //nolint:gosec // G104: best-effort cleanup of temp file after failed rename
 		return fmt.Errorf("rename: %w", err)
 	}
 	return nil

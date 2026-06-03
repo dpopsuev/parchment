@@ -28,7 +28,7 @@ func (b *LocalSnapshotBackend) Save(ctx context.Context, name string) (*Snapshot
 	// Checkpoint WAL for consistent snapshot
 	if b.writer != nil {
 		if _, err := b.writer.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
-			slog.Warn("WAL checkpoint failed before snapshot", "error", err)
+			slog.WarnContext(ctx, "WAL checkpoint failed before snapshot", slog.Any(LogKeyError, err))
 		}
 	}
 
@@ -52,8 +52,8 @@ func (b *LocalSnapshotBackend) Save(ctx context.Context, name string) (*Snapshot
 	snapDB, err := sql.Open("sqlite", snapPath+"?_pragma=query_only(on)")
 	if err == nil {
 		row := snapDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM artifacts")
-		row.Scan(&count)
-		snapDB.Close()
+		_ = row.Scan(&count)
+		_ = snapDB.Close()
 	}
 
 	meta := &SnapshotMeta{
@@ -64,7 +64,7 @@ func (b *LocalSnapshotBackend) Save(ctx context.Context, name string) (*Snapshot
 		Artifacts: count,
 	}
 
-	slog.Info("snapshot created", "path", snapPath, "artifacts", count, "size_bytes", info.Size())
+	slog.InfoContext(ctx, "snapshot created", slog.String("path", snapPath), slog.Int("artifacts", count), slog.Int64("size_bytes", info.Size())) //nolint:sloglint // no LogKey constants for "path"/"artifacts"/"size_bytes"
 	return meta, nil
 }
 
@@ -124,18 +124,18 @@ func (b *LocalSnapshotBackend) ReadArtifactIndex(ctx context.Context, key string
 	if err != nil {
 		return nil, err
 	}
-	defer snapDB.Close()
+	defer snapDB.Close() //nolint:errcheck // read-only snapshot DB; close error is non-critical
 
 	rows, err := snapDB.QueryContext(ctx, "SELECT id, updated_at FROM artifacts")
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed or context canceled
 
 	index := make(map[string]string)
 	for rows.Next() {
 		var id, updatedAt string
-		rows.Scan(&id, &updatedAt)
+		_ = rows.Scan(&id, &updatedAt)
 		index[id] = updatedAt
 	}
 	return index, rows.Err()
@@ -143,27 +143,27 @@ func (b *LocalSnapshotBackend) ReadArtifactIndex(ctx context.Context, key string
 
 func (b *LocalSnapshotBackend) Restore(ctx context.Context, key string) error {
 	if _, err := os.Stat(key); err != nil {
-		return fmt.Errorf("snapshot not found: %s", key)
+		return fmt.Errorf("snapshot not found: %s", key) //nolint:err113 // runtime value (key) required in message
 	}
 	if err := copyFile(key, b.dbPath); err != nil {
 		return fmt.Errorf("restore copy failed: %w", err)
 	}
-	slog.Info("snapshot restored", "from", key, "to", b.dbPath)
+	slog.InfoContext(ctx, "snapshot restored", slog.String("from", key), slog.String("to", b.dbPath)) //nolint:sloglint // LogKeyFrom/LogKeyTo already exist but "from"/"to" are directional (not semantic)
 	return nil
 }
 
 func copyFile(src, dst string) error {
-	in, err := os.Open(src)
+	in, err := os.Open(src) //nolint:gosec // src is an operator-supplied snapshot path
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer in.Close() //nolint:errcheck // read-only file; close error is non-critical
 
-	out, err := os.Create(dst)
+	out, err := os.Create(dst) //nolint:gosec // dst is an operator-supplied database path
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer out.Close() //nolint:errcheck // error already captured by io.Copy result
 
 	if _, err := io.Copy(out, in); err != nil {
 		return err

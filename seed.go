@@ -31,7 +31,7 @@ func (p *Protocol) Seed(ctx context.Context, dir string) (*SeedResult, error) {
 			path := filepath.Join(tplDir, e.Name())
 			art, err := parseTemplateFile(path)
 			if err != nil {
-				slog.Warn("seed: skip template", "path", path, "error", err)
+				slog.WarnContext(ctx, "seed: skip template", slog.String("path", path), slog.Any(LogKeyError, err)) //nolint:sloglint // no LogKeyPath constant
 				continue
 			}
 			// Check if already exists
@@ -43,7 +43,7 @@ func (p *Protocol) Seed(ctx context.Context, dir string) (*SeedResult, error) {
 				return result, fmt.Errorf("seed %s: %w", art.ID, err)
 			}
 			result.Created = append(result.Created, art.ID)
-			slog.Info("seed: created template", "id", art.ID, "title", art.Title)
+			slog.InfoContext(ctx, "seed: created template", slog.String(LogKeyID, art.ID), slog.String(LogKeyTitle, art.Title))
 		}
 	}
 
@@ -57,7 +57,7 @@ func (p *Protocol) Seed(ctx context.Context, dir string) (*SeedResult, error) {
 			path := filepath.Join(cfgDir, e.Name())
 			art, err := parseConfigFile(path)
 			if err != nil {
-				slog.Warn("seed: skip config", "path", path, "error", err)
+				slog.WarnContext(ctx, "seed: skip config", slog.String("path", path), slog.Any(LogKeyError, err)) //nolint:sloglint // no LogKeyPath constant
 				continue
 			}
 			if existing, _ := p.store.Get(ctx, art.ID); existing != nil {
@@ -68,7 +68,7 @@ func (p *Protocol) Seed(ctx context.Context, dir string) (*SeedResult, error) {
 				return result, fmt.Errorf("seed %s: %w", art.ID, err)
 			}
 			result.Created = append(result.Created, art.ID)
-			slog.Info("seed: created config", "id", art.ID, "scope", art.Scope)
+			slog.InfoContext(ctx, "seed: created config", slog.String(LogKeyID, art.ID), slog.String(LogKeyScope, art.Scope))
 		}
 	}
 
@@ -80,14 +80,14 @@ func (p *Protocol) Seed(ctx context.Context, dir string) (*SeedResult, error) {
 // H2 headings become named sections; the full body before the first heading
 // is dropped (frontmatter carries the structured data).
 func ParseMDFile(path string) (*Artifact, error) { //nolint:gosec,gocyclo,cyclop // one case per frontmatter field; complexity is linear not nested
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path is operator-supplied template directory path
 	if err != nil {
 		return nil, err
 	}
 	content := strings.ReplaceAll(string(data), "\r\n", "\n")
 	art := &Artifact{Kind: KindNote, Status: StatusActive}
 
-	if strings.HasPrefix(content, "---\n") {
+	if strings.HasPrefix(content, "---\n") { //nolint:nestif // YAML frontmatter parsing; branching is inherent to the format
 		end := strings.Index(content[4:], "\n---")
 		if end >= 0 {
 			fm := content[4 : 4+end]
@@ -102,11 +102,11 @@ func ParseMDFile(path string) (*Artifact, error) { //nolint:gosec,gocyclo,cyclop
 				switch key {
 				case "id":
 					art.ID = val
-				case "kind":
+				case FieldKind:
 					art.Kind = val
 				case "title":
 					art.Title = val
-				case "scope":
+				case FieldScope:
 					art.Scope = val
 				case "status":
 					art.Status = val
@@ -188,7 +188,7 @@ func parseTemplateFile(path string) (*Artifact, error) {
 // parseConfigFile reads a YAML file where each top-level key becomes a section.
 // Filename (without extension) becomes the scope. "global" = no scope.
 func parseConfigFile(path string) (*Artifact, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path is operator-supplied config directory path
 	if err != nil {
 		return nil, err
 	}

@@ -77,7 +77,7 @@ func TestAlias_AliasesAreSequential(t *testing.T) {
 }
 
 // TestAlias_CustomAliasOnCreate verifies that a caller-supplied alias is
-// honoured instead of auto-generating one.
+// honored instead of auto-generating one.
 func TestAlias_CustomAliasOnCreate(t *testing.T) {
 	t.Parallel()
 	proto := uuidProto(t)

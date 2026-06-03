@@ -48,7 +48,7 @@ func MigrateToUUID(srcPath, dstPath string) (*UUIDMigrateResult, error) {
 
 	result := buildIDRemap(recs)
 	if result.Remapped == 0 {
-		slog.Info("migrate-ids: all artifact IDs are already UUID-shaped")
+		slog.InfoContext(ctx, "migrate-ids: all artifact IDs are already UUID-shaped")
 		return result, nil
 	}
 
@@ -59,7 +59,7 @@ func MigrateToUUID(srcPath, dstPath string) (*UUIDMigrateResult, error) {
 	// Rebuild FTS5 index outside the transaction.
 	if _, err := db.ExecContext(ctx,
 		"INSERT INTO artifacts_fts(artifacts_fts) VALUES('rebuild')"); err != nil {
-		slog.Warn("FTS5 rebuild after UUID migration failed (non-fatal)", slog.Any("error", err))
+		slog.WarnContext(ctx, "FTS5 rebuild after UUID migration failed (non-fatal)", slog.Any(LogKeyError, err))
 	}
 
 	return result, nil
@@ -250,7 +250,7 @@ func copyWithCheckpoint(srcPath, dstPath string) error {
 	src.SetMaxOpenConns(1)
 	_, cpErr := src.ExecContext(context.Background(), "PRAGMA wal_checkpoint(FULL)")
 	if err := src.Close(); err != nil {
-		slog.Warn("close source after checkpoint", slog.Any("error", err))
+		slog.WarnContext(context.Background(), "close source after checkpoint", slog.Any(LogKeyError, err))
 	}
 	if cpErr != nil {
 		return fmt.Errorf("wal checkpoint: %w", cpErr)

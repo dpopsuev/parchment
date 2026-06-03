@@ -2344,7 +2344,7 @@ func TestCreateArtifact_ConformanceErrorHasStashID(t *testing.T) {
 	proto := setupTemplateProtoForConformance(t)
 
 	// Create bug without required "observed" section.
-	// New behaviour: succeeds as draft with a warning (no hard error at create time).
+	// New behavior: succeeds as draft with a warning (no hard error at create time).
 	// Template conformance fires when promoting out of draft.
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
 		Kind:  "bug",

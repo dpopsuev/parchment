@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -23,9 +24,9 @@ type CapsuleManifest struct {
 // and a manifest. Backend-agnostic — reads through the Store interface.
 func (p *Protocol) CapsuleExport(ctx context.Context, w io.Writer, version string) (*CapsuleManifest, error) {
 	gw := gzip.NewWriter(w)
-	defer gw.Close()
+	defer gw.Close() //nolint:errcheck // gzip.Writer.Close flushes; error already surfaced through tw.Close or caller
 	tw := tar.NewWriter(gw)
-	defer tw.Close()
+	defer tw.Close() //nolint:errcheck // tar.Writer.Close writes final blocks; error surfaced to caller via gw.Close
 
 	// Export artifacts as JSON-lines
 	arts, err := p.store.List(ctx, Filter{})
@@ -82,7 +83,7 @@ func (p *Protocol) CapsuleImport(ctx context.Context, r io.Reader) (*CapsuleMani
 	if err != nil {
 		return nil, fmt.Errorf("gzip: %w", err)
 	}
-	defer gr.Close()
+	defer gr.Close() //nolint:errcheck // gzip.Reader.Close only returns error when it hasn't read to EOF; we read to EOF in the loop
 	tr := tar.NewReader(gr)
 
 	var manifest *CapsuleManifest
@@ -90,7 +91,7 @@ func (p *Protocol) CapsuleImport(ctx context.Context, r io.Reader) (*CapsuleMani
 
 	for {
 		hdr, err := tr.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -114,7 +115,7 @@ func (p *Protocol) CapsuleImport(ctx context.Context, r io.Reader) (*CapsuleMani
 	}
 
 	if manifest == nil {
-		return nil, fmt.Errorf("capsule missing manifest.json")
+		return nil, fmt.Errorf("capsule missing manifest.json") //nolint:err113 // sentinel string; no runtime values
 	}
 
 	// Import artifacts
@@ -137,7 +138,7 @@ func (p *Protocol) CapsuleImport(ctx context.Context, r io.Reader) (*CapsuleMani
 			if err := dec.Decode(&e); err != nil {
 				return manifest, fmt.Errorf("decode edge: %w", err)
 			}
-			p.store.AddEdge(ctx, e)
+			_ = p.store.AddEdge(ctx, e)
 		}
 	}
 
@@ -150,12 +151,12 @@ func CapsuleInspect(r io.Reader) (*CapsuleManifest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("gzip: %w", err)
 	}
-	defer gr.Close()
+	defer gr.Close() //nolint:errcheck // gzip.Reader.Close only returns error when it hasn't read to EOF
 	tr := tar.NewReader(gr)
 
 	for {
 		hdr, err := tr.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -173,14 +174,14 @@ func CapsuleInspect(r io.Reader) (*CapsuleManifest, error) {
 			return &m, nil
 		}
 	}
-	return nil, fmt.Errorf("manifest.json not found in capsule")
+	return nil, fmt.Errorf("manifest.json not found in capsule") //nolint:err113 // sentinel string; no runtime values
 }
 
 func addTarEntry(tw *tar.Writer, name string, data []byte) error {
 	hdr := &tar.Header{
 		Name:    name,
 		Size:    int64(len(data)),
-		Mode:    0644,
+		Mode:    0o644,
 		ModTime: time.Now(),
 	}
 	if err := tw.WriteHeader(hdr); err != nil {

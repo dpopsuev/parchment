@@ -162,6 +162,11 @@ func ensureEventSchema(db *sql.DB) {
 	}
 }
 
+// GetEvents returns events from the EventLog since the given timestamp.
+func (p *Protocol) GetEvents(ctx context.Context, since time.Time, filter EventFilter) ([]Event, error) {
+	return p.store.GetEvents(ctx, since, filter)
+}
+
 // emitEvent appends an event to the EventLog. Errors are logged but not returned —
 // a failed event write must never block or fail a mutation.
 func (p *Protocol) emitEvent(ctx context.Context, eventType, artifactID, scope string, payload any) {

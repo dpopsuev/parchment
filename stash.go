@@ -43,7 +43,7 @@ func NewStashStore(ttl time.Duration, limit int) *StashStore {
 }
 
 // Put stores a partial artifact and returns the stash ID.
-func (s *StashStore) Put(in CreateInput) (string, error) {
+func (s *StashStore) Put(in CreateInput) (string, error) { //nolint:gocritic // hugeParam: CreateInput value semantics intentional; matches all other Protocol methods
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -51,7 +51,7 @@ func (s *StashStore) Put(in CreateInput) (string, error) {
 	s.expireLocked()
 
 	if len(s.stashes) >= s.limit {
-		return "", fmt.Errorf("stash limit exceeded (%d)", s.limit)
+		return "", fmt.Errorf("stash limit exceeded (%d)", s.limit) //nolint:err113 // runtime value (limit) required in message
 	}
 
 	var buf [16]byte
@@ -71,11 +71,11 @@ func (s *StashStore) Get(id string) (*StashedArtifact, error) {
 
 	stash, ok := s.stashes[id]
 	if !ok {
-		return nil, fmt.Errorf("stash not found")
+		return nil, fmt.Errorf("stash not found") //nolint:err113 // sentinel string; no runtime values
 	}
 	if time.Since(stash.CreatedAt) > s.ttl {
 		delete(s.stashes, id)
-		return nil, fmt.Errorf("stash expired")
+		return nil, fmt.Errorf("stash expired") //nolint:err113 // sentinel string; no runtime values
 	}
 	return stash, nil
 }
@@ -106,7 +106,7 @@ func (s *StashStore) expireLocked() {
 
 // MergeInput applies patch fields onto a stashed CreateInput.
 // Non-empty patch values override, sections are appended (deduped by name).
-func MergeInput(base CreateInput, patch CreateInput) CreateInput {
+func MergeInput(base CreateInput, patch CreateInput) CreateInput { //nolint:gocritic // hugeParam: CreateInput value semantics intentional; caller retains ownership of both
 	if patch.Title != "" {
 		base.Title = patch.Title
 	}

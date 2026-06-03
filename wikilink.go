@@ -127,9 +127,7 @@ func (p *Protocol) SyncWikilinks(ctx context.Context, id string) ([]string, erro
 		}
 	}
 	if len(created) > 0 {
-		slog.InfoContext(ctx, "wikilinks synced",
-			slog.String(LogKeyID, id),
-			slog.Int("new_edges", len(created)))
+		slog.InfoContext(ctx, "wikilinks synced", slog.String(LogKeyID, id), slog.Int("new_edges", len(created))) //nolint:sloglint // no LogKey constant for "new_edges"
 	}
 	return created, nil
 }

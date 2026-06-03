@@ -50,7 +50,7 @@ func DeriveKey(name string, existing map[string]bool) string {
 // (e.g. "bug" -> BUG, not BGU).
 func ExtractConsonantSkeleton(name string) string {
 	upper := toAlpha(name)
-	if len(upper) == 0 {
+	if upper == "" {
 		return "XXX"
 	}
 

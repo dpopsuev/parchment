@@ -153,7 +153,7 @@ func (p *Protocol) cascadeOverlaps(ctx context.Context, changed *Artifact, affec
 	}
 }
 
-func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string, targetIDs []string) ([]Result, error) {
+func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string, targetIDs []string) ([]Result, error) { //nolint:gocyclo,cyclop // link has many validation branches; splitting would increase call depth
 	if sourceID == "" {
 		return nil, fmt.Errorf("source ID is required") //nolint:err113 // pre-existing
 	}
@@ -195,10 +195,7 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 				return nil, fmt.Errorf("failed to resolve satisfies target %s: %w", tid, err)
 			}
 			if tpl.Kind != KindTemplate {
-				slog.WarnContext(ctx, "satisfies link target is not a template", //nolint:sloglint // pre-existing
-					"source_id", sourceID,
-					"target_id", tid,
-					"target_kind", tpl.Kind)
+				slog.WarnContext(ctx, "satisfies link target is not a template", slog.String("source_id", sourceID), slog.String("target_id", tid), slog.String("target_kind", tpl.Kind)) //nolint:sloglint // source_id/target_id/target_kind have no LogKey constants
 				return nil, fmt.Errorf("satisfies link target %s is not a template (kind=%s)", tid, tpl.Kind) //nolint:err113 // pre-existing
 			}
 			// Temporarily add link to artifact for conformance check
@@ -209,10 +206,7 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 				Links:    map[string][]string{RelSatisfies: {tid}},
 			}
 			if err := p.checkTemplateConformance(ctx, artWithLink, true); err != nil {
-				slog.WarnContext(ctx, "satisfies link blocked by template enforcement", //nolint:sloglint // pre-existing
-					"source_id", sourceID,
-					"target_id", tid,
-					"error", err.Error())
+				slog.WarnContext(ctx, "satisfies link blocked by template enforcement", slog.String("source_id", sourceID), slog.String("target_id", tid), slog.Any(LogKeyError, err)) //nolint:sloglint // source_id/target_id have no LogKey constants
 				return nil, err
 			}
 		}

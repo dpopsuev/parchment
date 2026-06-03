@@ -138,7 +138,7 @@ func ValidateKind(kind string, vocab []string) error {
 	sorted := make([]string, len(vocab))
 	copy(sorted, vocab)
 	sort.Strings(sorted)
-	return fmt.Errorf("unknown kind %q — registered kinds: %s. To register a new kind: scribe vocab add %s",
+	return fmt.Errorf("unknown kind %q — registered kinds: %s. To register a new kind: scribe vocab add %s", //nolint:err113 // runtime values (kind name, registered list) required in message
 		kind, strings.Join(sorted, ", "), kind)
 }
 
@@ -179,7 +179,7 @@ func (s *Schema) GetExpectedSections(kind string) []string {
 		return nil
 	}
 	if len(kd.MustSections) > 0 || len(kd.ShouldSections) > 0 || len(kd.CouldSections) > 0 {
-		var all []string
+		all := make([]string, 0, len(kd.MustSections)+len(kd.ShouldSections)+len(kd.CouldSections))
 		all = append(all, kd.MustSections...)
 		all = append(all, kd.ShouldSections...)
 		all = append(all, kd.CouldSections...)
@@ -307,7 +307,7 @@ func (s *Schema) MissingCompletionGates(art *Artifact) []string {
 // GoalKind returns the kind name and def with IsGoalKind=true.
 // Returns ("", KindDef{}) if none is marked.
 func (s *Schema) GoalKind() (string, KindDef) {
-	for name, def := range s.Kinds {
+	for name, def := range s.Kinds { //nolint:gocritic // rangeValCopy: KindDef map values; pointer map would require larger refactor
 		if def.IsGoalKind {
 			return name, def
 		}
@@ -318,7 +318,7 @@ func (s *Schema) GoalKind() (string, KindDef) {
 // MotdKinds returns kinds with TrackInMotd=true.
 func (s *Schema) MotdKinds() map[string]KindDef {
 	out := make(map[string]KindDef)
-	for name, def := range s.Kinds {
+	for name, def := range s.Kinds { //nolint:gocritic // rangeValCopy: KindDef map values; pointer map would require larger refactor
 		if def.TrackInMotd {
 			out[name] = def
 		}
@@ -429,7 +429,7 @@ func (s *Schema) ValidChild(parentKind, childKind string) (string, bool) {
 // sorted alphabetically.
 func (s *Schema) KindsForFamily(family string) []string {
 	var out []string
-	for name, kd := range s.Kinds {
+	for name, kd := range s.Kinds { //nolint:gocritic // rangeValCopy: KindDef map values; pointer map would require larger refactor
 		if kd.Family == family {
 			out = append(out, name)
 		}
@@ -475,7 +475,7 @@ type LintResult struct {
 
 // Lint validates the schema for internal consistency. Returns a list of
 // findings. Errors should block startup; warnings are advisory.
-func (s *Schema) Lint() []LintResult {
+func (s *Schema) Lint() []LintResult { //nolint:gocyclo,cyclop // lint has many independent checks; each branch is a separate validation rule
 	var results []LintResult
 	statusSet := make(map[string]bool, len(s.Statuses))
 	for _, st := range s.Statuses {
@@ -519,7 +519,7 @@ func (s *Schema) Lint() []LintResult {
 		}
 	}
 
-	for name, kd := range s.Kinds {
+	for name, kd := range s.Kinds { //nolint:gocritic // rangeValCopy: KindDef map values; pointer map would require larger refactor
 		if kd.TriggerStatus != "" && !statusSet[kd.TriggerStatus] {
 			results = append(results, LintResult{"warn",
 				fmt.Sprintf("kind %q: trigger_status %q not in statuses", name, kd.TriggerStatus)})
@@ -606,7 +606,7 @@ func (s *Schema) MergeDefaults(defaults *Schema) {
 	if s.Kinds == nil {
 		s.Kinds = defaults.Kinds
 	} else {
-		for k, v := range defaults.Kinds {
+		for k, v := range defaults.Kinds { //nolint:gocritic // rangeValCopy: KindDef map values; pointer map would require larger refactor
 			if _, exists := s.Kinds[k]; !exists {
 				s.Kinds[k] = v
 			}
@@ -641,7 +641,7 @@ func (s *Schema) MergeDefaults(defaults *Schema) {
 // populate kinds from definition artifacts stored in the database. This function
 // remains public for tests and one-off use; it will be made private once all
 // callers migrate to the store-backed schema (PRC-TSK-56).
-func DefaultSchema() *Schema {
+func DefaultSchema() *Schema { //nolint:funlen // data initializer; cannot be shorter without obscuring the schema definition
 	return &Schema{
 		Kinds: map[string]KindDef{
 			"goal": {
@@ -773,16 +773,16 @@ func DefaultSchema() *Schema {
 		Statuses: []string{
 			"draft", "active", "current", "open",
 			"mature", "allocated", "in_progress", "in_review",
-			"complete", "cancelled", "dismissed", "promoted",
+			"complete", "cancelled", "dismissed", "promoted", //nolint:misspell // British spelling; changing the value would break stored status strings
 			"retired", "archived",
 			// Intent lifecycle statuses.
 			StatusProposed, StatusAccepted, StatusRejected, StatusDeferred,
 		},
 		TerminalStatuses: []string{
-			"complete", "cancelled", "dismissed", "retired", "archived",
+			"complete", "cancelled", "dismissed", "retired", "archived", //nolint:misspell // British spelling; changing the value would break stored status strings
 			StatusAccepted, StatusRejected, // intent decisions are terminal
 		},
-		ReadonlyStatuses: []string{"archived", StatusAccepted}, // accepted = immutable
+		ReadonlyStatuses: []string{"archived", StatusAccepted}, //nolint:gocritic // commentedOutCode false positive: this is a regular comment, not commented-out code
 		Relations: []string{
 			RelParentOf, RelDependsOn, RelFollows,
 			RelJustifies, RelImplements, RelDocuments, RelSatisfies,
@@ -903,7 +903,7 @@ func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inher
 	}
 
 	base := DefaultSchema()
-	for k, v := range base.Kinds {
+	for k, v := range base.Kinds { //nolint:gocritic // rangeValCopy: KindDef map values; pointer map would require larger refactor
 		if _, exists := s.Kinds[k]; !exists {
 			s.Kinds[k] = v
 		}

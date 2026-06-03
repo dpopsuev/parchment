@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // SQLite driver registration
 )
 
 const schema = `
@@ -183,13 +183,13 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 	if path == "" {
 		path = DefaultSQLitePath()
 	}
-	log := slog.With("component", "store", "path", path)
+	log := slog.With("component", "store", "path", path) //nolint:sloglint // "component"/"path" have no LogKey constants
 
 	if info, err := os.Stat(path); err == nil && info.IsDir() {
-		return nil, fmt.Errorf("db path %s is a directory, not a file", path)
+		return nil, fmt.Errorf("db path %s is a directory, not a file", path) //nolint:err113 // runtime value (path) required in message
 	}
 
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil { //nolint:gosec // db dir; 0755 is intentional for user readability
 		return nil, fmt.Errorf("mkdir %s: %w", filepath.Dir(path), err)
 	}
 
@@ -203,24 +203,24 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 	writer.SetMaxOpenConns(1)
 
 	if _, err := writer.Exec(schema); err != nil {
-		writer.Close()
-		log.Error("schema creation failed", "error", err)
+		_ = writer.Close()
+		slog.ErrorContext(context.Background(), "schema creation failed", slog.Any(LogKeyError, err))
 		return nil, fmt.Errorf("create schema: %w", err)
 	}
 
-	writer.ExecContext(context.Background(),
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
 		"ALTER TABLE artifacts ADD COLUMN inserted_at TEXT NOT NULL DEFAULT ''")
-	writer.ExecContext(context.Background(),
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: best-effort backfill
 		"UPDATE artifacts SET inserted_at = created_at WHERE inserted_at = ''")
-	writer.ExecContext(context.Background(),
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
 		"ALTER TABLE scope_keys ADD COLUMN labels TEXT NOT NULL DEFAULT ''")
 	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
 		"ALTER TABLE artifacts ADD COLUMN alias TEXT NOT NULL DEFAULT ''")
-	writer.ExecContext(context.Background(), //nolint:errcheck // migration: column may already exist
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
 		"ALTER TABLE artifacts ADD COLUMN components TEXT NOT NULL DEFAULT '{}'")
 	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: index may already exist
 		"CREATE UNIQUE INDEX IF NOT EXISTS idx_art_alias ON artifacts(alias) WHERE alias != ''")
-	writer.ExecContext(context.Background(), //nolint:errcheck // migration: column may already exist
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
 		"ALTER TABLE artifacts ADD COLUMN annotations TEXT NOT NULL DEFAULT '[]'")
 	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: index may already exist
 		"CREATE INDEX IF NOT EXISTS idx_art_scope_inserted ON artifacts(scope, inserted_at)")
@@ -255,7 +255,7 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 
 	// Reseed scoped sequences to avoid ID collisions with existing artifacts.
 	if err := reseedScopedSequences(writer); err != nil {
-		log.Warn("reseed scoped sequences failed", "error", err)
+		log.WarnContext(context.Background(), "reseed scoped sequences failed", slog.Any(LogKeyError, err))
 	}
 
 	ensureEventSchema(writer)
@@ -263,22 +263,22 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 	// Always rebuild FTS5 on startup. If the shadow tables are corrupt (e.g.
 	// from a hard kill mid-write), drop and recreate them before rebuilding.
 	if _, err := writer.Exec("INSERT INTO artifacts_fts(artifacts_fts) VALUES('rebuild')"); err != nil {
-		log.Warn("FTS5 rebuild failed, attempting recovery", slog.Any("error", err))
+		log.WarnContext(context.Background(), "FTS5 rebuild failed, attempting recovery", slog.Any(LogKeyError, err))
 		if rerr := rebuildFTS5(writer); rerr != nil {
-			log.Error("FTS5 recovery failed", slog.Any("error", rerr))
+			log.ErrorContext(context.Background(), "FTS5 recovery failed", slog.Any(LogKeyError, rerr))
 		} else {
-			log.Info("FTS5 recovered after corruption")
+			log.InfoContext(context.Background(), "FTS5 recovered after corruption")
 		}
 	}
 
 	reader, err := sql.Open("sqlite", dsn+"&_pragma=query_only(on)")
 	if err != nil {
-		writer.Close()
+		_ = writer.Close()
 		return nil, fmt.Errorf("open reader: %w", err)
 	}
 	reader.SetMaxOpenConns(cfg.readerPool())
 
-	log.Info("database opened")
+	log.InfoContext(context.Background(), "database opened")
 
 	// Periodic WAL checkpoint every 60s to prevent WAL contention under batch writes
 	go func() {
@@ -286,7 +286,7 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 		defer ticker.Stop()
 		for range ticker.C {
 			if _, err := writer.ExecContext(context.Background(), "PRAGMA wal_checkpoint(PASSIVE)"); err != nil {
-				log.Debug("WAL checkpoint failed", "error", err)
+				log.DebugContext(context.Background(), "WAL checkpoint failed", slog.Any(LogKeyError, err))
 			}
 		}
 	}()
@@ -371,7 +371,7 @@ func reseedScopedSequences(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
 
 	// Track max seq per (scope_key, kind_code)
 	type seqKey struct{ scopeKey, kindCode string }
@@ -424,7 +424,7 @@ func reseedScopedSequences(db *sql.DB) error {
 }
 
 func (s *SQLiteStore) Close() error {
-	s.reader.Close()
+	_ = s.reader.Close()
 	return s.writer.Close()
 }
 
@@ -442,7 +442,7 @@ func (s *SQLiteStore) DBSizeBytes(ctx context.Context) (int64, error) {
 
 func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	if art.ID == "" {
-		return fmt.Errorf("artifact ID is required")
+		return fmt.Errorf("artifact ID is required") //nolint:err113 // sentinel; no runtime values
 	}
 	if art.UID == "" {
 		art.UID = generateUID()
@@ -460,7 +460,7 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // deferred rollback; commit is checked explicitly
 
 	// Check for human ID collision: same ID but different UID
 	var old *Artifact
@@ -789,7 +789,7 @@ func (s *SQLiteStore) autoRenameArtifact(ctx context.Context, tx *sql.Tx, existi
 	// Supports both "PREFIX-SEQ" (T-001) and "SCOPE-KIND-SEQ" (PROJ-SPC-1) formats.
 	lastDash := strings.LastIndex(oldID, "-")
 	if lastDash < 0 {
-		return fmt.Errorf("cannot auto-rename ID without sequence number: %q", oldID)
+		return fmt.Errorf("cannot auto-rename ID without sequence number: %q", oldID) //nolint:err113 // runtime value (oldID) required
 	}
 	prefix := oldID[:lastDash]
 	seq, err := strconv.ParseInt(oldID[lastDash+1:], 10, 64)
@@ -802,7 +802,7 @@ func (s *SQLiteStore) autoRenameArtifact(ctx context.Context, tx *sql.Tx, existi
 		candidateID := fmt.Sprintf("%s-%d", prefix, seq)
 		var exists int
 		err := tx.QueryRowContext(ctx, "SELECT 1 FROM artifacts WHERE id = ?", candidateID).Scan(&exists)
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			_, err = tx.ExecContext(ctx, "UPDATE artifacts SET id = ? WHERE uid = ?", candidateID, existing.UID)
 			if err != nil {
 				return fmt.Errorf("rename %s -> %s: %w", oldID, candidateID, err)
@@ -819,8 +819,7 @@ func (s *SQLiteStore) autoRenameArtifact(ctx context.Context, tx *sql.Tx, existi
 			if err != nil {
 				return err
 			}
-			slog.Warn("auto-renamed artifact on collision",
-				"old_id", oldID, "new_id", candidateID, "uid", existing.UID)
+		slog.WarnContext(context.Background(), "auto-renamed artifact on collision", slog.String("old_id", oldID), slog.String("new_id", candidateID), slog.String("uid", existing.UID)) //nolint:sloglint // old_id/new_id/uid have no LogKey constants
 			return nil
 		}
 		if err != nil {
@@ -833,7 +832,7 @@ func (s *SQLiteStore) Get(ctx context.Context, id string) (*Artifact, error) {
 	row := s.reader.QueryRowContext(ctx, "SELECT "+artifactColumns+" FROM artifacts WHERE id = ?", id)
 	art, err := scanArtifact(row)
 	if err != nil {
-		return nil, fmt.Errorf("artifact %s not found", id)
+		return nil, fmt.Errorf("artifact %s not found", id) //nolint:err113 // runtime value (id) required; wrapping scanArtifact error would expose internal scan detail
 	}
 	return art, nil
 }
@@ -902,7 +901,7 @@ func (s *SQLiteStore) Search(ctx context.Context, query string) ([]string, error
 	if err != nil {
 		return nil, fmt.Errorf("fts5 search: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
 	var ids []string
 	for rows.Next() {
 		var id string
@@ -931,7 +930,7 @@ func (s *SQLiteStore) Delete(ctx context.Context, id string) error {
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("artifact %s not found", id)
+		return fmt.Errorf("artifact %s not found", id) //nolint:err113 // runtime value (id) required
 	}
 
 	if _, err := tx.ExecContext(ctx, "DELETE FROM edges WHERE from_id = ? OR to_id = ?", id, id); err != nil {
@@ -940,7 +939,7 @@ func (s *SQLiteStore) Delete(ctx context.Context, id string) error {
 
 	// Clean dangling references from other artifacts' DependsOn and Links fields
 	if err := s.cleanDanglingRefs(ctx, tx, id); err != nil {
-		slog.Warn("cleanDanglingRefs", "deleted_id", id, "error", err)
+		slog.WarnContext(context.Background(), "cleanDanglingRefs", slog.String("deleted_id", id), slog.Any(LogKeyError, err)) //nolint:sloglint // deleted_id has no LogKey constant
 	}
 	if art != nil && rowid > 0 {
 		deleteFTSInTx(ctx, tx, rowid, art)
@@ -957,7 +956,7 @@ func (s *SQLiteStore) cleanDanglingRefs(ctx context.Context, tx *sql.Tx, deleted
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
 
 	type refUpdate struct {
 		id    string
@@ -978,7 +977,7 @@ func (s *SQLiteStore) cleanDanglingRefs(ctx context.Context, tx *sql.Tx, deleted
 
 		// Clean DependsOn
 		var deps []string
-		json.Unmarshal([]byte(u.deps), &deps)
+		_ = json.Unmarshal([]byte(u.deps), &deps) // malformed JSON → empty slice; safe fallback
 		var cleanDeps []string
 		for _, d := range deps {
 			if d != deletedID {
@@ -990,7 +989,7 @@ func (s *SQLiteStore) cleanDanglingRefs(ctx context.Context, tx *sql.Tx, deleted
 
 		// Clean Links
 		var links map[string][]string
-		json.Unmarshal([]byte(u.links), &links)
+		_ = json.Unmarshal([]byte(u.links), &links) // malformed JSON → nil map; safe fallback
 		for rel, targets := range links {
 			var clean []string
 			for _, t := range targets {
@@ -1131,7 +1130,7 @@ func (s *SQLiteStore) List(ctx context.Context, f Filter) ([]*Artifact, error) {
 
 	q := "SELECT " + artifactColumns + " FROM artifacts"
 	if len(clauses) > 0 {
-		q += " WHERE " + strings.Join(clauses, " AND ")
+		q += " WHERE " + strings.Join(clauses, " AND ") //nolint:gosec // G202: clauses are hardcoded predicate strings with ? placeholders; args carry user values
 	}
 	q += " ORDER BY id"
 
@@ -1139,7 +1138,7 @@ func (s *SQLiteStore) List(ctx context.Context, f Filter) ([]*Artifact, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
 
 	var results []*Artifact
 	for rows.Next() {
@@ -1282,10 +1281,10 @@ func (s *SQLiteStore) RemoveEdge(ctx context.Context, e Edge) error {
 	return err
 }
 
-func (s *SQLiteStore) Neighbors(ctx context.Context, id, rel string, dir Direction) ([]Edge, error) {
+func (s *SQLiteStore) Neighbors(ctx context.Context, id, rel string, dir Direction) ([]Edge, error) { //nolint:dupl // Outgoing and Incoming blocks are symmetric by design; extracting would complicate the direction logic
 	var edges []Edge
 
-	if dir == Outgoing || dir == Both {
+	if dir == Outgoing || dir == Both { //nolint:dupl // Outgoing block; symmetric to Incoming
 		q := "SELECT from_id, relation, to_id, weight FROM edges WHERE from_id = ?"
 		args := []any{id}
 		if rel != "" {
@@ -1302,10 +1301,10 @@ func (s *SQLiteStore) Neighbors(ctx context.Context, id, rel string, dir Directi
 				edges = append(edges, e)
 			}
 		}
-		rows.Close()
+		_ = rows.Close() //nolint:errcheck // rows.Close only fails when already closed
 	}
 
-	if dir == Incoming || dir == Both {
+	if dir == Incoming || dir == Both { //nolint:dupl // Incoming block; symmetric to Outgoing
 		q := "SELECT from_id, relation, to_id, weight FROM edges WHERE to_id = ?"
 		args := []any{id}
 		if rel != "" {
@@ -1322,18 +1321,18 @@ func (s *SQLiteStore) Neighbors(ctx context.Context, id, rel string, dir Directi
 				edges = append(edges, e)
 			}
 		}
-		rows.Close()
+		_ = rows.Close() //nolint:errcheck // rows.Close only fails when already closed
 	}
 
 	return edges, nil
 }
 
-func (s *SQLiteStore) Walk(ctx context.Context, root string, rel string, dir Direction, maxDepth int, fn WalkFn) error {
+func (s *SQLiteStore) Walk(ctx context.Context, root, rel string, dir Direction, maxDepth int, fn WalkFn) error {
 	visited := make(map[string]bool)
 	return s.walkRecurse(ctx, root, rel, dir, maxDepth, 0, visited, fn)
 }
 
-func (s *SQLiteStore) walkRecurse(ctx context.Context, id string, rel string, dir Direction, maxDepth, depth int, visited map[string]bool, fn WalkFn) error {
+func (s *SQLiteStore) walkRecurse(ctx context.Context, id, rel string, dir Direction, maxDepth, depth int, visited map[string]bool, fn WalkFn) error {
 	if maxDepth > 0 && depth >= maxDepth {
 		return nil
 	}
@@ -1380,11 +1379,11 @@ func (s *SQLiteStore) NextID(ctx context.Context, prefix string) (string, error)
 	if err != nil {
 		return "", err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // deferred rollback; commit is checked explicitly
 
 	var seq int64
 	err = tx.QueryRowContext(ctx, "SELECT next_val FROM sequences WHERE prefix = ?", prefix).Scan(&seq)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		seq = 1
 	} else if err != nil {
 		return "", err
@@ -1426,11 +1425,11 @@ func (s *SQLiteStore) NextSeq(ctx context.Context, key string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // deferred rollback; commit is checked explicitly
 
 	var seq int64
 	err = tx.QueryRowContext(ctx, "SELECT next_val FROM sequences WHERE prefix = ?", key).Scan(&seq)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		seq = 1
 	} else if err != nil {
 		return 0, err
@@ -1444,7 +1443,7 @@ func (s *SQLiteStore) NextSeq(ctx context.Context, key string) (int64, error) {
 		candidateID := fmt.Sprintf("%s-%d", key, seq)
 		var exists int
 		err = tx.QueryRowContext(ctx, "SELECT 1 FROM artifacts WHERE id = ?", candidateID).Scan(&exists)
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			// ID is free
 			_, err = tx.ExecContext(ctx,
 				"INSERT INTO sequences (prefix, next_val) VALUES (?, ?) ON CONFLICT(prefix) DO UPDATE SET next_val = ?",
@@ -1461,12 +1460,12 @@ func (s *SQLiteStore) NextSeq(ctx context.Context, key string) (int64, error) {
 	}
 }
 
-func (s *SQLiteStore) GetScopeKey(ctx context.Context, scope string) (string, bool, error) {
+func (s *SQLiteStore) GetScopeKey(ctx context.Context, scope string) (string, bool, error) { //nolint:gocritic // unnamedResult: local vars key/auto already named; named returns would shadow them
 	var key string
 	var auto int
 	err := s.reader.QueryRowContext(ctx,
 		"SELECT key, auto FROM scope_keys WHERE scope = ?", scope).Scan(&key, &auto)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", false, nil
 	}
 	if err != nil {
@@ -1492,7 +1491,7 @@ func (s *SQLiteStore) ListScopeKeys(ctx context.Context) (map[string]string, err
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
 
 	result := make(map[string]string)
 	for rows.Next() {
@@ -1530,7 +1529,7 @@ func (s *SQLiteStore) ScopesByLabel(ctx context.Context, label string) ([]string
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
 	var scopes []string
 	for rows.Next() {
 		var scope string
@@ -1553,7 +1552,7 @@ func (s *SQLiteStore) ListScopeInfo(ctx context.Context) ([]ScopeInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
 	var result []ScopeInfo
 	for rows.Next() {
 		var scope, key, csv string
@@ -1619,7 +1618,7 @@ func scanRow(s rowScanner) (*Artifact, error) {
 		{annotations, &art.Annotations, "annotations"},
 	} {
 		if err := json.Unmarshal([]byte(pair.data), pair.dst); err != nil {
-			slog.Warn("scanRow: unmarshal failed", "id", art.ID, "field", pair.name, "error", err)
+			slog.WarnContext(context.Background(), "scanRow: unmarshal failed", slog.String(LogKeyID, art.ID), slog.String("field", pair.name), slog.Any(LogKeyError, err)) //nolint:sloglint // "field" has no LogKey constant
 		}
 	}
 	for _, pair := range []struct {
@@ -1632,7 +1631,7 @@ func scanRow(s rowScanner) (*Artifact, error) {
 		{insertedAt, &art.InsertedAt, "inserted_at"},
 	} {
 		if t, err := time.Parse(time.RFC3339Nano, pair.raw); err != nil {
-			slog.Warn("scanRow: parse time failed", "id", art.ID, "field", pair.name, "error", err)
+			slog.WarnContext(context.Background(), "scanRow: parse time failed", slog.String(LogKeyID, art.ID), slog.String("field", pair.name), slog.Any(LogKeyError, err)) //nolint:sloglint // "field" has no LogKey constant
 		} else {
 			*pair.dst = t
 		}
@@ -1685,7 +1684,7 @@ func reconcileEdgesSQL(ctx context.Context, tx *sql.Tx, old, cur *Artifact) erro
 	if old != nil {
 		oldParent = old.Parent
 	}
-	if cur.Parent != oldParent {
+	if cur.Parent != oldParent { //nolint:nestif // parent edge reparenting requires conditional edge delete/add; splitting reduces clarity
 		if oldParent != "" {
 			if err := deleteEdge(ctx, tx, oldParent, RelParentOf, cur.ID); err != nil {
 				return fmt.Errorf("delete parent edge: %w", err)

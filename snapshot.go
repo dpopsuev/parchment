@@ -149,7 +149,7 @@ func (s *Snapshotter) Clean(ctx context.Context, cfg SnapshotConfig) (int, error
 		if shouldDelete {
 			if err := s.backend.Delete(ctx, snap.Key); err == nil {
 				deleted++
-				slog.Info("snapshot deleted", "key", snap.Key, "reason", "retention")
+				slog.InfoContext(ctx, "snapshot deleted", slog.String("key", snap.Key), slog.String("reason", "retention")) //nolint:sloglint // no LogKey constants for "key"/"reason"
 			}
 		}
 	}
@@ -171,7 +171,7 @@ func (s *Snapshotter) AutoSnapshot(ctx context.Context, cfg SnapshotConfig) {
 	snapshots, err := s.backend.List(ctx)
 	if err != nil || len(snapshots) == 0 {
 		if _, err := s.backend.Save(ctx, "auto"); err != nil {
-			slog.Warn("auto-snapshot failed", "error", err)
+			slog.WarnContext(ctx, "auto-snapshot failed", slog.Any(LogKeyError, err))
 		}
 		return
 	}
@@ -180,9 +180,9 @@ func (s *Snapshotter) AutoSnapshot(ctx context.Context, cfg SnapshotConfig) {
 	threshold := time.Duration(cfg.timeDeltaHours()) * time.Hour
 	if time.Since(latest.Timestamp) > threshold {
 		if _, err := s.backend.Save(ctx, "auto"); err != nil {
-			slog.Warn("auto-snapshot failed", "error", err)
+			slog.WarnContext(ctx, "auto-snapshot failed", slog.Any(LogKeyError, err))
 		} else {
-			s.Clean(ctx, cfg)
+			_, _ = s.Clean(ctx, cfg)
 		}
 	}
 }

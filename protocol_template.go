@@ -66,8 +66,7 @@ func (p *Protocol) createHookArtifacts(ctx context.Context, parent *Artifact, ra
 			SkipHooks: true,
 		})
 		if err != nil {
-			slog.WarnContext(ctx, "template hook: failed to create artifact", //nolint:sloglint // pre-existing
-				"parent", parent.ID, "title", title, "error", err)
+		slog.WarnContext(ctx, "template hook: failed to create artifact", slog.String("parent", parent.ID), slog.String("title", title), slog.Any(LogKeyError, err)) //nolint:sloglint // "parent"/"title" have no LogKey constants
 			continue
 		}
 
@@ -75,14 +74,12 @@ func (p *Protocol) createHookArtifacts(ctx context.Context, parent *Artifact, ra
 			if err := p.store.AddEdge(ctx, Edge{
 				From: child.ID, To: prevID, Relation: RelFollows,
 			}); err != nil {
-				slog.WarnContext(ctx, "template hook: failed to add follows edge", //nolint:sloglint // pre-existing
-					"from", child.ID, "to", prevID, "error", err)
+				slog.WarnContext(ctx, "template hook: failed to add follows edge", slog.String("from", child.ID), slog.String("to", prevID), slog.Any(LogKeyError, err)) //nolint:sloglint // "from"/"to" have no LogKey constants
 			}
 		}
 		prevID = child.ID
 
-		slog.DebugContext(ctx, "template hook: created artifact", //nolint:sloglint // pre-existing
-			"parent", parent.ID, "child", child.ID, "title", title)
+		slog.DebugContext(ctx, "template hook: created artifact", slog.String("parent", parent.ID), slog.String("child", child.ID), slog.String("title", title)) //nolint:sloglint // "parent"/"child"/"title" have no LogKey constants
 	}
 	return prevID
 }
@@ -130,23 +127,14 @@ func (p *Protocol) resolveTemplate(ctx context.Context, art *Artifact) *Artifact
 	}
 	tpl, err := p.store.Get(ctx, targets[0])
 	if err != nil {
-		slog.DebugContext(ctx, "failed to resolve template", //nolint:sloglint // pre-existing
-			"artifact_id", art.ID,
-			"template_id", targets[0],
-			"error", err)
+		slog.DebugContext(ctx, "failed to resolve template", slog.String("artifact_id", art.ID), slog.String("template_id", targets[0]), slog.Any(LogKeyError, err)) //nolint:sloglint // artifact_id/template_id have no LogKey constants
 		return nil
 	}
 	if tpl.Kind != KindTemplate {
-		slog.WarnContext(ctx, "satisfies link target is not a template", //nolint:sloglint // pre-existing
-			"artifact_id", art.ID,
-			"target_id", tpl.ID,
-			"target_kind", tpl.Kind)
+		slog.WarnContext(ctx, "satisfies link target is not a template", slog.String("artifact_id", art.ID), slog.String("target_id", tpl.ID), slog.String("target_kind", tpl.Kind)) //nolint:sloglint // artifact_id/target_id/target_kind have no LogKey constants
 		return nil
 	}
-	slog.DebugContext(ctx, "template resolved", //nolint:sloglint // pre-existing
-		"artifact_id", art.ID,
-		"template_id", tpl.ID,
-		"template_sections", len(tpl.Sections))
+	slog.DebugContext(ctx, "template resolved", slog.String("artifact_id", art.ID), slog.String("template_id", tpl.ID), slog.Int("template_sections", len(tpl.Sections))) //nolint:sloglint // artifact_id/template_id/template_sections have no LogKey constants
 	return tpl
 }
 
@@ -209,24 +197,13 @@ func (p *Protocol) checkTemplateConformance(ctx context.Context, art *Artifact, 
 		}
 	}
 	if len(msgs) == 0 {
-		slog.DebugContext(ctx, "template conformance passed", //nolint:sloglint // pre-existing
-			"artifact_id", art.ID,
-			"template_id", tpl.ID,
-			"sections_provided", len(art.Sections),
-			"sections_required", len(expected))
+		slog.DebugContext(ctx, "template conformance passed", slog.String("artifact_id", art.ID), slog.String("template_id", tpl.ID), slog.Int("sections_provided", len(art.Sections)), slog.Int("sections_required", len(expected))) //nolint:sloglint // no LogKey constants for these fields
 		return nil
 	}
 
 	sort.Strings(msgs)
 	sort.Strings(missingNames)
-	slog.WarnContext(ctx, "template conformance failed", //nolint:sloglint // pre-existing
-		"artifact_id", art.ID,
-		"artifact_kind", art.Kind,
-		"template_id", tpl.ID,
-		"sections_provided", len(art.Sections),
-		"sections_required", len(expected),
-		"sections_missing", len(msgs),
-		"missing_list", strings.Join(msgs, "; "))
+	slog.WarnContext(ctx, "template conformance failed", slog.String("artifact_id", art.ID), slog.String("artifact_kind", art.Kind), slog.String("template_id", tpl.ID), slog.Int("sections_provided", len(art.Sections)), slog.Int("sections_required", len(expected)), slog.Int("sections_missing", len(msgs)), slog.String("missing_list", strings.Join(msgs, "; "))) //nolint:sloglint // no LogKey constants for these fields
 
 	// Build a copy-paste-ready correction showing the required sections wire format.
 	fixParts := make([]string, 0, len(missingNames))
@@ -294,6 +271,6 @@ func (p *Protocol) checkTemplateConformancePromote(ctx context.Context, art *Art
 	for _, name := range missingNames {
 		fixParts = append(fixParts, fmt.Sprintf(`{"name":%q,"text":"..."}`, name))
 	}
-	return fmt.Errorf("artifact does not conform to template %s — missing sections:\n%s\nFix: pass sections: %s", //nolint:err113
+	return fmt.Errorf("artifact does not conform to template %s — missing sections:\n%s\nFix: pass sections: %s", //nolint:err113 // runtime values (template ID, section names) required in message
 		tpl.ID, strings.Join(msgs, "\n"), "["+strings.Join(fixParts, ", ")+"]")
 }

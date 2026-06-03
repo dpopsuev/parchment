@@ -193,8 +193,8 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 					art.Links = make(map[string][]string)
 				}
 				art.Links[RelSatisfies] = []string{tplID}
-				slog.DebugContext(ctx, "auto-linked template", //nolint:sloglint // pre-existing
-					"artifact_kind", art.Kind, "scope", scope, "template_id", tplID)
+				slog.DebugContext(ctx, "auto-linked template",
+					slog.String("artifact_kind", art.Kind), slog.String("scope", scope), slog.String("template_id", tplID)) //nolint:sloglint // artifact_kind/scope/template_id have no LogKey constants
 			}
 		}
 		// Check mandatory outgoing edges
@@ -208,10 +208,10 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 					hasEdge = true
 				}
 				if !hasEdge {
-					hint := fmt.Sprintf(`links: {"%s": ["<target-id>"]}`, reqRel)
-					if reqRel == RelDependsOn {
-						hint = fmt.Sprintf(`depends_on: ["<target-id>"] or links: {"%s": ["<target-id>"]}`, reqRel)
-					}
+				hint := fmt.Sprintf("links: {%q: [\"<target-id>\"]}", reqRel)
+				if reqRel == RelDependsOn {
+					hint = fmt.Sprintf("depends_on: [\"<target-id>\"] or links: {%q: [\"<target-id>\"]}", reqRel)
+				}
 					return nil, fmt.Errorf("%s requires a %s edge — add it at creation time via %s", art.Kind, reqRel, hint) //nolint:err113 // pre-existing
 				}
 			}
@@ -233,8 +233,8 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		if existing, _ := p.store.List(ctx, Filter{Kind: art.Kind, Scope: art.Scope}); len(existing) > 0 {
 			for _, e := range existing {
 				if !p.schema.IsTerminal(e.Status) && e.Title == art.Title {
-					slog.WarnContext(ctx, "duplicate title detected on create", //nolint:sloglint // pre-existing
-						"new_id", art.ID, "existing_id", e.ID, "title", art.Title)
+					slog.WarnContext(ctx, "duplicate title detected on create",
+						slog.String("new_id", art.ID), slog.String("existing_id", e.ID), slog.String("title", art.Title)) //nolint:sloglint // new_id/existing_id have no LogKey constants
 				}
 			}
 		}

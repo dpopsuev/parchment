@@ -457,11 +457,11 @@ func vaultParseSections(body string, art *Artifact) {
 
 func renderGroupKey(a *Artifact, field string) string {
 	switch field {
-	case "status":
+	case FieldStatus:
 		return a.Status
-	case "scope":
+	case FieldScope:
 		return a.Scope
-	case "kind":
+	case FieldKind:
 		return a.Kind
 	case "sprint":
 		return a.Sprint
@@ -471,7 +471,7 @@ func renderGroupKey(a *Artifact, field string) string {
 }
 
 func renderGroupOrderForField(field string) []string {
-	if field == "status" {
+	if field == FieldStatus {
 		return []string{"current", "active", "open", "draft", "complete", "dismissed", "promoted", "retired", "archived"}
 	}
 	return nil

@@ -43,7 +43,7 @@ func ParseRule(art *Artifact) (*RuleDef, error) {
 		return nil, fmt.Errorf("rule %s missing when section", art.ID) //nolint:err113 // runtime value required
 	}
 	if action == "" {
-		action = "block"
+		action = RuleActionBlock
 	}
 	if message == "" {
 		message = fmt.Sprintf("rule %q blocked the transition", art.Title) //nolint:err113 // runtime value required
@@ -122,6 +122,13 @@ func seedRulesFromRegistry(ctx context.Context, s Store) {
 	}
 }
 
+// Rule action constants.
+const (
+	RuleActionBlock = "block"
+	RuleActionWarn  = "warn"
+	RuleActionAllow = "allow"
+)
+
 // RuleResult is returned by EvaluateRule when a rule fires.
 // nil means the rule did not fire (transition is allowed by this rule).
 type RuleResult struct {
@@ -151,7 +158,7 @@ func EvaluateRule(rule *RuleDef, art *Artifact, toStatus string) *RuleResult {
 	}
 	action := rule.Action
 	if action == "" {
-		action = "block"
+		action = RuleActionBlock
 	}
 	return &RuleResult{
 		RuleID:  rule.ID,

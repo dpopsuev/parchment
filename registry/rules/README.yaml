@@ -1,0 +1,8 @@
+# placeholder: real rules are added here per guard migration (PRC-GOL-18)
+# DO NOT add rules here until the corresponding Go guard is deleted.
+# Pattern per task: add YAML → verify green → delete Go guard → verify green → commit
+name: _placeholder
+trigger: _none
+when: "to=_never"
+action: allow
+message: ""

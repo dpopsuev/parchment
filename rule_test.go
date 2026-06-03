@@ -49,7 +49,9 @@ func TestRule_ParsedFromArtifact(t *testing.T) {
 }
 
 func TestRule_SeededInSchema(t *testing.T) {
-	// SeedDefinitions creates a RULE-priority_required artifact in _schema.
+	// SeedRules seeds rule artifacts from registry/rules/*.yaml.
+	// Currently only the _placeholder exists — real rules are added
+	// one at a time as Go guards are deleted (PRC-GOL-18 tasks).
 	t.Parallel()
 	dir := t.TempDir()
 	s, err := parchment.OpenSQLite(dir + "/test.db")
@@ -57,8 +59,8 @@ func TestRule_SeededInSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
+
 	ctx := context.Background()
-	parchment.SeedDefinitions(ctx, s)
 	parchment.SeedRules(ctx, s)
 
 	arts, err := s.List(ctx, parchment.Filter{
@@ -68,23 +70,9 @@ func TestRule_SeededInSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// At minimum the _placeholder is seeded; it has trigger=_none so it never fires.
 	if len(arts) == 0 {
-		t.Fatal("no rule artifacts seeded in _schema")
-	}
-	// priority_required must be seeded
-	found := false
-	for _, a := range arts {
-		if a.Title == "priority_required" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		titles := make([]string, len(arts))
-		for i, a := range arts {
-			titles[i] = a.Title
-		}
-		t.Errorf("priority_required rule not seeded; got: %v", titles)
+		t.Fatal("SeedRules seeded nothing — embed may be broken")
 	}
 }
 

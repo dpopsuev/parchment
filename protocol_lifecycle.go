@@ -307,6 +307,18 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 		}
 	}
 
+	// Rule evaluator: check rule artifacts loaded from _schema.
+	// Runs after Go guards, before quality gates. BypassGuards (force) skips Go guards above
+	// but rule artifacts are always evaluated — they are data-defined constraints.
+	for _, rule := range p.rules {
+		if result := EvaluateRule(rule, art, status); result != nil {
+			if result.Action == RuleActionBlock {
+				return Result{ID: art.ID, Error: result.Message}
+			}
+			// warn: record but continue
+		}
+	}
+
 	// Quality gates: check before terminal status transitions.
 	if p.schema.IsTerminal(status) && len(p.gates) > 0 {
 		for _, gate := range p.gates {

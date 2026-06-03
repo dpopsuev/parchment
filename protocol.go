@@ -94,6 +94,7 @@ type Protocol struct {
 	gates            []QualityGate
 	embedFunc        EmbeddingFunc
 	embedModel       string
+	rules            []*RuleDef // loaded from _schema rule artifacts at startup
 }
 
 // New creates a Protocol with the given store, schema, home scopes,
@@ -115,8 +116,11 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 	if s != nil {
 		SeedLabelTraits(context.Background(), s)
 		SeedEdgeTypeTraits(context.Background(), s)
+		SeedRules(context.Background(), s)
 		p.labelTraits = loadLabelTraits(context.Background(), s)
 		p.edgeTypeTraits = loadEdgeTypeTraits(context.Background(), s)
+		rules, _ := p.LoadRules(context.Background())
+		p.rules = rules
 	}
 	p.idFormat = idc.IDFormat
 	p.idTemplate = idc.IDTemplate

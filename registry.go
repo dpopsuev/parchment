@@ -12,8 +12,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:embed registry/kinds/*.yaml registry/edge_types/*.yaml registry/labels/*.yaml registry/rules/*.yaml
+//go:embed registry/kinds/*.yaml registry/edge_types/*.yaml registry/labels/*.yaml
 var registryFS embed.FS
+
+//go:embed registry/rules
+var rulesFS embed.FS
 
 // kindYAML is the on-disk format for a kind definition.
 // Fields map directly to KindDef embedded structs plus guidance sections.
@@ -420,7 +423,7 @@ type ruleYAML struct {
 
 // loadRegistryRules parses all rule YAML files from the embedded registry.
 func loadRegistryRules() []ruleYAML { //nolint:dupl // parallel to other loadRegistry* funcs; generic helper would obscure embed path
-	entries, err := registryFS.ReadDir("registry/rules")
+	entries, err := rulesFS.ReadDir("registry/rules")
 	if err != nil {
 		return nil
 	}
@@ -429,7 +432,7 @@ func loadRegistryRules() []ruleYAML { //nolint:dupl // parallel to other loadReg
 		if !strings.HasSuffix(e.Name(), ".yaml") {
 			continue
 		}
-		data, err := registryFS.ReadFile("registry/rules/" + e.Name())
+		data, err := rulesFS.ReadFile("registry/rules/" + e.Name())
 		if err != nil {
 			continue
 		}

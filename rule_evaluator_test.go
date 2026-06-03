@@ -1,7 +1,9 @@
 package parchment_test
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/dpopsuev/parchment"
 )
@@ -85,5 +87,100 @@ func TestRuleEvaluator_KindCondition_DoesNotFire_ForWrongKind(t *testing.T) {
 	art := &parchment.Artifact{Kind: parchment.KindSpec, Priority: ""}
 	if result := parchment.EvaluateRule(rule, art, "active"); result != nil {
 		t.Errorf("rule fired for wrong kind, got %+v", result)
+	}
+}
+
+// --- Integration: rule artifacts wired into Protocol transitions ---
+
+func TestProtocol_RuleArtifact_BlocksTransition(t *testing.T) {
+	// Given: a rule artifact with a predicate no Go guard covers:
+	//   block transition to 'active' for scope="forbidden-scope"
+	// When: SetField(status=active, BypassGuards=true) so Go guards don't fire
+	// Then: transition is blocked ONLY if the rule evaluator is wired
+	t.Parallel()
+	dir := t.TempDir()
+	s, err := parchment.OpenSQLite(dir + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	// Rule: block active transition for scope=forbidden-scope
+	// No Go guard covers this — only the RuleEvaluator can fire it.
+	_ = s.Put(ctx, &parchment.Artifact{
+		ID: "RULE-scope-block", Kind: parchment.KindRule, Scope: parchment.SchemaScope,
+		Title: "scope_block", Status: parchment.StatusActive,
+		Sections: []parchment.Section{
+			{Name: "trigger", Text: "status_changed"},
+			{Name: "when", Text: `to=active AND scope=forbidden-scope`},
+			{Name: "action", Text: "block"},
+			{Name: "message", Text: "RULE_EVALUATOR_FIRED: forbidden scope"},
+		},
+		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
+	})
+
+	proto := parchment.New(s, parchment.KnowledgeSchema(), []string{"forbidden-scope"}, nil, parchment.ProtocolConfig{})
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
+		Kind: parchment.KindNote, Title: "test", Scope: "forbidden-scope",
+	})
+
+	// BypassGuards so only rule artifacts can block
+	results, err := proto.SetField(ctx, []string{art.ID}, "status", "active",
+		parchment.SetFieldOptions{BypassGuards: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) == 0 || results[0].OK {
+		t.Errorf("expected rule evaluator to block transition; got: %+v", results)
+	}
+	if results[0].Error != "RULE_EVALUATOR_FIRED: forbidden scope" {
+		t.Errorf("error = %q, want RULE_EVALUATOR_FIRED message", results[0].Error)
+	}
+}
+
+func TestProtocol_RuleArtifact_AllowsWhenNotMatching(t *testing.T) {
+	// Given: scope-block rule, but artifact is in a different scope
+	// When: SetField with BypassGuards
+	// Then: rule does not fire
+	t.Parallel()
+	dir := t.TempDir()
+	s, err := parchment.OpenSQLite(dir + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+	_ = s.Put(ctx, &parchment.Artifact{
+		ID: "RULE-scope-block2", Kind: parchment.KindRule, Scope: parchment.SchemaScope,
+		Title: "scope_block2", Status: parchment.StatusActive,
+		Sections: []parchment.Section{
+			{Name: "trigger", Text: "status_changed"},
+			{Name: "when", Text: `to=active AND scope=forbidden-scope`},
+			{Name: "action", Text: "block"},
+			{Name: "message", Text: "RULE_EVALUATOR_FIRED"},
+		},
+		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
+	})
+
+	// Use scope=allowed-scope — rule should NOT fire
+	proto := parchment.New(s, parchment.KnowledgeSchema(), []string{"allowed-scope"}, nil, parchment.ProtocolConfig{})
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
+		Kind: parchment.KindNote, Title: "test", Scope: "allowed-scope",
+	})
+
+	results, err := proto.SetField(ctx, []string{art.ID}, "status", "active",
+		parchment.SetFieldOptions{BypassGuards: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, r := range results {
+		if !r.OK && r.Error == "RULE_EVALUATOR_FIRED" {
+			t.Errorf("rule fired on non-forbidden scope")
+		}
 	}
 }

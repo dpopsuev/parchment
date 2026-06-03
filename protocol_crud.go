@@ -248,6 +248,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		p.executeTemplateHooks(ctx, art)
 	}
 
+	p.emitEvent(ctx, EventCreated, art.ID, art.Scope, nil)
 	return art, nil
 }
 

@@ -243,6 +243,7 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 		slog.String(LogKeyID, sourceID),
 		slog.String(LogKeyRelation, relation),
 		slog.Int(LogKeyCount, len(targetIDs)))
+	p.emitEvent(ctx, EventLinked, sourceID, art.Scope, map[string]any{"relation": relation, "targets": targetIDs})
 	return results, nil
 }
 

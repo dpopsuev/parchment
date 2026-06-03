@@ -162,6 +162,23 @@ func ensureEventSchema(db *sql.DB) {
 	}
 }
 
+// emitEvent appends an event to the EventLog. Errors are logged but not returned —
+// a failed event write must never block or fail a mutation.
+func (p *Protocol) emitEvent(ctx context.Context, eventType, artifactID, scope string, payload any) {
+	err := p.store.AppendEvent(ctx, Event{
+		EventType:  eventType,
+		ArtifactID: artifactID,
+		Scope:      scope,
+		Payload:    payload,
+	})
+	if err != nil {
+		slog.WarnContext(ctx, "emitEvent failed",
+			slog.String(LogKeyEventType, eventType),
+			slog.String(LogKeyID, artifactID),
+			slog.Any(LogKeyError, err))
+	}
+}
+
 func joinStrings(ss []string, sep string) string {
 	result := ""
 	for i, s := range ss {

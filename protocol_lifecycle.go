@@ -228,6 +228,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 	if err := p.store.Put(ctx, art); err != nil {
 		return Result{ID: id, Error: err.Error()}
 	}
+	p.emitEvent(ctx, EventUpdated, art.ID, art.Scope, map[string]string{"field": field, "value": value})
 	return Result{ID: id, OK: true}
 }
 
@@ -314,6 +315,7 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 	if err := p.store.Put(ctx, art); err != nil {
 		return Result{ID: art.ID, Error: err.Error()}
 	}
+	p.emitEvent(ctx, EventStatusChanged, art.ID, art.Scope, map[string]string{"from": oldStatus, "to": status})
 
 	slog.InfoContext(ctx, "lifecycle transition",
 		slog.String(LogKeyID, art.ID),

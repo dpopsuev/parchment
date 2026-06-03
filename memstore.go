@@ -27,6 +27,8 @@ type MemoryStore struct {
 	embeddings map[string][]float32
 	// metrics tracks access counts and timestamps per artifact ID.
 	metrics map[string]ArtifactMetrics
+	events  []Event
+	eventID int64
 }
 
 type scopeKeyEntry struct {
@@ -646,10 +648,50 @@ func (m *MemoryStore) UpdateEdgeWeight(_ context.Context, from, to, relation str
 	return nil
 }
 
-func (m *MemoryStore) AppendEvent(_ context.Context, _ Event) error { return nil }
+func (m *MemoryStore) AppendEvent(_ context.Context, event Event) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.eventID++
+	event.ID = m.eventID
+	if event.Ts.IsZero() {
+		event.Ts = time.Now().UTC()
+	}
+	m.events = append(m.events, event)
+	return nil
+}
 
-func (m *MemoryStore) GetEvents(_ context.Context, _ time.Time, _ EventFilter) ([]Event, error) {
-	return nil, nil
+func (m *MemoryStore) GetEvents(_ context.Context, since time.Time, filter EventFilter) ([]Event, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var result []Event
+	for _, e := range m.events {
+		if e.Ts.Before(since) {
+			continue
+		}
+		if filter.Scope != "" && e.Scope != filter.Scope {
+			continue
+		}
+		if filter.ArtifactID != "" && e.ArtifactID != filter.ArtifactID {
+			continue
+		}
+		if filter.Actor != "" && e.Actor != filter.Actor {
+			continue
+		}
+		if len(filter.EventTypes) > 0 {
+			matched := false
+			for _, et := range filter.EventTypes {
+				if e.EventType == et {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+		result = append(result, e)
+	}
+	return result, nil
 }
 
 // putLocked writes art while the write lock is already held.

@@ -1,0 +1,7 @@
+name: stamps_required
+trigger: status_changed
+when: to=in_review AND kind=task
+action: block
+forceable: true
+check: stamps_required
+message: "stamps section required before in_review — attach stamps section with verification evidence"

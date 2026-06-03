@@ -432,53 +432,11 @@ func (p *Protocol) transitionGuards() []transitionGuard {
 	// template_conformance_complete migrated → registry/rules/template_conformance_complete.yaml
 
 	// Archive: children must be readonly
-	if p.schema.Guards.ArchivedReadonly {
-		guards = append(guards, transitionGuard{
-			name: "children_readonly", when: StatusArchived, forceable: true,
-			check: func(ctx context.Context, p *Protocol, art *Artifact) error {
-				children, err := p.store.Children(ctx, art.ID)
-				if err != nil {
-					return err
-				}
-				for _, ch := range children {
-					if !p.schema.IsReadonly(ch.Status) {
-						return fmt.Errorf("cannot archive %s: child %s is %s (use archive_artifact with cascade)", art.ID, ch.ID, ch.Status) //nolint:err113 // sentinel; no caller uses errors.Is on this
-					}
-				}
-				return nil
-			},
-		})
-	}
-
-	// Allocation: worker_id required in Extra for task allocation.
-	// In-review: stamps section required for review transition.
-	// Activation: required fields.
-	guards = append(guards,
-		transitionGuard{
-			name: "worker_id_required", when: StatusAllocated, where: KindTask, forceable: true,
-			check: func(_ context.Context, _ *Protocol, art *Artifact) error {
-				if art.Extra == nil {
-					return fmt.Errorf("%w: %s", ErrWorkerIDRequired, art.ID)
-				}
-				if _, ok := art.Extra["worker_id"]; !ok {
-					return fmt.Errorf("%w: %s", ErrWorkerIDRequired, art.ID)
-				}
-				return nil
-			},
-		},
-		transitionGuard{
-			name: "stamps_required", when: StatusInReview, where: KindTask, forceable: true,
-			check: func(_ context.Context, _ *Protocol, art *Artifact) error {
-				for _, sec := range art.Sections {
-					if sec.Name == "stamps" {
-						return nil
-					}
-				}
-				return fmt.Errorf("%w: %s", ErrStampsRequired, art.ID)
-			},
-		},
-		// required_sections migrated → registry/rules/required_sections.yaml (check: activation_sections)
-	)
+	// All guards migrated to registry/rules/ YAML artifacts:
+	// children_readonly    → registry/rules/children_readonly.yaml
+	// worker_id_required   → registry/rules/worker_id_required.yaml
+	// stamps_required      → registry/rules/stamps_required.yaml
+	// required_sections    → registry/rules/required_sections.yaml
 
 	return guards
 }

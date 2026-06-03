@@ -1,0 +1,7 @@
+name: worker_id_required
+trigger: status_changed
+when: to=allocated AND kind=task
+action: block
+forceable: true
+check: worker_id_required
+message: "worker_id required in extra before allocation — set extra.worker_id to the agent or operator ID"

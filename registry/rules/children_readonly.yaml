@@ -1,0 +1,7 @@
+name: children_readonly
+trigger: status_changed
+when: to=archived
+action: block
+forceable: true
+check: children_readonly
+message: "archived artifacts are read-only — children cannot be in non-terminal states"

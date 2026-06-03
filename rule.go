@@ -149,6 +149,9 @@ const (
 	CheckChildrenComplete            = "children_complete"            // all children in terminal status
 	CheckDependsOnComplete           = "depends_on_complete"          // all depends_on artifacts in terminal status
 	CheckCompletionGates             = "completion_gates"             // schema.MissingCompletionGates
+	CheckChildrenReadonly            = "children_readonly"            // all children are readonly (archived)
+	CheckWorkerIDRequired            = "worker_id_required"           // extra["worker_id"] must be set
+	CheckStampsRequired              = "stamps_required"              // stamps section must be present
 )
 
 // RuleResult is returned by EvaluateRule when a rule fires.
@@ -264,6 +267,30 @@ func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResul
 			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock,
 				Message: rule.Message + " (" + strings.Join(missing, ", ") + ")"}
 		}
+	case CheckChildrenReadonly:
+		children, err := p.store.Children(context.Background(), art.ID)
+		if err == nil {
+			for _, ch := range children {
+				if !p.schema.IsReadonly(ch.Status) {
+					return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock,
+						Message: rule.Message + ": child " + ch.ID + " is " + ch.Status}
+				}
+			}
+		}
+	case CheckWorkerIDRequired:
+		if art.Extra == nil {
+			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: rule.Message}
+		}
+		if _, ok := art.Extra["worker_id"]; !ok {
+			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: rule.Message}
+		}
+	case CheckStampsRequired:
+		for _, sec := range art.Sections {
+			if sec.Name == "stamps" {
+				return nil
+			}
+		}
+		return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: rule.Message}
 	}
 	return nil // unknown or passing check
 }

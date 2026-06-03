@@ -26,7 +26,7 @@ type TreeNode struct {
 // would create a cycle. Walks up the parent chain from parentID; if childID
 // is encountered, the assignment would close a loop. When childID is empty
 // (new artifact), no cycle is possible.
-func (p *Protocol) wouldCycleParent(ctx context.Context, parentID, childID string) (bool, []string) { //nolint:gocritic // unnamedResult: pre-existing
+func (p *Protocol) wouldCycleParent(ctx context.Context, parentID, childID string) (bool, []string) { //nolint:gocritic // unnamedResult: (found, path) pair is idiomatic for cycle detection
 	if childID == "" {
 		return false, nil
 	}
@@ -53,7 +53,7 @@ func (p *Protocol) wouldCycleParent(ctx context.Context, parentID, childID strin
 // wouldCycle returns true if adding a depends_on edge from -> to would
 // create a cycle. It walks outgoing depends_on edges from 'to'; if 'from'
 // is reachable, the edge would close a loop. Returns the cycle path.
-func (p *Protocol) wouldCycle(ctx context.Context, from, to string) (bool, []string) { //nolint:gocritic // unnamedResult: pre-existing
+func (p *Protocol) wouldCycle(ctx context.Context, from, to string) (bool, []string) { //nolint:gocritic // unnamedResult: (found, path) pair is idiomatic for cycle detection
 	if from == to {
 		return true, []string{from, from}
 	}
@@ -155,16 +155,16 @@ func (p *Protocol) cascadeOverlaps(ctx context.Context, changed *Artifact, affec
 
 func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string, targetIDs []string) ([]Result, error) { //nolint:gocyclo,cyclop // link has many validation branches; splitting would increase call depth
 	if sourceID == "" {
-		return nil, fmt.Errorf("source ID is required") //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("source ID is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	if relation == "" {
-		return nil, fmt.Errorf("relation is required") //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("relation is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	if len(targetIDs) == 0 {
-		return nil, fmt.Errorf("at least one target ID is required") //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("at least one target ID is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	if !p.schema.ValidRelation(relation) && !p.isRegisteredEdgeType(relation) {
-		return nil, fmt.Errorf("unknown relation %q; valid: %s", relation, strings.Join(p.RegisteredRelations(), ", ")) //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("unknown relation %q; valid: %s", relation, strings.Join(p.RegisteredRelations(), ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 
 	if trait := p.ResolveEdgeTrait(relation); trait.MaxOutgoing > 0 {
@@ -177,7 +177,7 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 	if relation == RelDependsOn {
 		for _, tid := range targetIDs {
 			if cycle, path := p.wouldCycle(ctx, sourceID, tid); cycle {
-				return nil, fmt.Errorf("depends_on cycle detected: %s", strings.Join(path, " → ")) //nolint:err113 // pre-existing
+				return nil, fmt.Errorf("depends_on cycle detected: %s", strings.Join(path, " → ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 			}
 		}
 	}
@@ -196,7 +196,7 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 			}
 			if tpl.Kind != KindTemplate {
 				slog.WarnContext(ctx, "satisfies link target is not a template", slog.String("source_id", sourceID), slog.String("target_id", tid), slog.String("target_kind", tpl.Kind)) //nolint:sloglint // source_id/target_id/target_kind have no LogKey constants
-				return nil, fmt.Errorf("satisfies link target %s is not a template (kind=%s)", tid, tpl.Kind) //nolint:err113 // pre-existing
+				return nil, fmt.Errorf("satisfies link target %s is not a template (kind=%s)", tid, tpl.Kind) //nolint:err113 // sentinel; no caller uses errors.Is on this
 			}
 			// Temporarily add link to artifact for conformance check
 			artWithLink := &Artifact{
@@ -243,13 +243,13 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 
 func (p *Protocol) UnlinkArtifacts(ctx context.Context, sourceID, relation string, targetIDs []string) ([]Result, error) {
 	if sourceID == "" {
-		return nil, fmt.Errorf("source ID is required") //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("source ID is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	if relation == "" {
-		return nil, fmt.Errorf("relation is required") //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("relation is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	if len(targetIDs) == 0 {
-		return nil, fmt.Errorf("at least one target ID is required") //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("at least one target ID is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	art, err := p.store.Get(ctx, sourceID)
 	if err != nil {
@@ -306,7 +306,7 @@ func (p *Protocol) ArtifactTree(ctx context.Context, in TreeInput) (*TreeNode, e
 		rel = RelParentOf
 	}
 	if !p.schema.ValidRelation(rel) && !p.isRegisteredEdgeType(rel) {
-		return nil, fmt.Errorf("unknown relation %q; valid: %s, *", rel, strings.Join(p.schema.Relations, ", ")) //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("unknown relation %q; valid: %s, *", rel, strings.Join(p.schema.Relations, ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 
 	dir := in.Direction
@@ -323,7 +323,7 @@ func (p *Protocol) ArtifactTree(ctx context.Context, in TreeInput) (*TreeNode, e
 	case "both":
 		storeDir = Both
 	default:
-		return nil, fmt.Errorf("unknown direction %q. Valid: outgoing, incoming, both", dir) //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("unknown direction %q. Valid: outgoing, incoming, both", dir) //nolint:err113 // runtime values required in message; no static sentinel possible
 	}
 
 	maxD := p.defaults.GetTreeMaxDepth()

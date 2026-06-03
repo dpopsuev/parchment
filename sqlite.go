@@ -1690,7 +1690,7 @@ func toSet(items []string) map[string]bool {
 }
 
 // reconcileEdgesSQL mirrors the bbolt reconcileEdges logic using SQL.
-func reconcileEdgesSQL(ctx context.Context, tx *sql.Tx, old, cur *Artifact) error { //nolint:gocyclo // pre-existing complexity, moved from protocol/
+func reconcileEdgesSQL(ctx context.Context, tx *sql.Tx, old, cur *Artifact) error { //nolint:gocyclo // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
 	oldParent := ""
 	if old != nil {
 		oldParent = old.Parent

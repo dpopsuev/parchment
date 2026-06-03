@@ -212,7 +212,7 @@ func (p *Protocol) checkTemplateConformance(ctx context.Context, art *Artifact, 
 	}
 	fix := "[" + strings.Join(fixParts, ", ") + "]"
 
-	return fmt.Errorf("artifact does not conform to template %s — missing sections:\n%s\nFix: pass sections: %s", //nolint:err113 // pre-existing
+	return fmt.Errorf("artifact does not conform to template %s — missing sections:\n%s\nFix: pass sections: %s", //nolint:err113 // sentinel; no caller uses errors.Is on this
 		tpl.ID, strings.Join(msgs, "\n"), fix)
 }
 

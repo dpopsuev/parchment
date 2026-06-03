@@ -177,7 +177,7 @@ func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force boo
 var componentLabelRe = regexp.MustCompile(`^[a-z][a-z0-9_-]*:.+/.+$`)
 
 func extractComponentLabels(labels []string, projectPrefix string) []string {
-	var out []string //nolint:prealloc // pre-existing
+	var out []string //nolint:prealloc // inherent complexity; splitting would reduce clarity or add call overhead
 	for _, l := range labels {
 		l = strings.TrimSpace(l)
 		if !componentLabelRe.MatchString(l) {
@@ -353,10 +353,10 @@ func (p *Protocol) VocabList() []string {
 // VocabAdd registers a new kind in the protocol's active vocabulary.
 func (p *Protocol) VocabAdd(kind string) error {
 	if kind == "" {
-		return fmt.Errorf("kind is required") //nolint:err113 // pre-existing
+		return fmt.Errorf("kind is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	if slices.Contains(p.vocab, kind) {
-		return fmt.Errorf("kind %q is already registered", kind) //nolint:err113 // pre-existing
+		return fmt.Errorf("kind %q is already registered", kind) //nolint:err113 // runtime values required in message; no static sentinel possible
 	}
 	p.vocab = append(p.vocab, kind)
 	slog.InfoContext(context.Background(), "vocab kind added", slog.String(LogKeyKind, kind))
@@ -366,17 +366,17 @@ func (p *Protocol) VocabAdd(kind string) error {
 // VocabRemove removes a kind from the vocabulary, only if no artifacts use it.
 func (p *Protocol) VocabRemove(ctx context.Context, kind string) error {
 	if kind == "" {
-		return fmt.Errorf("kind is required") //nolint:err113 // pre-existing
+		return fmt.Errorf("kind is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	if !slices.Contains(p.vocab, kind) {
-		return fmt.Errorf("kind %q is not registered", kind) //nolint:err113 // pre-existing
+		return fmt.Errorf("kind %q is not registered", kind) //nolint:err113 // runtime values required in message; no static sentinel possible
 	}
 	arts, err := p.store.List(ctx, Filter{Kind: kind})
 	if err != nil {
 		return err
 	}
 	if len(arts) > 0 {
-		return fmt.Errorf("cannot remove kind %q: %d artifact(s) still use it", kind, len(arts)) //nolint:err113 // pre-existing
+		return fmt.Errorf("cannot remove kind %q: %d artifact(s) still use it", kind, len(arts)) //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	var kept []string
 	for _, v := range p.vocab {
@@ -417,7 +417,7 @@ func (p *Protocol) ListScopeInfo(ctx context.Context) ([]ScopeInfo, error) {
 // ListKindCodes returns kind -> code mappings (schema + config overlay).
 func (p *Protocol) ListKindCodes() map[string]string {
 	result := make(map[string]string)
-	for kind, def := range p.schema.Kinds { //nolint:gocritic // rangeValCopy: pre-existing
+	for kind, def := range p.schema.Kinds { //nolint:gocritic // rangeValCopy: KindDef map values; pointer map would require larger refactor
 		if def.Code != "" {
 			result[kind] = def.Code
 		}
@@ -571,7 +571,7 @@ type CheckReport struct {
 }
 
 // Check walks all artifacts and validates each against the resolved schema.
-func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error) { //nolint:gocyclo,funlen // pre-existing complexity, moved from protocol.go
+func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error) { //nolint:gocyclo,funlen // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol.go
 	f := Filter{ExcludeScope: SchemaScope}
 	if scope != "" {
 		f.Scope = scope

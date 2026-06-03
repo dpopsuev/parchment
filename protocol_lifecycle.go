@@ -13,7 +13,7 @@ func (p *Protocol) RegisterGate(g QualityGate) { p.gates = append(p.gates, g) }
 
 // CompletionScore computes a 0.0-1.0 progress score for an artifact.
 // Components: checklist items, child completion, section coverage.
-func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 { //nolint:gocyclo // pre-existing complexity, moved from protocol/
+func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 { //nolint:gocyclo // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
 	// Terminal artifacts are 100% complete by definition
 	if p.schema.IsTerminal(art.Status) {
 		return 1.0
@@ -97,10 +97,10 @@ type SetFieldOptions struct {
 
 func (p *Protocol) SetField(ctx context.Context, ids []string, field, value string, opts ...SetFieldOptions) ([]Result, error) {
 	if len(ids) == 0 {
-		return nil, fmt.Errorf("at least one ID is required") //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("at least one ID is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	if field == "" {
-		return nil, fmt.Errorf("field is required") //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("field is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	slog.DebugContext(ctx, "set field",
 		slog.Int(LogKeyCount, len(ids)),
@@ -137,7 +137,7 @@ func (p *Protocol) SetField(ctx context.Context, ids []string, field, value stri
 	return results, nil
 }
 
-func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, opt SetFieldOptions) Result { //nolint:gocyclo // pre-existing complexity, moved from protocol.go
+func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, opt SetFieldOptions) Result { //nolint:gocyclo // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol.go
 	art, err := p.GetArtifact(ctx, id)
 	if err != nil {
 		return Result{ID: id, Error: err.Error()}
@@ -248,7 +248,7 @@ type transitionGuard struct {
 	check     func(ctx context.Context, p *Protocol, art *Artifact) error
 }
 
-func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status string, force bool) Result { //nolint:gocyclo,funlen // pre-existing complexity, moved from protocol.go
+func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status string, force bool) Result { //nolint:gocyclo,funlen // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol.go
 	reason, valid := p.schema.ValidTransition(art.Kind, art.Status, status)
 	if !valid {
 		if !force {
@@ -340,7 +340,7 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 		}
 	}
 	// Auto-enrichment: on task completion, update implementing spec
-	if art.Kind == KindTask && status == StatusComplete { //nolint:nestif // pre-existing complexity, moved from protocol/
+	if art.Kind == KindTask && status == StatusComplete { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
 		if targets, ok := art.Links[RelImplements]; ok {
 			for _, specID := range targets {
 				spec, err := p.store.Get(ctx, specID)
@@ -414,7 +414,7 @@ func (p *Protocol) transitionGuards() []transitionGuard {
 		name: "template_conformance_complete", when: StatusComplete, forceable: true,
 		check: func(ctx context.Context, p *Protocol, art *Artifact) error {
 			if err := p.checkTemplateConformance(ctx, art, false); err != nil {
-				return fmt.Errorf("cannot complete: %w", err) //nolint:err113 // pre-existing
+				return fmt.Errorf("cannot complete: %w", err) //nolint:err113 // runtime values required in message; no static sentinel possible
 			}
 			return nil
 		},
@@ -422,7 +422,7 @@ func (p *Protocol) transitionGuards() []transitionGuard {
 		name: "completion_gates", when: StatusComplete, forceable: true,
 		check: func(ctx context.Context, p *Protocol, art *Artifact) error {
 			if missing := p.schema.MissingCompletionGates(art); len(missing) > 0 {
-				return fmt.Errorf("cannot complete %s: gated sections missing or empty: %s", //nolint:err113 // pre-existing
+				return fmt.Errorf("cannot complete %s: gated sections missing or empty: %s", //nolint:err113 // sentinel; no caller uses errors.Is on this
 					art.ID, strings.Join(missing, ", "))
 			}
 			return nil
@@ -440,7 +440,7 @@ func (p *Protocol) transitionGuards() []transitionGuard {
 				}
 				for _, ch := range children {
 					if !p.schema.IsReadonly(ch.Status) {
-						return fmt.Errorf("cannot archive %s: child %s is %s (use archive_artifact with cascade)", art.ID, ch.ID, ch.Status) //nolint:err113 // pre-existing
+						return fmt.Errorf("cannot archive %s: child %s is %s (use archive_artifact with cascade)", art.ID, ch.ID, ch.Status) //nolint:err113 // sentinel; no caller uses errors.Is on this
 					}
 				}
 				return nil
@@ -516,7 +516,7 @@ func (p *Protocol) guardDependsOnComplete(ctx context.Context, art *Artifact) er
 		}
 	}
 	if len(incomplete) > 0 {
-		return fmt.Errorf("cannot complete %s: %d incomplete dependencies: %s", //nolint:err113 // pre-existing
+		return fmt.Errorf("cannot complete %s: %d incomplete dependencies: %s", //nolint:err113 // sentinel; no caller uses errors.Is on this
 			art.ID, len(incomplete), strings.Join(incomplete, ", "))
 	}
 	return nil
@@ -534,7 +534,7 @@ func (p *Protocol) guardChildrenComplete(ctx context.Context, art *Artifact) err
 		}
 	}
 	if len(incomplete) > 0 {
-		return fmt.Errorf("cannot complete %s: %d incomplete children: %s", //nolint:err113 // pre-existing
+		return fmt.Errorf("cannot complete %s: %d incomplete children: %s", //nolint:err113 // sentinel; no caller uses errors.Is on this
 			art.ID, len(incomplete), strings.Join(incomplete, ", "))
 	}
 	return nil

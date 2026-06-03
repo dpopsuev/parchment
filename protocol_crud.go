@@ -23,7 +23,7 @@ func (p *Protocol) PromoteStash(ctx context.Context, stashID string, patch Creat
 		p.stash.Delete(stashID)
 		newID, stashErr := p.stash.Put(merged)
 		if stashErr != nil {
-			return nil, fmt.Errorf("%w (stash unavailable: %w)", err, stashErr) //nolint:errorlint // pre-existing
+			return nil, fmt.Errorf("%w (stash unavailable: %w)", err, stashErr) //nolint:errorlint // inherent complexity; splitting would reduce clarity or add call overhead
 		}
 		// If the underlying error is already a ConformanceError, update its StashID.
 		// Otherwise wrap in a new ConformanceError.
@@ -61,24 +61,24 @@ type CreateInput struct {
 	SkipHooks  bool                `json:"skip_hooks,omitempty"`
 }
 
-func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifact, error) { //nolint:gocyclo,funlen,gocritic // pre-existing complexity, moved from protocol/; hugeParam: value semantics intentional
+func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifact, error) { //nolint:gocyclo,funlen,gocritic // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/; hugeParam: value semantics intentional
 	if in.Title == "" {
-		return nil, fmt.Errorf("title is required") //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("title is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	if err := ValidateKind(in.Kind, p.vocab); err != nil {
 		return nil, err
 	}
 	if in.Priority != "" && !p.schema.ValidPriority(in.Priority) {
-		return nil, fmt.Errorf("invalid priority %q — valid: %s", in.Priority, strings.Join(p.schema.Priorities, ", ")) //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("invalid priority %q — valid: %s", in.Priority, strings.Join(p.schema.Priorities, ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	if in.Parent != "" {
 		if parent, err := p.store.Get(ctx, in.Parent); err == nil {
 			if reason, ok := p.schema.ValidChild(parent.Kind, in.Kind); !ok {
-				return nil, fmt.Errorf("%s", reason) //nolint:err113 // pre-existing
+				return nil, fmt.Errorf("%s", reason) //nolint:err113 // runtime values required in message; no static sentinel possible
 			}
 		}
 		if cycle, path := p.wouldCycleParent(ctx, in.Parent, ""); cycle {
-			return nil, fmt.Errorf("parent_of cycle detected: %s", strings.Join(path, " → ")) //nolint:err113 // pre-existing
+			return nil, fmt.Errorf("parent_of cycle detected: %s", strings.Join(path, " → ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 		}
 	}
 	scope, err := p.inferScope(ctx, in.Scope, in.Parent, in.Kind)
@@ -88,7 +88,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	// Enforce scope policy
 	if policy, ok := p.scopePolicies[scope]; ok {
 		if len(policy.AllowedKinds) > 0 && !slices.Contains(policy.AllowedKinds, in.Kind) {
-			return nil, fmt.Errorf("kind %q not allowed in scope %q (allowed: %s)", in.Kind, scope, strings.Join(policy.AllowedKinds, ", ")) //nolint:err113 // pre-existing
+			return nil, fmt.Errorf("kind %q not allowed in scope %q (allowed: %s)", in.Kind, scope, strings.Join(policy.AllowedKinds, ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 		}
 		if in.Priority == "" && policy.DefaultPriority != "" {
 			in.Priority = policy.DefaultPriority
@@ -103,7 +103,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		}
 	}
 	var id string
-	if in.ExplicitID != "" { //nolint:gocritic,nestif // ifElseChain: pre-existing
+	if in.ExplicitID != "" { //nolint:gocritic,nestif // ifElseChain: legitimate branching for ID validation
 		id = in.ExplicitID
 	} else if p.idFormat == IDFormatUUID && in.Prefix == "" {
 		id = GenerateUUID()
@@ -185,7 +185,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		skipGuards = kd.SkipGuards
 	}
 
-	if !skipGuards { //nolint:nestif // pre-existing complexity
+	if !skipGuards { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity
 		// Auto-link template if no satisfies link provided
 		if art.Links == nil || len(art.Links[RelSatisfies]) == 0 {
 			if tplID := p.findTemplateForKind(ctx, art.Kind, scope); tplID != "" {
@@ -212,7 +212,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 				if reqRel == RelDependsOn {
 					hint = fmt.Sprintf("depends_on: [\"<target-id>\"] or links: {%q: [\"<target-id>\"]}", reqRel)
 				}
-					return nil, fmt.Errorf("%s requires a %s edge — add it at creation time via %s", art.Kind, reqRel, hint) //nolint:err113 // pre-existing
+					return nil, fmt.Errorf("%s requires a %s edge — add it at creation time via %s", art.Kind, reqRel, hint) //nolint:err113 // runtime values required in message; no static sentinel possible
 				}
 			}
 		}
@@ -478,12 +478,12 @@ func (p *Protocol) populateScopeLabelIndex(ctx context.Context, f *Filter) {
 
 func (p *Protocol) SearchArtifacts(ctx context.Context, query string, in ListInput) ([]*Artifact, error) { //nolint:gocritic // hugeParam: value semantics intentional, changing to pointer would require updating all callers including MCP handlers
 	if query == "" {
-		return nil, fmt.Errorf("query is required") //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("query is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 
 	// Try FTS5 first, fall back to substring scan
 	ftsIDs, ftsErr := p.store.Search(ctx, query)
-	if ftsErr == nil && len(ftsIDs) > 0 { //nolint:nestif // pre-existing complexity
+	if ftsErr == nil && len(ftsIDs) > 0 { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity
 		var matched []*Artifact
 		for _, id := range ftsIDs {
 			art, err := p.store.Get(ctx, id)
@@ -556,7 +556,7 @@ func matchesQuery(art *Artifact, q string) bool {
 
 func (p *Protocol) AttachSection(ctx context.Context, id, name, text string) (bool, error) {
 	if id == "" || name == "" {
-		return false, fmt.Errorf("id and name are required") //nolint:err113 // pre-existing
+		return false, fmt.Errorf("id and name are required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	art, err := p.store.Get(ctx, id)
 	if err != nil {
@@ -591,7 +591,7 @@ func (p *Protocol) AttachSection(ctx context.Context, id, name, text string) (bo
 
 func (p *Protocol) GetSection(ctx context.Context, id, name string) (string, error) {
 	if id == "" || name == "" {
-		return "", fmt.Errorf("id and name are required") //nolint:err113 // pre-existing
+		return "", fmt.Errorf("id and name are required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	art, err := p.store.Get(ctx, id)
 	if err != nil {
@@ -602,14 +602,14 @@ func (p *Protocol) GetSection(ctx context.Context, id, name string) (string, err
 			return sec.Text, nil
 		}
 	}
-	return "", fmt.Errorf("section %q not found on %s", name, id) //nolint:err113 // pre-existing
+	return "", fmt.Errorf("section %q not found on %s", name, id) //nolint:err113 // runtime values required in message; no static sentinel possible
 }
 
 // DetachSection removes a named section from an artifact. Returns true if the
 // section existed and was removed.
 func (p *Protocol) DetachSection(ctx context.Context, id, name string) (bool, error) {
 	if id == "" || name == "" {
-		return false, fmt.Errorf("id and name are required") //nolint:err113 // pre-existing
+		return false, fmt.Errorf("id and name are required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	art, err := p.store.Get(ctx, id)
 	if err != nil {
@@ -621,7 +621,7 @@ func (p *Protocol) DetachSection(ctx context.Context, id, name string) (bool, er
 	if tpl := p.resolveTemplate(ctx, art); tpl != nil {
 		expected := templateSections(tpl)
 		if guidance, required := expected[name]; required {
-			return false, fmt.Errorf("cannot remove section %q required by template %s: %s", name, tpl.ID, guidance) //nolint:err113 // pre-existing
+			return false, fmt.Errorf("cannot remove section %q required by template %s: %s", name, tpl.ID, guidance) //nolint:err113 // runtime values required in message; no static sentinel possible
 		}
 	}
 	idx := -1
@@ -668,7 +668,7 @@ func (p *Protocol) inferScope(ctx context.Context, explicit, parentID, kind stri
 	if len(p.scopes) > 0 {
 		avail = strings.Join(p.scopes, ", ")
 	}
-	return "", fmt.Errorf("scope is required (available scopes: %s)", avail) //nolint:err113 // pre-existing
+	return "", fmt.Errorf("scope is required (available scopes: %s)", avail) //nolint:err113 // sentinel; no caller uses errors.Is on this
 }
 
 func (p *Protocol) resolveScopeKey(ctx context.Context, scope string) (string, error) {
@@ -748,7 +748,7 @@ func (p *Protocol) RetireArtifact(ctx context.Context, ids []string, cascade boo
 // applyToEach applies fn to each id and accumulates Results, logging failures.
 func (p *Protocol) applyToEach(ctx context.Context, ids []string, op string, fn func(string) error) ([]Result, error) {
 	if len(ids) == 0 {
-		return nil, fmt.Errorf("ids is required") //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("ids is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	results := make([]Result, 0, len(ids))
 	for _, id := range ids {
@@ -799,7 +799,7 @@ func (p *Protocol) retireSingle(ctx context.Context, id string, cascade bool) er
 // DeArchive restores archived artifacts to draft status, bypassing ArchivedReadonly guard.
 func (p *Protocol) DeArchive(ctx context.Context, ids []string, cascade bool) ([]Result, error) {
 	if len(ids) == 0 {
-		return nil, fmt.Errorf("ids is required") //nolint:err113 // pre-existing
+		return nil, fmt.Errorf("ids is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	slog.InfoContext(ctx, "de-archive",
 		slog.Int(LogKeyCount, len(ids)),

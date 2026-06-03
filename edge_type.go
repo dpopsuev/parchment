@@ -108,6 +108,8 @@ var defaultEdgeTypes = []struct {
 func SeedEdgeTypeTraits(ctx context.Context, s Store) {
 	// Primary path: seed from embedded YAML registry.
 	seedEdgeTypesFromRegistry(ctx, s)
+	// Migration: add guidance sections to pre-registry artifacts.
+	migrateEdgeTypeSections(ctx, s)
 
 	// Fallback: seed any edge types in defaultEdgeTypes not covered by the registry.
 	now := time.Now().UTC()

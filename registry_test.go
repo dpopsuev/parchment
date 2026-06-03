@@ -3,6 +3,7 @@ package parchment_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/dpopsuev/parchment"
 )
@@ -108,4 +109,78 @@ func TestRegistry_KindDef_NoGuidanceFields(t *testing.T) {
 	_ = task // compile-time: if WhenToCreate is on KindDef, this line would access it
 	// The real check is that guidance comes from _schema artifacts, not from KindDef fields.
 	// We verify by checking the kind_definition artifact has sections (tested above).
+}
+
+func TestMigrateRegistrySections_AddsMissingSectionsToExistingArtifacts(t *testing.T) {
+	// Given: DEF-task exists in the store WITHOUT guidance sections (pre-registry state)
+	// When: SeedDefinitions is called (which now includes migration)
+	// Then: when_to_create and agent_note are added WITHOUT overwriting existing sections
+	t.Parallel()
+	dir := t.TempDir()
+	s, err := parchment.OpenSQLite(dir + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	ctx := context.Background()
+
+	// Simulate pre-registry state: DEF-task exists with NO guidance sections
+	now := time.Now().UTC()
+	_ = s.Put(ctx, &parchment.Artifact{
+		ID: "DEF-task", Kind: parchment.KindDefinition,
+		Scope: parchment.SchemaScope, Title: "task", Status: parchment.StatusActive,
+		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
+	})
+
+	// Call SeedDefinitions — should migrate the existing artifact
+	parchment.SeedDefinitions(ctx, s)
+
+	art, err := s.Get(ctx, "DEF-task")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sections := make(map[string]string)
+	for _, sec := range art.Sections {
+		sections[sec.Name] = sec.Text
+	}
+	if sections["when_to_create"] == "" {
+		t.Error("migration should have added when_to_create to existing DEF-task")
+	}
+	if sections["agent_note"] == "" {
+		t.Error("migration should have added agent_note to existing DEF-task")
+	}
+}
+
+func TestMigrateRegistrySections_PreservesExistingCustomSections(t *testing.T) {
+	// Given: DEF-task exists with a custom when_to_create section
+	// When: SeedDefinitions migrates
+	// Then: the custom content is preserved (migration is additive, not overwriting)
+	t.Parallel()
+	dir := t.TempDir()
+	s, err := parchment.OpenSQLite(dir + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+	_ = s.Put(ctx, &parchment.Artifact{
+		ID: "DEF-task", Kind: parchment.KindDefinition,
+		Scope: parchment.SchemaScope, Title: "task", Status: parchment.StatusActive,
+		Sections: []parchment.Section{
+			{Name: "when_to_create", Text: "custom operator guidance"},
+		},
+		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
+	})
+
+	parchment.SeedDefinitions(ctx, s)
+
+	art, _ := s.Get(ctx, "DEF-task")
+	for _, sec := range art.Sections {
+		if sec.Name == "when_to_create" && sec.Text != "custom operator guidance" {
+			t.Errorf("migration overwrote custom when_to_create: %q", sec.Text)
+		}
+	}
 }

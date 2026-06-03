@@ -46,6 +46,8 @@ func extraToKindDef(extra map[string]any) (KindDef, error) {
 func SeedDefinitions(ctx context.Context, s Store) {
 	// Primary path: seed from embedded YAML registry (data-driven, operator-overridable).
 	seedKindsFromRegistry(ctx, s)
+	// Migration: add guidance sections to artifacts seeded before the registry existed.
+	migrateKindSections(ctx, s)
 
 	// Fallback: seed any kinds present in KnowledgeSchema() but missing from the registry.
 	// This preserves backward compat for kinds not yet migrated to YAML.

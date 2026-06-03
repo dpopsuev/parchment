@@ -145,6 +145,8 @@ var defaultLabelTraits = []struct {
 func SeedLabelTraits(ctx context.Context, s Store) {
 	// Primary path: seed from embedded YAML registry.
 	seedLabelsFromRegistry(ctx, s)
+	// Migration: add guidance sections to pre-registry artifacts.
+	migrateLabelSections(ctx, s)
 
 	// Fallback: seed any labels in defaultLabelTraits not covered by the registry.
 	for _, entry := range defaultLabelTraits {

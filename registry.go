@@ -322,6 +322,93 @@ func seedLabelsFromRegistry(ctx context.Context, s Store) {
 	}
 }
 
+// migrateKindSections updates existing kind_definition artifacts in the store
+// by adding any guidance sections present in the registry YAML but absent from
+// the stored artifact. Existing sections are never overwritten — operator
+// customisation is preserved. This is the forward-migration path for stores
+// seeded before the registry existed.
+func migrateKindSections(ctx context.Context, s Store) {
+	allKinds := loadRegistryKinds()
+	for i := range allKinds {
+		k := &allKinds[i]
+		id := "DEF-" + k.Name
+		art, err := s.Get(ctx, id)
+		if err != nil {
+			continue // not yet seeded; seedKindsFromRegistry will handle it
+		}
+		existing := make(map[string]bool, len(art.Sections))
+		for _, sec := range art.Sections {
+			existing[sec.Name] = true
+		}
+		var added bool
+		if k.WhenToCreate != "" && !existing["when_to_create"] {
+			art.Sections = append(art.Sections, Section{Name: "when_to_create", Text: strings.TrimSpace(k.WhenToCreate)})
+			added = true
+		}
+		if k.AgentNote != "" && !existing["agent_note"] {
+			art.Sections = append(art.Sections, Section{Name: "agent_note", Text: strings.TrimSpace(k.AgentNote)})
+			added = true
+		}
+		if added {
+			_ = s.Put(ctx, art)
+		}
+	}
+}
+
+// migrateEdgeTypeSections updates existing edge_type_definition artifacts similarly.
+func migrateEdgeTypeSections(ctx context.Context, s Store) { //nolint:dupl // parallel to migrateLabelSections; different types prevent a shared generic
+	for _, et := range loadRegistryEdgeTypes() {
+		id := "EDT-" + et.Name
+		art, err := s.Get(ctx, id)
+		if err != nil {
+			continue
+		}
+		existing := make(map[string]bool, len(art.Sections))
+		for _, sec := range art.Sections {
+			existing[sec.Name] = true
+		}
+		var added bool
+		if et.WhenToUse != "" && !existing["when_to_use"] {
+			art.Sections = append(art.Sections, Section{Name: "when_to_use", Text: strings.TrimSpace(et.WhenToUse)})
+			added = true
+		}
+		if et.Semantics != "" && !existing["semantics"] {
+			art.Sections = append(art.Sections, Section{Name: "semantics", Text: strings.TrimSpace(et.Semantics)})
+			added = true
+		}
+		if added {
+			_ = s.Put(ctx, art)
+		}
+	}
+}
+
+// migrateLabelSections updates existing label_definition artifacts similarly.
+func migrateLabelSections(ctx context.Context, s Store) { //nolint:dupl // parallel to migrateEdgeTypeSections; different types prevent a shared generic
+	for _, l := range loadRegistryLabels() {
+		id := "LDEF-" + l.Name
+		art, err := s.Get(ctx, id)
+		if err != nil {
+			continue
+		}
+		existing := make(map[string]bool, len(art.Sections))
+		for _, sec := range art.Sections {
+			existing[sec.Name] = true
+		}
+		var added bool
+		if l.WhenToApply != "" && !existing["when_to_apply"] {
+			art.Sections = append(art.Sections, Section{Name: "when_to_apply", Text: strings.TrimSpace(l.WhenToApply)})
+			added = true
+		}
+		if l.Implies != "" && !existing["implies"] {
+			art.Sections = append(art.Sections, Section{Name: "implies", Text: strings.TrimSpace(l.Implies)})
+			added = true
+		}
+		if added {
+			_ = s.Put(ctx, art)
+		}
+	}
+}
+
 // registrySchema builds a Schema from the embedded kind registry YAML files.
 // This replaces the hardcoded KnowledgeSchema() kind map with data-driven definitions.
 func registrySchema() map[string]KindDef {

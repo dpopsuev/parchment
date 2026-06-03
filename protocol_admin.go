@@ -809,6 +809,30 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		}
 	}
 
+	// ID prefix mismatch: artifact ID prefix does not match the scope's registered key.
+	// Non-blocking warning — the artifact is valid but was likely created in a different scope.
+	scopeKeys, _ := p.ListScopeKeys(ctx) // map[scope]key
+	keyByScope := make(map[string]string, len(scopeKeys))
+	for scope, key := range scopeKeys {
+		if key != "" {
+			keyByScope[scope] = strings.ToUpper(key)
+		}
+	}
+	for _, art := range arts {
+		expectedKey, ok := keyByScope[art.Scope]
+		if !ok {
+			continue
+		}
+		prefix := strings.SplitN(art.ID, "-", 2)[0]
+		if !strings.EqualFold(prefix, expectedKey) {
+			report.Violations = append(report.Violations, CheckViolation{
+				ID: art.ID, Kind: art.Kind, Title: art.Title,
+				Category: "id_prefix_mismatch",
+				Detail:   fmt.Sprintf("ID prefix %q does not match scope %q key %q", prefix, art.Scope, expectedKey),
+			})
+		}
+	}
+
 	sort.Slice(report.Violations, func(i, j int) bool {
 		return report.Violations[i].ID < report.Violations[j].ID
 	})

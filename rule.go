@@ -13,12 +13,13 @@ import (
 // reads at startup and evaluates during status transitions —
 // replacing compiled-in Go transitionGuards one at a time.
 type RuleDef struct {
-	ID      string // artifact ID, e.g. RULE-priority_required
-	Title   string // human name, e.g. priority_required
-	Trigger string // event that fires this rule: status_changed
-	When    string // predicate string, e.g. to=active AND kind=task AND priority==""
-	Action  string // block | warn | allow (default: block)
-	Message string // agent-facing error or warning text
+	ID        string // artifact ID, e.g. RULE-priority_required
+	Title     string // human name, e.g. priority_required
+	Trigger   string // event that fires this rule: status_changed
+	When      string // predicate string, e.g. to=active AND kind=task AND priority==""
+	Action    string // block | warn | allow (default: block)
+	Forceable bool   // if true, SetFieldOptions.Force=true skips this rule
+	Message   string // agent-facing error or warning text
 }
 
 // ParseRule parses a kind=rule artifact into a RuleDef.
@@ -35,6 +36,7 @@ func ParseRule(art *Artifact) (*RuleDef, error) {
 	when := sections["when"]
 	action := sections["action"]
 	message := sections["message"]
+	forceable := sections["forceable"] == "true"
 
 	if trigger == "" {
 		return nil, fmt.Errorf("rule %s missing trigger section", art.ID) //nolint:err113 // runtime value required
@@ -50,12 +52,13 @@ func ParseRule(art *Artifact) (*RuleDef, error) {
 	}
 
 	return &RuleDef{
-		ID:      art.ID,
-		Title:   art.Title,
-		Trigger: trigger,
-		When:    when,
-		Action:  action,
-		Message: message,
+		ID:        art.ID,
+		Title:     art.Title,
+		Trigger:   trigger,
+		When:      when,
+		Action:    action,
+		Forceable: forceable,
+		Message:   message,
 	}, nil
 }
 
@@ -115,6 +118,9 @@ func seedRulesFromRegistry(ctx context.Context, s Store) {
 				{Name: "action", Text: r.Action},
 				{Name: "message", Text: r.Message},
 			},
+		}
+		if r.Forceable {
+			art.Sections = append(art.Sections, Section{Name: "forceable", Text: "true"})
 		}
 		if err := s.Put(ctx, art); err != nil {
 			slog.WarnContext(ctx, "seed rules: put failed", slog.String(LogKeyID, id), slog.Any(LogKeyError, err))

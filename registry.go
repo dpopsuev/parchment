@@ -414,11 +414,12 @@ func migrateLabelSections(ctx context.Context, s Store) { //nolint:dupl // paral
 
 // ruleYAML is the on-disk format for a rule definition.
 type ruleYAML struct {
-	Name    string `yaml:"name"`
-	Trigger string `yaml:"trigger"`
-	When    string `yaml:"when"`
-	Action  string `yaml:"action"`
-	Message string `yaml:"message"`
+	Name      string `yaml:"name"`
+	Trigger   string `yaml:"trigger"`
+	When      string `yaml:"when"`
+	Action    string `yaml:"action"`
+	Forceable bool   `yaml:"forceable"` // if true, force=true (BypassGuards) skips this rule
+	Message   string `yaml:"message"`
 }
 
 // loadRegistryRules parses all rule YAML files from the embedded registry.

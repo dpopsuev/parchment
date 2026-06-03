@@ -308,9 +308,11 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 	}
 
 	// Rule evaluator: check rule artifacts loaded from _schema.
-	// Runs after Go guards, before quality gates. BypassGuards (force) skips Go guards above
-	// but rule artifacts are always evaluated — they are data-defined constraints.
+	// Mirrors Go guard semantics: forceable rules are skipped when force=true.
 	for _, rule := range p.rules {
+		if force && rule.Forceable {
+			continue
+		}
 		if result := EvaluateRule(rule, art, status); result != nil {
 			if result.Action == RuleActionBlock {
 				return Result{ID: art.ID, Error: result.Message}
@@ -513,16 +515,7 @@ func (p *Protocol) transitionGuards() []transitionGuard {
 				return fmt.Errorf("%w: %s", ErrStampsRequired, art.ID)
 			},
 		},
-		transitionGuard{
-			name: "required_fields", when: StatusActive, forceable: true,
-			check: func(_ context.Context, _ *Protocol, art *Artifact) error {
-				if missing := p.schema.MissingRequiredFields(art); len(missing) > 0 {
-					return fmt.Errorf("%w: %s (%s)", ErrMissingRequiredFields, art.ID, strings.Join(missing, ", "))
-				}
-				return nil
-			},
-		},
-		transitionGuard{
+		transitionGuard{ // migrated: priority_required → registry/rules/priority_required.yaml
 			name: "required_sections", when: StatusActive, forceable: true,
 			check: func(_ context.Context, _ *Protocol, art *Artifact) error {
 				if !p.schema.ActivationRequiresSections(art.Kind) {

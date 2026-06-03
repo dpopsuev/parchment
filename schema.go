@@ -255,6 +255,8 @@ func (s *Schema) MissingShouldSections(kind string, have []Section) []string {
 }
 
 // MissingRequiredFields returns field names that are required for the kind but empty on the artifact.
+// Kept for loadSchema round-trip and potential future rule predicates.
+// The required_fields transitionGuard was migrated to registry/rules/priority_required.yaml.
 func (s *Schema) MissingRequiredFields(art *Artifact) []string {
 	kd, ok := s.Kinds[art.Kind]
 	if !ok || len(kd.RequiredFields) == 0 {

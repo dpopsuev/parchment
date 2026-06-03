@@ -381,17 +381,10 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 	p.populateScopeLabelIndex(ctx, &f)
 	p.populateFamilyKinds(&f)
 	arts, err := p.store.List(ctx, f)
-	if err != nil || in.TitleContains == "" {
+	if err != nil {
 		return arts, err
 	}
-	q := strings.ToLower(in.TitleContains)
-	var filtered []*Artifact
-	for _, art := range arts {
-		if strings.Contains(strings.ToLower(art.Title), q) {
-			filtered = append(filtered, art)
-		}
-	}
-	return filtered, nil
+	return filterByTitleContains(arts, in.TitleContains), nil
 }
 
 // ListPage returns a cursor-paginated page of artifacts. It applies the same
@@ -435,20 +428,30 @@ func (p *Protocol) ListPage(ctx context.Context, in ListInput) (Page, error) { /
 	p.populateScopeLabelIndex(ctx, &f)
 	p.populateFamilyKinds(&f)
 	page, err := p.store.ListPage(ctx, f)
-	if err != nil || in.TitleContains == "" {
+	if err != nil {
 		return page, err
 	}
-	// Apply TitleContains post-fetch (same as ListArtifacts).
-	q := strings.ToLower(in.TitleContains)
-	filtered := page.Artifacts[:0]
-	for _, art := range page.Artifacts {
-		if strings.Contains(strings.ToLower(art.Title), q) {
-			filtered = append(filtered, art)
+	if in.TitleContains != "" {
+		page.Artifacts = filterByTitleContains(page.Artifacts, in.TitleContains)
+		page.Total = len(page.Artifacts)
+	}
+	return page, nil
+}
+
+// filterByTitleContains returns the subset of arts whose Title contains q (case-insensitive).
+// Returns arts unchanged when q is empty.
+func filterByTitleContains(arts []*Artifact, q string) []*Artifact {
+	if q == "" {
+		return arts
+	}
+	lower := strings.ToLower(q)
+	var out []*Artifact
+	for _, art := range arts {
+		if strings.Contains(strings.ToLower(art.Title), lower) {
+			out = append(out, art)
 		}
 	}
-	page.Artifacts = filtered
-	page.Total = len(filtered)
-	return page, nil
+	return out
 }
 
 // populateFamilyKinds resolves the Family filter field into a FamilyKinds

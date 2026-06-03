@@ -697,6 +697,55 @@ func (m *MemoryStore) UpdateEdgeWeight(_ context.Context, from, to, relation str
 	return nil
 }
 
+// RenameID atomically renames oldID to newID in the in-memory store.
+func (m *MemoryStore) RenameID(_ context.Context, oldID, newID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	art, ok := m.artifacts[oldID]
+	if !ok {
+		return fmt.Errorf("artifact %s not found", oldID) //nolint:err113 // runtime value required
+	}
+
+	// 1. Rename artifact, set alias.
+	art.ID = newID
+	art.Alias = oldID
+	m.artifacts[newID] = art
+	m.aliases[oldID] = newID
+	delete(m.artifacts, oldID)
+
+	// 2. Update edges.
+	for key, e := range m.edges {
+		changed := false
+		if e.From == oldID {
+			e.From = newID
+			changed = true
+		}
+		if e.To == oldID {
+			e.To = newID
+			changed = true
+		}
+		if changed {
+			delete(m.edges, key)
+			m.edges[edgeKey(e.From, e.Relation, e.To)] = e
+		}
+	}
+
+	// 3. Update parent fields and depends_on.
+	for _, a := range m.artifacts {
+		if a.Parent == oldID {
+			a.Parent = newID
+		}
+		for i, dep := range a.DependsOn {
+			if dep == oldID {
+				a.DependsOn[i] = newID
+			}
+		}
+	}
+
+	return nil
+}
+
 func (m *MemoryStore) AppendEvent(_ context.Context, event Event) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -46,6 +46,10 @@ type ArtifactStore interface {
 	ListPage(ctx context.Context, f Filter) (Page, error)
 	Children(ctx context.Context, parentID string) ([]*Artifact, error)
 	Search(ctx context.Context, query string) ([]string, error)
+	// RenameID atomically renames an artifact from oldID to newID, cascading
+	// to all edge references, parent fields, and depends_on arrays. The old ID
+	// is registered as an alias on the renamed artifact for backward-compat lookup.
+	RenameID(ctx context.Context, oldID, newID string) error
 	// Embedding operations — optional semantic layer over FTS5.
 	PutEmbedding(ctx context.Context, artifactID, model string, vec []float32) error
 	GetEmbedding(ctx context.Context, artifactID, model string) ([]float32, error)

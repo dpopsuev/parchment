@@ -839,6 +839,80 @@ func (s *SQLiteStore) autoRenameArtifact(ctx context.Context, tx *sql.Tx, existi
 	}
 }
 
+// RenameID atomically renames oldID to newID in a single transaction.
+// Cascades to: edges (from_id, to_id), parent fields, depends_on JSON arrays.
+// Registers oldID as alias on the renamed artifact for backward-compat lookup.
+func (s *SQLiteStore) RenameID(ctx context.Context, oldID, newID string) error { //nolint:funlen // four cascading updates + alias; splitting would break the atomic guarantee
+	tx, err := s.writer.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck // deferred rollback; commit is checked explicitly
+
+	// 1. Rename the artifact row itself.
+	res, err := tx.ExecContext(ctx, "UPDATE artifacts SET id = ? WHERE id = ?", newID, oldID)
+	if err != nil {
+		return fmt.Errorf("rename artifact row: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("artifact %s not found", oldID) //nolint:err113 // runtime value required
+	}
+
+	// 2. Update edges: from_id and to_id.
+	if _, err := tx.ExecContext(ctx, "UPDATE edges SET from_id = ? WHERE from_id = ?", newID, oldID); err != nil {
+		return fmt.Errorf("rename edges from_id: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE edges SET to_id = ? WHERE to_id = ?", newID, oldID); err != nil {
+		return fmt.Errorf("rename edges to_id: %w", err)
+	}
+
+	// 3. Update artifact_labels junction table.
+	if _, err := tx.ExecContext(ctx, "UPDATE artifact_labels SET artifact_id = ? WHERE artifact_id = ?", newID, oldID); err != nil {
+		return fmt.Errorf("rename artifact_labels: %w", err)
+	}
+
+	// 4. Update parent fields on children.
+	if _, err := tx.ExecContext(ctx, "UPDATE artifacts SET parent = ? WHERE parent = ?", newID, oldID); err != nil {
+		return fmt.Errorf("rename parent refs: %w", err)
+	}
+
+	// 5. Update depends_on JSON arrays that reference oldID.
+	// SQLite JSON_REPLACE can't do array element replace; do it in a subquery that
+	// rebuilds the array by replacing the string token.
+	rows, err := tx.QueryContext(ctx,
+		"SELECT id, depends_on FROM artifacts WHERE depends_on LIKE ?", "%"+oldID+"%")
+	if err != nil {
+		return fmt.Errorf("query depends_on: %w", err)
+	}
+	type depsRow struct {
+		id, deps string
+	}
+	var toUpdate []depsRow
+	for rows.Next() {
+		var r depsRow
+		if serr := rows.Scan(&r.id, &r.deps); serr == nil {
+			toUpdate = append(toUpdate, r)
+		}
+	}
+	_ = rows.Close()
+	for _, r := range toUpdate {
+		updated := strings.ReplaceAll(r.deps, `"`+oldID+`"`, `"`+newID+`"`)
+		if updated == r.deps {
+			continue
+		}
+		if _, serr := tx.ExecContext(ctx, "UPDATE artifacts SET depends_on = ? WHERE id = ?", updated, r.id); serr != nil {
+			return fmt.Errorf("update depends_on for %s: %w", r.id, serr)
+		}
+	}
+
+	// 6. Register old ID as alias for backward-compat lookup.
+	if _, err := tx.ExecContext(ctx, "UPDATE artifacts SET alias = ? WHERE id = ?", oldID, newID); err != nil {
+		return fmt.Errorf("set alias: %w", err)
+	}
+
+	return tx.Commit()
+}
+
 func (s *SQLiteStore) Get(ctx context.Context, id string) (*Artifact, error) {
 	row := s.reader.QueryRowContext(ctx, "SELECT "+artifactColumns+" FROM artifacts WHERE id = ?", id)
 	art, err := scanArtifact(row)

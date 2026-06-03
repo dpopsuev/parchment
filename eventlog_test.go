@@ -115,7 +115,7 @@ func TestEventLog_LinkArtifacts_EmitsLinked(t *testing.T) {
 		Kind: parchment.KindTask, Title: "destination", Scope: "test",
 	})
 
-	_, err := proto.LinkArtifacts(ctx, src.ID, "related", []string{dst.ID})
+	_, err := proto.LinkArtifacts(ctx, src.ID, "related", []string{dst.ID}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

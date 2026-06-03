@@ -40,7 +40,7 @@ func TestTopoSort_ShouldRespectParentGoalDependencies(t *testing.T) {
 		Parent: campaign.ID,
 	})
 	// Link GOL-2 depends_on GOL-1
-	_, err := proto.LinkArtifacts(ctx, goal2.ID, "depends_on", []string{goal1.ID})
+	_, err := proto.LinkArtifacts(ctx, goal2.ID, "depends_on", []string{goal1.ID}, 0)
 	if err != nil {
 		t.Fatalf("LinkArtifacts(goal2 depends_on goal1): %v", err)
 	}

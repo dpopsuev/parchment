@@ -181,8 +181,8 @@ func TestBacklinks(t *testing.T) {
 	c := mkArt("Gamma")
 
 	// B and C justify A.
-	_, _ = p.LinkArtifacts(ctx, b.ID, RelJustifies, []string{a.ID})
-	_, _ = p.LinkArtifacts(ctx, c.ID, RelJustifies, []string{a.ID})
+	_, _ = p.LinkArtifacts(ctx, b.ID, RelJustifies, []string{a.ID}, 0)
+	_, _ = p.LinkArtifacts(ctx, c.ID, RelJustifies, []string{a.ID}, 0)
 
 	backlinks, err := p.Backlinks(ctx, a.ID, RelJustifies)
 	if err != nil {

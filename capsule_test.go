@@ -23,7 +23,7 @@ func TestCapsuleExport_Import_RoundTrip(t *testing.T) {
 	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
 		Kind: parchment.KindTask, Title: "task two", Scope: "test",
 	})
-	_, _ = proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID})
+	_, _ = proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID}, 0)
 
 	// Export
 	var buf bytes.Buffer

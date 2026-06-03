@@ -74,10 +74,10 @@ func TestBond_RejectsWhenMaxOutgoingExceeded(t *testing.T) {
 	b := mustCreate(t, proto, parchment.CreateInput{Kind: "task", Title: "B", Scope: "test"})
 	c := mustCreate(t, proto, parchment.CreateInput{Kind: "task", Title: "C", Scope: "test"})
 
-	if _, err := proto2.LinkArtifacts(ctx, a.ID, "owns", []string{b.ID}); err != nil {
+	if _, err := proto2.LinkArtifacts(ctx, a.ID, "owns", []string{b.ID}, 0); err != nil {
 		t.Fatalf("first link should succeed: %v", err)
 	}
-	_, err := proto2.LinkArtifacts(ctx, a.ID, "owns", []string{c.ID})
+	_, err := proto2.LinkArtifacts(ctx, a.ID, "owns", []string{c.ID}, 0)
 	if err == nil {
 		t.Fatal("expected error when MaxOutgoing=1 is exceeded")
 	}
@@ -105,7 +105,7 @@ func TestValidRelation_AcceptsRegisteredEdgeType(t *testing.T) {
 	a := mustCreate(t, proto2, parchment.CreateInput{Kind: "task", Title: "A", Scope: "test"})
 	b := mustCreate(t, proto, parchment.CreateInput{Kind: "task", Title: "B", Scope: "test"})
 
-	_, err := proto2.LinkArtifacts(ctx, a.ID, "mentors", []string{b.ID})
+	_, err := proto2.LinkArtifacts(ctx, a.ID, "mentors", []string{b.ID}, 0)
 	if err != nil {
 		t.Errorf("expected custom edge type 'mentors' to be accepted, got: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestLinkArtifacts_ErrorListsRegisteredRelations(t *testing.T) {
 	proto2 := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	a := mustCreate(t, proto2, parchment.CreateInput{Kind: "task", Title: "A", Scope: "test"})
 
-	_, err := proto2.LinkArtifacts(ctx, a.ID, "imaginary_xyz", []string{"x"})
+	_, err := proto2.LinkArtifacts(ctx, a.ID, "imaginary_xyz", []string{"x"}, 0)
 	if err == nil {
 		t.Fatal("expected error for unknown relation")
 	}

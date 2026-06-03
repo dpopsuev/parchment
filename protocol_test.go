@@ -1093,7 +1093,7 @@ func TestLinkArtifacts_BasicLink(t *testing.T) {
 		},
 	})
 
-	results, err := proto.LinkArtifacts(ctx, task.ID, "implements", []string{spec.ID})
+	results, err := proto.LinkArtifacts(ctx, task.ID, "implements", []string{spec.ID}, 0)
 	if err != nil {
 		t.Fatalf("LinkArtifacts: %v", err)
 	}
@@ -1118,19 +1118,19 @@ func TestLinkArtifacts_DependsOnCycleDetection(t *testing.T) {
 	c := createTask(t, proto, "task C")
 
 	// A depends on B
-	_, err := proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID})
+	_, err := proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID}, 0)
 	if err != nil {
 		t.Fatalf("A->B: %v", err)
 	}
 
 	// B depends on C
-	_, err = proto.LinkArtifacts(ctx, b.ID, "depends_on", []string{c.ID})
+	_, err = proto.LinkArtifacts(ctx, b.ID, "depends_on", []string{c.ID}, 0)
 	if err != nil {
 		t.Fatalf("B->C: %v", err)
 	}
 
 	// C depends on A would create cycle
-	_, err = proto.LinkArtifacts(ctx, c.ID, "depends_on", []string{a.ID})
+	_, err = proto.LinkArtifacts(ctx, c.ID, "depends_on", []string{a.ID}, 0)
 	if err == nil {
 		t.Fatal("expected cycle detection error for C->A")
 	}
@@ -1143,7 +1143,7 @@ func TestLinkArtifacts_SelfCycleDetection(t *testing.T) {
 
 	a := createTask(t, proto, "self-dep")
 
-	_, err := proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{a.ID})
+	_, err := proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{a.ID}, 0)
 	if err == nil {
 		t.Fatal("expected cycle detection error for self-dependency")
 	}
@@ -1157,10 +1157,10 @@ func TestLinkArtifacts_DuplicateLink(t *testing.T) {
 	a := createTask(t, proto, "task A")
 	b := createTask(t, proto, "task B")
 
-	proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID})
+	proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID}, 0)
 
 	// Link again
-	results, err := proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID})
+	results, err := proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID}, 0)
 	if err != nil {
 		t.Fatalf("LinkArtifacts: %v", err)
 	}
@@ -1176,7 +1176,7 @@ func TestLinkArtifacts_InvalidRelation(t *testing.T) {
 
 	a := createTask(t, proto, "task")
 
-	_, err := proto.LinkArtifacts(ctx, a.ID, "imaginary_relation", []string{"x"})
+	_, err := proto.LinkArtifacts(ctx, a.ID, "imaginary_relation", []string{"x"}, 0)
 	if err == nil {
 		t.Fatal("expected error for unknown relation")
 	}
@@ -1187,7 +1187,7 @@ func TestLinkArtifacts_EmptySource(t *testing.T) {
 	proto, _ := newProto(t)
 	ctx := context.Background()
 
-	_, err := proto.LinkArtifacts(ctx, "", "depends_on", []string{"x"})
+	_, err := proto.LinkArtifacts(ctx, "", "depends_on", []string{"x"}, 0)
 	if err == nil {
 		t.Fatal("expected error for empty source ID")
 	}
@@ -1198,7 +1198,7 @@ func TestLinkArtifacts_EmptyRelation(t *testing.T) {
 	proto, _ := newProto(t)
 	ctx := context.Background()
 
-	_, err := proto.LinkArtifacts(ctx, "x", "", []string{"y"})
+	_, err := proto.LinkArtifacts(ctx, "x", "", []string{"y"}, 0)
 	if err == nil {
 		t.Fatal("expected error for empty relation")
 	}
@@ -1209,7 +1209,7 @@ func TestLinkArtifacts_EmptyTargets(t *testing.T) {
 	proto, _ := newProto(t)
 	ctx := context.Background()
 
-	_, err := proto.LinkArtifacts(ctx, "x", "depends_on", []string{})
+	_, err := proto.LinkArtifacts(ctx, "x", "depends_on", []string{}, 0)
 	if err == nil {
 		t.Fatal("expected error for empty target IDs")
 	}
@@ -1223,7 +1223,7 @@ func TestLinkArtifacts_SatisfiesNonTemplate(t *testing.T) {
 	task := createTask(t, proto, "task")
 	goal := createGoal(t, proto, "not a template")
 
-	_, err := proto.LinkArtifacts(ctx, task.ID, "satisfies", []string{goal.ID})
+	_, err := proto.LinkArtifacts(ctx, task.ID, "satisfies", []string{goal.ID}, 0)
 	if err == nil {
 		t.Fatal("expected error when satisfies target is not a template")
 	}
@@ -1239,7 +1239,7 @@ func TestUnlinkArtifacts_Success(t *testing.T) {
 	a := createTask(t, proto, "task A")
 	b := createTask(t, proto, "task B")
 
-	proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID})
+	proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID}, 0)
 
 	results, err := proto.UnlinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID})
 	if err != nil {
@@ -1375,7 +1375,7 @@ func TestArtifactTree_DependsOnRelation(t *testing.T) {
 	})
 
 	// A depends on B
-	proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID})
+	proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID}, 0)
 
 	tree, err := proto.ArtifactTree(ctx, parchment.TreeInput{
 		ID:       a.ID,
@@ -1504,7 +1504,7 @@ func TestWouldCycle_TransitiveCycle(t *testing.T) {
 	store.AddEdge(ctx, parchment.Edge{From: c.ID, To: d.ID, Relation: "depends_on"})
 
 	// D -> A would create cycle
-	_, err := proto.LinkArtifacts(ctx, d.ID, "depends_on", []string{a.ID})
+	_, err := proto.LinkArtifacts(ctx, d.ID, "depends_on", []string{a.ID}, 0)
 	if err == nil {
 		t.Fatal("expected cycle detection for D->A")
 	}
@@ -1521,8 +1521,8 @@ func TestCascade_FollowsDependsOn(t *testing.T) {
 	b := createTask(t, proto, "depends on A")
 	c := createTask(t, proto, "depends on B")
 
-	proto.LinkArtifacts(ctx, b.ID, "depends_on", []string{a.ID})
-	proto.LinkArtifacts(ctx, c.ID, "depends_on", []string{b.ID})
+	proto.LinkArtifacts(ctx, b.ID, "depends_on", []string{a.ID}, 0)
+	proto.LinkArtifacts(ctx, c.ID, "depends_on", []string{b.ID}, 0)
 
 	affected := proto.Cascade(ctx, a.ID)
 	// b and c depend on a (transitively)

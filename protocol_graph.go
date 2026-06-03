@@ -153,7 +153,7 @@ func (p *Protocol) cascadeOverlaps(ctx context.Context, changed *Artifact, affec
 	}
 }
 
-func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string, targetIDs []string) ([]Result, error) { //nolint:gocyclo,cyclop // link has many validation branches; splitting would increase call depth
+func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string, targetIDs []string, weight float64) ([]Result, error) { //nolint:gocyclo,cyclop // link has many validation branches; splitting would increase call depth
 	if sourceID == "" {
 		return nil, fmt.Errorf("source ID is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
@@ -224,7 +224,7 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 			results = append(results, Result{ID: tid, OK: true, Error: "already linked"})
 			continue
 		}
-		if err := p.store.AddEdge(ctx, Edge{From: sourceID, To: tid, Relation: relation}); err != nil {
+		if err := p.store.AddEdge(ctx, Edge{From: sourceID, To: tid, Relation: relation, Weight: weight}); err != nil {
 			results = append(results, Result{ID: tid, Error: err.Error()})
 			continue
 		}

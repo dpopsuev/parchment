@@ -116,7 +116,7 @@ func (p *Protocol) SyncWikilinks(ctx context.Context, id string) ([]string, erro
 		return nil, nil
 	}
 
-	results, err := p.LinkArtifacts(ctx, id, RelDocuments, newLinks)
+	results, err := p.LinkArtifacts(ctx, id, RelDocuments, newLinks, 0)
 	if err != nil {
 		return nil, err
 	}

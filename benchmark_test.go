@@ -179,7 +179,7 @@ func BenchmarkWalk(b *testing.B) {
 	// Create a chain of 100 artifacts linked by depends_on.
 	ids := seedArtifacts(b, p, 100)
 	for i := 1; i < len(ids); i++ {
-		_, err := p.LinkArtifacts(ctx, ids[i], RelDependsOn, []string{ids[i-1]})
+		_, err := p.LinkArtifacts(ctx, ids[i], RelDependsOn, []string{ids[i-1]}, 0)
 		if err != nil {
 			b.Fatal(err)
 		}

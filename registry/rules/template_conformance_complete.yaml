@@ -1,0 +1,7 @@
+name: template_conformance_complete
+trigger: status_changed
+when: to=complete
+action: block
+forceable: true
+check: template_conformance_complete
+message: "artifact does not conform to template — required sections missing at completion"

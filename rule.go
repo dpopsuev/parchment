@@ -143,7 +143,9 @@ const (
 // Built-in check names for the Check field on RuleDef.
 // These replace Go guards that require schema or store access.
 const (
-	CheckActivationSections = "activation_sections" // schema.ActivationRequiresSections + MissingSections
+	CheckActivationSections         = "activation_sections"          // schema.ActivationRequiresSections + MissingSections
+	CheckTemplateConformancePromote = "template_conformance_promote" // checkTemplateConformancePromote (promote to active)
+	CheckTemplateConformanceComplete = "template_conformance_complete" // checkTemplateConformance (complete)
 )
 
 // RuleResult is returned by EvaluateRule when a rule fires.
@@ -225,7 +227,8 @@ func matchesTerm(term string, art *Artifact, toStatus string) bool {
 // Returns a non-nil RuleResult to block, nil to allow.
 // Used for checks that require schema or store access beyond simple field predicates.
 func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResult {
-	if rule.Check == CheckActivationSections {
+	switch rule.Check {
+	case CheckActivationSections:
 		if !p.schema.ActivationRequiresSections(art.Kind) {
 			return nil
 		}
@@ -236,6 +239,14 @@ func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResul
 		if expMissing := p.schema.MissingSections(art.Kind, art.Sections); len(expMissing) > 0 {
 			msg := rule.Message + " (expected: " + strings.Join(expMissing, ", ") + ")"
 			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: msg}
+		}
+	case CheckTemplateConformancePromote:
+		if err := p.checkTemplateConformancePromote(context.Background(), art); err != nil {
+			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: err.Error()}
+		}
+	case CheckTemplateConformanceComplete:
+		if err := p.checkTemplateConformance(context.Background(), art, false); err != nil {
+			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: err.Error()}
 		}
 	}
 	return nil // unknown or passing check

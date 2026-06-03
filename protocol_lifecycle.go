@@ -443,30 +443,10 @@ func (p *Protocol) transitionGuards() []transitionGuard {
 		})
 	}
 
-	// Template conformance on promotion: partial drafts are allowed at create time,
-	// required sections must be present before the artifact can go active.
-	guards = append(guards, transitionGuard{ //nolint:gocritic // appendCombine: separated intentionally for readability; each block has its own comment
-		name: "template_conformance_promote", when: StatusActive, forceable: true,
-		check: func(ctx context.Context, p *Protocol, art *Artifact) error {
-			// Enforce sections explicitly marked "required:" in the template guidance text,
-			// plus schema MustSections. Investigation-time sections (fix, root_cause, etc.)
-			// without a "required:" prefix are deferred to completion.
-			if err := p.checkTemplateConformancePromote(ctx, art); err != nil {
-				return fmt.Errorf("cannot promote to active: %w", err) //nolint:err113 // wraps inner error; no standalone sentinel needed
-			}
-			return nil
-		},
-	})
-	// Template conformance on completion
-	guards = append(guards, transitionGuard{
-		name: "template_conformance_complete", when: StatusComplete, forceable: true,
-		check: func(ctx context.Context, p *Protocol, art *Artifact) error {
-			if err := p.checkTemplateConformance(ctx, art, false); err != nil {
-				return fmt.Errorf("cannot complete: %w", err) //nolint:err113 // runtime values required in message; no static sentinel possible
-			}
-			return nil
-		},
-	}, transitionGuard{ // Completion gates: kind-defined sections that must be non-empty
+	// template_conformance_promote migrated → registry/rules/template_conformance_promote.yaml
+	// template_conformance_complete migrated → registry/rules/template_conformance_complete.yaml
+	guards = append(guards, transitionGuard{ //nolint:gocritic // kept for completion_gates below
+		// Completion gates: kind-defined sections that must be non-empty
 		name: "completion_gates", when: StatusComplete, forceable: true,
 		check: func(ctx context.Context, p *Protocol, art *Artifact) error {
 			if missing := p.schema.MissingCompletionGates(art); len(missing) > 0 {

@@ -1,0 +1,7 @@
+name: template_conformance_promote
+trigger: status_changed
+when: to=active
+action: block
+forceable: true
+check: template_conformance_promote
+message: "artifact does not conform to template — required sections missing at promotion"

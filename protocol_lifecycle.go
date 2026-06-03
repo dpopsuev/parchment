@@ -313,11 +313,19 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 		if force && rule.Forceable {
 			continue
 		}
+		// Simple predicate check
 		if result := EvaluateRule(rule, art, status); result != nil {
 			if result.Action == RuleActionBlock {
 				return Result{ID: art.ID, Error: result.Message}
 			}
-			// warn: record but continue
+		}
+		// Built-in check (schema/store access required)
+		if rule.Check != "" && matchesPredicate(rule.When, art, status) {
+			if result := p.evaluateBuiltinCheck(rule, art); result != nil {
+				if result.Action == RuleActionBlock {
+					return Result{ID: art.ID, Error: result.Message}
+				}
+			}
 		}
 	}
 
@@ -515,21 +523,7 @@ func (p *Protocol) transitionGuards() []transitionGuard {
 				return fmt.Errorf("%w: %s", ErrStampsRequired, art.ID)
 			},
 		},
-		transitionGuard{ // migrated: priority_required → registry/rules/priority_required.yaml
-			name: "required_sections", when: StatusActive, forceable: true,
-			check: func(_ context.Context, _ *Protocol, art *Artifact) error {
-				if !p.schema.ActivationRequiresSections(art.Kind) {
-					return nil
-				}
-				if shouldMissing := p.schema.MissingShouldSections(art.Kind, art.Sections); len(shouldMissing) > 0 {
-					return fmt.Errorf("%w: %s recommended: %s", ErrMissingSections, art.ID, strings.Join(shouldMissing, ", "))
-				}
-				if expMissing := p.schema.MissingSections(art.Kind, art.Sections); len(expMissing) > 0 {
-					return fmt.Errorf("%w: %s expected: %s", ErrMissingSections, art.ID, strings.Join(expMissing, ", "))
-				}
-				return nil
-			},
-		},
+		// required_sections migrated → registry/rules/required_sections.yaml (check: activation_sections)
 	)
 
 	return guards

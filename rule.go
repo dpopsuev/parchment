@@ -19,6 +19,7 @@ type RuleDef struct {
 	When      string // predicate string, e.g. to=active AND kind=task AND priority==""
 	Action    string // block | warn | allow (default: block)
 	Forceable bool   // if true, SetFieldOptions.Force=true skips this rule
+	Check     string // built-in check name evaluated by Protocol (e.g. activation_sections)
 	Message   string // agent-facing error or warning text
 }
 
@@ -58,6 +59,7 @@ func ParseRule(art *Artifact) (*RuleDef, error) {
 		When:      when,
 		Action:    action,
 		Forceable: forceable,
+		Check:     sections["check"],
 		Message:   message,
 	}, nil
 }
@@ -122,6 +124,9 @@ func seedRulesFromRegistry(ctx context.Context, s Store) {
 		if r.Forceable {
 			art.Sections = append(art.Sections, Section{Name: "forceable", Text: "true"})
 		}
+		if r.Check != "" {
+			art.Sections = append(art.Sections, Section{Name: "check", Text: r.Check})
+		}
 		if err := s.Put(ctx, art); err != nil {
 			slog.WarnContext(ctx, "seed rules: put failed", slog.String(LogKeyID, id), slog.Any(LogKeyError, err))
 		}
@@ -133,6 +138,12 @@ const (
 	RuleActionBlock = "block"
 	RuleActionWarn  = "warn"
 	RuleActionAllow = "allow"
+)
+
+// Built-in check names for the Check field on RuleDef.
+// These replace Go guards that require schema or store access.
+const (
+	CheckActivationSections = "activation_sections" // schema.ActivationRequiresSections + MissingSections
 )
 
 // RuleResult is returned by EvaluateRule when a rule fires.
@@ -158,6 +169,9 @@ type RuleResult struct {
 func EvaluateRule(rule *RuleDef, art *Artifact, toStatus string) *RuleResult {
 	if rule.Trigger != "status_changed" {
 		return nil // only status_changed supported in this evaluator version
+	}
+	if rule.Check != "" {
+		return nil // built-in check — handled separately by Protocol.evaluateBuiltinCheck
 	}
 	if !matchesPredicate(rule.When, art, toStatus) {
 		return nil
@@ -205,6 +219,26 @@ func matchesTerm(term string, art *Artifact, toStatus string) bool {
 	field := strings.TrimSpace(term[:idx])
 	value := strings.Trim(strings.TrimSpace(term[idx+1:]), `"`)
 	return fieldValue(field, art, toStatus) == value
+}
+
+// evaluateBuiltinCheck runs a named built-in check against art + schema.
+// Returns a non-nil RuleResult to block, nil to allow.
+// Used for checks that require schema or store access beyond simple field predicates.
+func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResult {
+	if rule.Check == CheckActivationSections {
+		if !p.schema.ActivationRequiresSections(art.Kind) {
+			return nil
+		}
+		if shouldMissing := p.schema.MissingShouldSections(art.Kind, art.Sections); len(shouldMissing) > 0 {
+			msg := rule.Message + " (recommended: " + strings.Join(shouldMissing, ", ") + ")"
+			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: msg}
+		}
+		if expMissing := p.schema.MissingSections(art.Kind, art.Sections); len(expMissing) > 0 {
+			msg := rule.Message + " (expected: " + strings.Join(expMissing, ", ") + ")"
+			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: msg}
+		}
+	}
+	return nil // unknown or passing check
 }
 
 // fieldValue maps a predicate field name to its value on the artifact or context.

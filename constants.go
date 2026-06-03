@@ -7,7 +7,6 @@ var (
 	ErrArtifactNotFound      = errors.New("artifact not found")
 	ErrWorkerIDRequired      = errors.New("worker_id required in extra for allocation")
 	ErrStampsRequired        = errors.New("stamps section required for in_review transition")
-	ErrMissingSections       = errors.New("missing sections for activation")
 	ErrConflict              = errors.New("version conflict: artifact was modified since last read")
 	ErrEdgeNotFound          = errors.New("edge not found")
 	ErrArtifactIDRequired    = errors.New("artifact ID is required")

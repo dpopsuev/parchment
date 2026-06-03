@@ -419,6 +419,7 @@ type ruleYAML struct {
 	When      string `yaml:"when"`
 	Action    string `yaml:"action"`
 	Forceable bool   `yaml:"forceable"` // if true, force=true (BypassGuards) skips this rule
+	Check     string `yaml:"check"`     // built-in check name (e.g. activation_sections); evaluated by Protocol
 	Message   string `yaml:"message"`
 }
 

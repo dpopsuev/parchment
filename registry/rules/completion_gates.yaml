@@ -1,0 +1,7 @@
+name: completion_gates
+trigger: status_changed
+when: to=complete
+action: block
+forceable: true
+check: completion_gates
+message: "required completion sections are missing or empty"

@@ -1,0 +1,6 @@
+name: depends_on_complete
+trigger: status_changed
+when: to=complete
+action: block
+check: depends_on_complete
+message: "all depends_on artifacts must be complete before completing"

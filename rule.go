@@ -143,9 +143,12 @@ const (
 // Built-in check names for the Check field on RuleDef.
 // These replace Go guards that require schema or store access.
 const (
-	CheckActivationSections         = "activation_sections"          // schema.ActivationRequiresSections + MissingSections
-	CheckTemplateConformancePromote = "template_conformance_promote" // checkTemplateConformancePromote (promote to active)
+	CheckActivationSections          = "activation_sections"          // schema.ActivationRequiresSections + MissingSections
+	CheckTemplateConformancePromote  = "template_conformance_promote" // checkTemplateConformancePromote (promote to active)
 	CheckTemplateConformanceComplete = "template_conformance_complete" // checkTemplateConformance (complete)
+	CheckChildrenComplete            = "children_complete"            // all children in terminal status
+	CheckDependsOnComplete           = "depends_on_complete"          // all depends_on artifacts in terminal status
+	CheckCompletionGates             = "completion_gates"             // schema.MissingCompletionGates
 )
 
 // RuleResult is returned by EvaluateRule when a rule fires.
@@ -247,6 +250,19 @@ func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResul
 	case CheckTemplateConformanceComplete:
 		if err := p.checkTemplateConformance(context.Background(), art, false); err != nil {
 			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: err.Error()}
+		}
+	case CheckChildrenComplete:
+		if err := p.guardChildrenComplete(context.Background(), art); err != nil {
+			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: rule.Message + ": " + err.Error()}
+		}
+	case CheckDependsOnComplete:
+		if err := p.guardDependsOnComplete(context.Background(), art); err != nil {
+			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: rule.Message + ": " + err.Error()}
+		}
+	case CheckCompletionGates:
+		if missing := p.schema.MissingCompletionGates(art); len(missing) > 0 {
+			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock,
+				Message: rule.Message + " (" + strings.Join(missing, ", ") + ")"}
 		}
 	}
 	return nil // unknown or passing check

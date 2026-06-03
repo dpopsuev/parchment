@@ -425,37 +425,11 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 func (p *Protocol) transitionGuards() []transitionGuard {
 	var guards []transitionGuard
 
-	// Completion gates
-	if p.schema.Guards.CompletionRequiresChildrenComplete {
-		guards = append(guards, transitionGuard{
-			name: "children_complete", when: StatusComplete,
-			check: func(ctx context.Context, p *Protocol, art *Artifact) error {
-				return p.guardChildrenComplete(ctx, art)
-			},
-		})
-	}
-	if p.schema.Guards.CompletionRequiresDependsOnComplete {
-		guards = append(guards, transitionGuard{
-			name: "depends_on_complete", when: StatusComplete,
-			check: func(ctx context.Context, p *Protocol, art *Artifact) error {
-				return p.guardDependsOnComplete(ctx, art)
-			},
-		})
-	}
-
+	// children_complete migrated  → registry/rules/children_complete.yaml
+	// depends_on_complete migrated → registry/rules/depends_on_complete.yaml
+	// completion_gates migrated    → registry/rules/completion_gates.yaml
 	// template_conformance_promote migrated → registry/rules/template_conformance_promote.yaml
 	// template_conformance_complete migrated → registry/rules/template_conformance_complete.yaml
-	guards = append(guards, transitionGuard{ //nolint:gocritic // kept for completion_gates below
-		// Completion gates: kind-defined sections that must be non-empty
-		name: "completion_gates", when: StatusComplete, forceable: true,
-		check: func(ctx context.Context, p *Protocol, art *Artifact) error {
-			if missing := p.schema.MissingCompletionGates(art); len(missing) > 0 {
-				return fmt.Errorf("cannot complete %s: gated sections missing or empty: %s", //nolint:err113 // sentinel; no caller uses errors.Is on this
-					art.ID, strings.Join(missing, ", "))
-			}
-			return nil
-		},
-	})
 
 	// Archive: children must be readonly
 	if p.schema.Guards.ArchivedReadonly {

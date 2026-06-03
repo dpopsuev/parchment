@@ -1,0 +1,6 @@
+name: children_complete
+trigger: status_changed
+when: to=complete
+action: block
+check: children_complete
+message: "all children must be in a terminal status before completing"

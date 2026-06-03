@@ -248,9 +248,6 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		p.executeTemplateHooks(ctx, art)
 	}
 
-	// Index embedding asynchronously after successful write.
-	p.indexEmbedding(ctx, art)
-
 	return art, nil
 }
 
@@ -882,23 +879,4 @@ func (p *Protocol) SearchSemantic(ctx context.Context, query string, in ListInpu
 	return results, nil
 }
 
-// indexEmbedding stores an embedding for an artifact if EmbedFunc is configured.
-// Called after successful artifact writes. Errors are logged but not fatal —
-// a missing embedding degrades to FTS, it doesn't break the write.
-func (p *Protocol) indexEmbedding(ctx context.Context, art *Artifact) {
-	if p.embedFunc == nil {
-		return
-	}
-	text := art.Title + " " + art.Goal
-	for _, sec := range art.Sections {
-		text += " " + sec.Text
-	}
-	vec, err := p.embedFunc(ctx, text)
-	if err != nil {
-		slog.WarnContext(ctx, "embedding failed", slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, err))
-		return
-	}
-	if err := p.store.PutEmbedding(ctx, art.ID, p.embedModel, vec); err != nil {
-		slog.WarnContext(ctx, "store embedding failed", slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, err))
-	}
-}
+

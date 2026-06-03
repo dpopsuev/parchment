@@ -252,9 +252,9 @@ func TestEmbeddingStore_SearchSemantic_SkipsUnindexed(t *testing.T) {
 
 // ─── Protocol integration ─────────────────────────────────────────────────────
 
-func TestProtocol_WithEmbedding_IndexesOnCapture(t *testing.T) {
-	// When Protocol is configured with an EmbeddingFunc, creating/updating
-	// an artifact should auto-index its embedding.
+func TestProtocol_NeverAutoIndexesEmbedding(t *testing.T) {
+	// Protocol does not index embeddings on write — that is the librarian sidecar's job.
+	// Creating an artifact with EmbedFunc configured must NOT produce a stored embedding.
 	t.Parallel()
 	store := parchment.NewMemoryStore()
 	vocab := []string{"template", "conformance", "setfield", "recall"}
@@ -276,19 +276,16 @@ func TestProtocol_WithEmbedding_IndexesOnCapture(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Embedding should be stored automatically.
+	// No embedding should be stored — the write path does not index.
 	vec, err := store.GetEmbedding(ctx, art.ID, parchment.DefaultEmbedModel)
-	if err != nil {
-		t.Fatalf("embedding not stored after create: %v", err)
-	}
-	if len(vec) == 0 {
-		t.Error("stored embedding must not be empty")
+	if err == nil && len(vec) > 0 {
+		t.Error("Protocol must not auto-index embeddings on write; that is the librarian sidecar's responsibility")
 	}
 }
 
 func TestProtocol_SemanticRecall_BeatsFTSOnSemantic(t *testing.T) {
-	// A query with zero keyword overlap should still find semantically
-	// related artifacts when embeddings are enabled.
+	// SearchSemantic finds semantically related artifacts when embeddings are present.
+	// Embeddings are supplied externally (by the librarian sidecar); the store holds them.
 	t.Parallel()
 	store := parchment.NewMemoryStore()
 	vocab := []string{"template", "conformance", "create", "promote", "draft",
@@ -300,14 +297,20 @@ func TestProtocol_SemanticRecall_BeatsFTSOnSemantic(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, _ = proto.CreateArtifact(ctx, parchment.CreateInput{
+	conf, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
 		Kind: parchment.KindNote, Title: "template draft on missing sections", Scope: "test",
 		Sections: []parchment.Section{{Name: "body", Text: "template conformance deferred, artifact created in draft"}},
 	})
-	_, _ = proto.CreateArtifact(ctx, parchment.CreateInput{
+	ptp, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
 		Kind: parchment.KindNote, Title: "ptp clock holdover", Scope: "test",
 		Sections: []parchment.Section{{Name: "body", Text: "ptp clock synchronization holdover test"}},
 	})
+
+	// Librarian sidecar supplies embeddings externally.
+	confVec, _ := embedFn(ctx, "template conformance deferred, artifact created in draft")
+	ptpVec, _ := embedFn(ctx, "ptp clock synchronization holdover test")
+	_ = store.PutEmbedding(ctx, conf.ID, parchment.DefaultEmbedModel, confVec)
+	_ = store.PutEmbedding(ctx, ptp.ID, parchment.DefaultEmbedModel, ptpVec)
 
 	// Query uses no keywords from either artifact — pure semantic.
 	results, err := proto.SearchSemantic(ctx, "validation deferred until status change", parchment.ListInput{Scope: "test"})

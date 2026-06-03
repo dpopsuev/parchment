@@ -326,6 +326,7 @@ type ListInput struct {
 	GroupBy        string   `json:"group_by,omitempty"`
 	Sort           string   `json:"sort,omitempty"`
 	Limit          int      `json:"limit,omitempty"`
+	Cursor         string   `json:"cursor,omitempty"` // opaque pagination cursor from Page.NextCursor
 	Query          string   `json:"query,omitempty"`
 	TitleContains  string   `json:"title_contains,omitempty"` // substring filter on title (case-insensitive)
 	CreatedAfter   string   `json:"created_after,omitempty"`
@@ -391,6 +392,49 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 		}
 	}
 	return filtered, nil
+}
+
+// ListPage returns a cursor-paginated page of artifacts. It applies the same
+// scope defaults and filter resolution as ListArtifacts. Limit=0 with no Cursor
+// returns all artifacts in one page (backward-compatible with ListArtifacts).
+func (p *Protocol) ListPage(ctx context.Context, in ListInput) (Page, error) { //nolint:gocritic // hugeParam: value semantics match ListArtifacts
+	// Apply sticky filter defaults.
+	if in.Scope == "" {
+		if v := p.GetConfig(ctx, configKeyDefaultScope, ""); v != "" {
+			in.Scope = v
+		}
+	}
+
+	f := Filter{
+		Family:         in.Family,
+		Kind:           in.Kind,
+		Status:         in.Status,
+		Parent:         in.Parent,
+		Sprint:         in.Sprint,
+		IDPrefix:       in.IDPrefix,
+		ExcludeKind:    in.ExcludeKind,
+		ExcludeStatus:  in.ExcludeStatus,
+		ExcludeScope:   SchemaScope,
+		Labels:         in.Labels,
+		LabelsOr:       in.LabelsOr,
+		ExcludeLabels:  in.ExcludeLabels,
+		CreatedAfter:   in.CreatedAfter,
+		CreatedBefore:  in.CreatedBefore,
+		UpdatedAfter:   in.UpdatedAfter,
+		UpdatedBefore:  in.UpdatedBefore,
+		InsertedAfter:  in.InsertedAfter,
+		InsertedBefore: in.InsertedBefore,
+		Limit:          in.Limit,
+		Cursor:         in.Cursor,
+	}
+	if in.Scope != "" {
+		f.Scope = in.Scope
+	} else if len(p.scopes) > 0 {
+		f.Scopes = p.scopes
+	}
+	p.populateScopeLabelIndex(ctx, &f)
+	p.populateFamilyKinds(&f)
+	return p.store.ListPage(ctx, f)
 }
 
 // populateFamilyKinds resolves the Family filter field into a FamilyKinds

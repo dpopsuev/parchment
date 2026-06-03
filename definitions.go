@@ -69,6 +69,12 @@ func SeedDefinitions(ctx context.Context, s Store) {
 			UpdatedAt:  now,
 			InsertedAt: now,
 		}
+		if kd.WhenToCreate != "" {
+			art.Sections = append(art.Sections, Section{Name: "when_to_create", Text: kd.WhenToCreate})
+		}
+		if kd.AgentNote != "" {
+			art.Sections = append(art.Sections, Section{Name: "agent_note", Text: kd.AgentNote})
+		}
 		if err := s.Put(ctx, art); err != nil {
 			slog.WarnContext(ctx, "seed definitions: put failed",
 				slog.String(LogKeyKind, name), slog.Any(LogKeyError, err))

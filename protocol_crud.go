@@ -267,6 +267,13 @@ func (p *Protocol) GetArtifact(ctx context.Context, id string) (*Artifact, error
 	return art, nil
 }
 
+// UpdateArtifact is an optimistic-locking write. It calls PutIfVersion and
+// returns ErrConflict if the artifact was modified since the caller last read it.
+// All agent read-modify-write paths should use this instead of direct store.Put.
+func (p *Protocol) UpdateArtifact(ctx context.Context, art *Artifact, version time.Time) error {
+	return p.store.PutIfVersion(ctx, art, version)
+}
+
 // PatchArtifact delegates to ArtifactStore.PatchArtifact — atomic append-only
 // delta write without a read-modify-write cycle in application code.
 func (p *Protocol) PatchArtifact(ctx context.Context, id string, patch ArtifactPatch) error {

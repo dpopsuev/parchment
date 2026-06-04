@@ -7,9 +7,9 @@ import (
 
 // TestKindDef_Family verifies the Family field is present on KindDef.
 func TestKindDef_Family(t *testing.T) {
-	kd := KindDef{KindIdentity: KindIdentity{Prefix: "TST", Family: FamilyIntent}}
-	if kd.Family != FamilyIntent {
-		t.Errorf("KindDef.Family = %q, want %q", kd.Family, FamilyIntent)
+	kd := KindDef{KindIdentity: KindIdentity{Prefix: "TST", Family: "intent"}}
+	if kd.Family != "intent" {
+		t.Errorf("KindDef.Family = %q, want %q", kd.Family, "intent")
 	}
 }
 
@@ -33,18 +33,18 @@ func TestDefaultSchema_FamilyDistribution(t *testing.T) {
 		family string
 	}{
 		// Intent family
-		{KindNeed, FamilyIntent},
-		{KindSpec, FamilyIntent},
-		{KindBug, FamilyIntent},
-		{KindDecision, FamilyIntent},
+		{"need", "intent"},
+		{KindSpec, "intent"},
+		{KindBug, "intent"},
+		{KindDecision, "intent"},
 		// Effort family
-		{KindCampaign, FamilyEffort},
-		{KindGoal, FamilyEffort},
-		{KindTask, FamilyEffort},
+		{KindCampaign, "effort"},
+		{KindGoal, "effort"},
+		{KindTask, "effort"},
 		// Support (infrastructure kinds — no family constraint)
-		{KindTemplate, FamilySupport},
-		{KindConfig, FamilySupport},
-		{KindMirror, FamilySupport},
+		{KindTemplate, "support"},
+		{KindConfig, "support"},
+		{"mirror", "support"},
 	}
 
 	for _, tc := range cases {
@@ -69,7 +69,7 @@ func TestKnowledgeSchema_FamilyTags(t *testing.T) {
 	}
 }
 
-// TestKnowledgeSchema_KnowledgeFamily verifies knowledge kinds land in FamilyKnowledge.
+// TestKnowledgeSchema_KnowledgeFamily verifies knowledge kinds land in "knowledge".
 func TestKnowledgeSchema_KnowledgeFamily(t *testing.T) {
 	s := KnowledgeSchema()
 
@@ -79,8 +79,8 @@ func TestKnowledgeSchema_KnowledgeFamily(t *testing.T) {
 			t.Errorf("kind %q missing from KnowledgeSchema", kind)
 			continue
 		}
-		if kd.Family != FamilyKnowledge {
-			t.Errorf("kind %q: Family = %q, want %q", kind, kd.Family, FamilyKnowledge)
+		if kd.Family != "knowledge" {
+			t.Errorf("kind %q: Family = %q, want %q", kind, kd.Family, "knowledge")
 		}
 	}
 }
@@ -89,18 +89,18 @@ func TestKnowledgeSchema_KnowledgeFamily(t *testing.T) {
 func TestSchema_KindsForFamily(t *testing.T) {
 	s := KnowledgeSchema()
 
-	intent := s.KindsForFamily(FamilyIntent)
+	intent := s.KindsForFamily("intent")
 	if len(intent) == 0 {
 		t.Error("KindsForFamily(intent) returned empty")
 	}
 	for _, name := range intent {
 		kd := s.Kinds[name]
-		if kd.Family != FamilyIntent {
+		if kd.Family != "intent" {
 			t.Errorf("KindsForFamily(intent) returned %q with family %q", name, kd.Family)
 		}
 	}
 
-	knowledge := s.KindsForFamily(FamilyKnowledge)
+	knowledge := s.KindsForFamily("knowledge")
 	if len(knowledge) == 0 {
 		t.Error("KindsForFamily(knowledge) returned empty")
 	}
@@ -128,7 +128,7 @@ func TestFilter_FamilyFilter(t *testing.T) {
 	}
 
 	// List with family=knowledge — must return only the note.
-	knowledge, err := p.ListArtifacts(ctx, ListInput{Family: FamilyKnowledge, Scope: "test"})
+	knowledge, err := p.ListArtifacts(ctx, ListInput{Family: "knowledge", Scope: "test"})
 	if err != nil {
 		t.Fatalf("list knowledge: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestFilter_FamilyFilter(t *testing.T) {
 	}
 
 	// List with family=effort — must return only the task.
-	effort, err := p.ListArtifacts(ctx, ListInput{Family: FamilyEffort, Scope: "test"})
+	effort, err := p.ListArtifacts(ctx, ListInput{Family: "effort", Scope: "test"})
 	if err != nil {
 		t.Fatalf("list effort: %v", err)
 	}

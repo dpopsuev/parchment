@@ -28,19 +28,19 @@ func TestIntentLifecycle_Need(t *testing.T) {
 	s := DefaultSchema()
 
 	// proposed → accepted (happy path)
-	if reason, ok := s.ValidTransition(KindNeed, StatusProposed, StatusAccepted); !ok {
+	if reason, ok := s.ValidTransition("need", StatusProposed, StatusAccepted); !ok {
 		t.Errorf("need: proposed→accepted blocked: %s", reason)
 	}
 	// proposed → rejected
-	if reason, ok := s.ValidTransition(KindNeed, StatusProposed, StatusRejected); !ok {
+	if reason, ok := s.ValidTransition("need", StatusProposed, StatusRejected); !ok {
 		t.Errorf("need: proposed→rejected blocked: %s", reason)
 	}
 	// proposed → deferred
-	if reason, ok := s.ValidTransition(KindNeed, StatusProposed, StatusDeferred); !ok {
+	if reason, ok := s.ValidTransition("need", StatusProposed, StatusDeferred); !ok {
 		t.Errorf("need: proposed→deferred blocked: %s", reason)
 	}
 	// accepted → archived (terminal)
-	if reason, ok := s.ValidTransition(KindNeed, StatusAccepted, StatusArchived); !ok {
+	if reason, ok := s.ValidTransition("need", StatusAccepted, StatusArchived); !ok {
 		t.Errorf("need: accepted→archived blocked: %s", reason)
 	}
 }
@@ -66,7 +66,7 @@ func TestIntentLifecycle_AcceptedIsReadonly(t *testing.T) {
 func TestIntentLifecycle_DraftToProposed(t *testing.T) {
 	s := DefaultSchema()
 
-	for _, kind := range []string{KindNeed, KindSpec, KindBug, KindDecision} {
+	for _, kind := range []string{"need", KindSpec, KindBug, "decision"} {
 		if reason, ok := s.ValidTransition(kind, StatusDraft, StatusProposed); !ok {
 			t.Errorf("%s: draft→proposed blocked: %s", kind, reason)
 		}
@@ -81,7 +81,7 @@ func TestIntentLifecycle_Protocol(t *testing.T) {
 
 	// Create a need in draft.
 	art, err := p.CreateArtifact(ctx, CreateInput{
-		Kind:  KindNeed,
+		Kind:  "need",
 		Title: "We need better search",
 		Scope: "test",
 		Sections: []Section{

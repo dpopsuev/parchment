@@ -107,7 +107,7 @@ func TestKnowledgeSchema_PreservesWorkKinds(t *testing.T) {
 
 	for _, kind := range []string{
 		KindTask, KindSpec, KindBug, KindGoal,
-		KindCampaign, KindNeed, KindDoc, KindRef, KindDecision,
+		KindCampaign, "need", "doc", "ref", "decision",
 	} {
 		if _, ok := s.Kinds[kind]; !ok {
 			t.Errorf("work kind %q missing — KnowledgeSchema must be additive", kind)

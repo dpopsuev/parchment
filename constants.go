@@ -17,8 +17,6 @@ const (
 	StatusCurrent    = "current"
 	StatusOpen       = "open"
 	StatusComplete   = "complete"
-	StatusCanceled   = "cancelled" //nolint:misspell // data-compat: existing artifacts use this spelling
-	StatusDismissed  = "dismissed"
 	StatusRetired    = "retired"
 	StatusArchived   = "archived"
 	StatusMature     = "mature"
@@ -46,13 +44,9 @@ const (
 	KindBug      = "bug"
 	KindGoal     = "goal"
 	KindCampaign = "campaign"
-	KindNeed     = "need"
-	KindDoc      = "doc"
-	KindRef      = "ref"
 	KindTemplate = "template"
 	KindDecision = "decision"
 	KindConfig   = "config"
-	KindMirror   = "mirror"
 )
 
 // Intent lifecycle statuses — for need, spec, bug, decision kinds.
@@ -68,10 +62,6 @@ const (
 // Every kind belongs to exactly one family. Scribe uses families for
 // cross-family traceability checks and motd grouping.
 const (
-	FamilyIntent    = "intent"    // need, spec, bug, decision — desired state
-	FamilyEffort    = "effort"    // campaign, goal, task — how we get there
-	FamilyKnowledge = "knowledge" // note, journal, source, concept, context — what we learn
-	FamilySupport   = "support"   // template, config, mirror, doc, ref — infrastructure
 )
 
 // KindDefinition is the meta-kind. Every other kind is stored as a
@@ -124,8 +114,6 @@ const (
 	LogKeyValue    = "value"
 	LogKeyOp       = "op"
 	LogKeyRelation = "relation"
-	LogKeyTarget   = "target"
-	LogKeyQuery    = "query"
 	LogKeyDays     = "days"
 	LogKeyCascade  = "cascade"
 	LogKeyForce    = "force"
@@ -145,7 +133,6 @@ const (
 
 // ID format identifiers.
 const (
-	IDFormatScoped = "scoped"
 	IDFormatUUID   = "uuid"
 )
 

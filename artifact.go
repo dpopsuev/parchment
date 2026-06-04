@@ -161,6 +161,9 @@ type Page struct {
 // LabelPrefixKind is the label namespace for kind membership.
 const LabelPrefixKind = "kind:"
 
+// LabelPrefixStatus is the label namespace for status.
+const LabelPrefixStatus = "status:"
+
 // ResolvedKind returns the artifact's kind. The Kind field is authoritative;
 // if empty, the first "kind:<name>" label is used. Both paths will be
 // equivalent once the Kind field is fully deprecated in favor of labels.
@@ -171,6 +174,20 @@ func (a *Artifact) ResolvedKind() string {
 	for _, l := range a.Labels {
 		if strings.HasPrefix(l, LabelPrefixKind) {
 			return strings.TrimPrefix(l, LabelPrefixKind)
+		}
+	}
+	return ""
+}
+
+// ResolvedStatus returns the artifact's status. The Status field is authoritative;
+// if empty, the first "status:<value>" label is used.
+func (a *Artifact) ResolvedStatus() string {
+	if a.Status != "" {
+		return a.Status
+	}
+	for _, l := range a.Labels {
+		if strings.HasPrefix(l, LabelPrefixStatus) {
+			return strings.TrimPrefix(l, LabelPrefixStatus)
 		}
 	}
 	return ""
@@ -189,7 +206,7 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic /
 	if f.ExcludeKind != "" && art.ResolvedKind() == f.ExcludeKind {
 		return false
 	}
-	if f.ExcludeStatus != "" && art.Status == f.ExcludeStatus {
+	if f.ExcludeStatus != "" && art.ResolvedStatus() == f.ExcludeStatus {
 		return false
 	}
 	if f.ExcludeScope != "" && art.Scope == f.ExcludeScope {
@@ -218,7 +235,7 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic /
 			return false
 		}
 	}
-	if f.Status != "" && art.Status != f.Status {
+	if f.Status != "" && art.ResolvedStatus() != f.Status {
 		return false
 	}
 	if f.Parent != "" && art.Parent != f.Parent {

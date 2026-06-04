@@ -339,6 +339,14 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 
 	oldStatus := art.Status
 	art.Status = status
+	// Mirror to labels: remove any existing status:* label then add the new one.
+	next := make([]string, 0, len(art.Labels))
+	for _, l := range art.Labels {
+		if !strings.HasPrefix(l, LabelPrefixStatus) {
+			next = append(next, l)
+		}
+	}
+	art.Labels = append(next, LabelPrefixStatus+status) //nolint:gocritic // appendAssign: intentional — next is a temp and art.Labels is the target
 	if err := p.store.Put(ctx, art); err != nil {
 		return Result{ID: art.ID, Error: err.Error()}
 	}

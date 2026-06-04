@@ -43,26 +43,6 @@ func TestFilter_MatchLabels_ScopeLabelIndex_Expansion(t *testing.T) {
 	}
 }
 
-// --- DefaultPrefix ---
-
-func TestDefaultPrefix_ReturnsNonEmpty(t *testing.T) {
-	// DefaultPrefix wraps DefaultSchema().Prefix — verify it doesn't panic and returns something.
-	t.Parallel()
-	p := parchment.DefaultPrefix("task")
-	if p == "" {
-		t.Error("DefaultPrefix(task) returned empty string")
-	}
-}
-
-func TestDefaultPrefix_UnknownKindReturnsXXX(t *testing.T) {
-	t.Parallel()
-	p := parchment.DefaultPrefix("nonexistent_kind_xyz")
-	// Unknown kinds fall through to the keygen fallback ("XXX" or similar).
-	if p == "" {
-		t.Error("DefaultPrefix for unknown kind should still return something")
-	}
-}
-
 // --- FormatID / FormatScopedID (already 100% but document intent) ---
 
 func TestFormatID_ContainsYearAndSeq(t *testing.T) {

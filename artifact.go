@@ -272,12 +272,6 @@ func FormatScopedID(scopeKey, kindCode string, seq int) string {
 	return fmt.Sprintf("%s-%s-%d", scopeKey, kindCode, seq)
 }
 
-// DefaultPrefix returns the canonical ID prefix for a given artifact kind.
-// Delegates to the built-in schema (see schema.go).
-func DefaultPrefix(kind string) string {
-	return DefaultSchema().Prefix(kind)
-}
-
 // --- ID Template Engine ---
 
 // IDComponent describes a single component of an ID template.

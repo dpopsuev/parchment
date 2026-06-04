@@ -65,6 +65,15 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	if in.Title == "" {
 		return nil, fmt.Errorf("title is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
+	// Resolve kind from labels when the Kind field is absent.
+	if in.Kind == "" {
+		for _, l := range in.Labels {
+			if strings.HasPrefix(l, LabelPrefixKind) {
+				in.Kind = strings.TrimPrefix(l, LabelPrefixKind)
+				break
+			}
+		}
+	}
 	if err := ValidateKind(in.Kind, p.vocab); err != nil {
 		return nil, err
 	}

@@ -52,3 +52,21 @@ func TestFilter_ExcludeKindMatchesLabelKind(t *testing.T) {
 		t.Error("Filter.ExcludeKind=bug should exclude artifact with labels[kind:bug]")
 	}
 }
+
+// --- ResolvedKindFromLabels for CreateInput ---
+
+func TestCreateArtifact_KindFromLabel(t *testing.T) {
+	// Given a protocol and a CreateInput with no Kind field but a kind label
+	store := parchment.NewMemoryStore()
+	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{IDFormat: "sequential"})
+	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{
+		Title:  "test bug",
+		Labels: []string{"kind:bug"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if art.Kind != "bug" {
+		t.Errorf("expected Kind=bug, got %q", art.Kind)
+	}
+}

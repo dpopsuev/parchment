@@ -164,6 +164,9 @@ const LabelPrefixKind = "kind:"
 // LabelPrefixStatus is the label namespace for status.
 const LabelPrefixStatus = "status:"
 
+// LabelPrefixScope is the label namespace for scope membership.
+const LabelPrefixScope = "scope:"
+
 // ResolvedKind returns the artifact's kind. The Kind field is authoritative;
 // if empty, the first "kind:<name>" label is used. Both paths will be
 // equivalent once the Kind field is fully deprecated in favor of labels.
@@ -193,6 +196,20 @@ func (a *Artifact) ResolvedStatus() string {
 	return ""
 }
 
+// ResolvedScope returns the artifact's scope. The Scope field is authoritative;
+// if empty, the first "scope:<value>" label is used.
+func (a *Artifact) ResolvedScope() string {
+	if a.Scope != "" {
+		return a.Scope
+	}
+	for _, l := range a.Labels {
+		if strings.HasPrefix(l, LabelPrefixScope) {
+			return strings.TrimPrefix(l, LabelPrefixScope)
+		}
+	}
+	return ""
+}
+
 // Matches reports whether art satisfies all non-zero filter fields.
 func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic // hugeParam: Filter is read-only in all callers; pointer would complicate call sites
 	if f.Family != "" && len(f.FamilyKinds) > 0 {
@@ -209,7 +226,7 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic /
 	if f.ExcludeStatus != "" && art.ResolvedStatus() == f.ExcludeStatus {
 		return false
 	}
-	if f.ExcludeScope != "" && art.Scope == f.ExcludeScope {
+	if f.ExcludeScope != "" && art.ResolvedScope() == f.ExcludeScope {
 		return false
 	}
 	if f.Kind != "" && art.ResolvedKind() != f.Kind {
@@ -218,7 +235,7 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic /
 	if len(f.Scopes) > 0 { //nolint:nestif // scope filter has legitimate branching; splitting would reduce clarity
 		found := false
 		for _, s := range f.Scopes {
-			if art.Scope == s {
+			if art.ResolvedScope() == s {
 				found = true
 				break
 			}
@@ -228,10 +245,10 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic /
 		}
 	} else if f.Scope != "" {
 		if f.ScopePrefix {
-			if art.Scope != f.Scope && !strings.HasPrefix(art.Scope, f.Scope+"/") {
+			if art.ResolvedScope() != f.Scope && !strings.HasPrefix(art.ResolvedScope(), f.Scope+"/") {
 				return false
 			}
-		} else if art.Scope != f.Scope {
+		} else if art.ResolvedScope() != f.Scope {
 			return false
 		}
 	}
@@ -289,7 +306,7 @@ func (f Filter) labelCheck(label string, art *Artifact) bool { //nolint:gocritic
 	}
 	if f.ScopeLabelIndex != nil {
 		for _, s := range f.ScopeLabelIndex[label] {
-			if art.Scope == s {
+			if art.ResolvedScope() == s {
 				return true
 			}
 		}

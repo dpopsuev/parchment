@@ -161,12 +161,30 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	if status == "" {
 		status = p.schema.DefaultStatus(in.Kind)
 	}
+	// Seed labels with scope, kind, and status mirrors so label-based queries work.
+	seedLabels := make([]string, 0, len(in.Labels)+3)
+	for _, l := range in.Labels {
+		if !strings.HasPrefix(l, LabelPrefixScope) &&
+			!strings.HasPrefix(l, LabelPrefixKind) &&
+			!strings.HasPrefix(l, LabelPrefixStatus) {
+			seedLabels = append(seedLabels, l)
+		}
+	}
+	if scope != "" {
+		seedLabels = append(seedLabels, LabelPrefixScope+scope)
+	}
+	if in.Kind != "" {
+		seedLabels = append(seedLabels, LabelPrefixKind+in.Kind)
+	}
+	if status != "" {
+		seedLabels = append(seedLabels, LabelPrefixStatus+status)
+	}
 	art := &Artifact{
 		ID: id, Alias: in.Alias, Kind: in.Kind, Scope: scope,
 		Status: status, Parent: in.Parent,
 		Title: in.Title, Goal: in.Goal,
 		Priority:  in.Priority,
-		DependsOn: in.DependsOn, Labels: in.Labels,
+		DependsOn: in.DependsOn, Labels: seedLabels,
 		Links: in.Links, Extra: in.Extra,
 		Sections: in.Sections,
 	}

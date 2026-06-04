@@ -5,7 +5,7 @@ family: effort
 protected: true
 lifecycle:
   active_status: active
-  track_in_motd: true
+  track_in_brief: true
 sections:
   must: [mission]
   should: [goals, success_criteria]
@@ -19,5 +19,5 @@ when_to_create: |
   goals toward a named outcome — a release, a refactor initiative, a feature
   area. Campaigns group goals; they are not created for single tasks.
 agent_note: |
-  Campaigns contain goals (parent_of). Campaigns track in motd when active.
+  Campaigns contain goals (parent_of). Campaigns surface in brief when active.
   A campaign without at least one active goal is stalled. mission section is required.

@@ -35,7 +35,7 @@ type kindYAML struct {
 		ActiveStatus                 string              `yaml:"active_status"`
 		TriggerStatus                string              `yaml:"trigger_status"`
 		IsGoalKind                   bool                `yaml:"is_goal_kind"`
-		TrackInMotd                  bool                `yaml:"track_in_motd"`
+		TrackInBrief                 bool                `yaml:"track_in_brief"`
 		ActivationRequiresSections   bool                `yaml:"activation_requires_sections"`
 		AutoArchiveOnJustifyComplete bool                `yaml:"auto_archive_on_justify_complete"`
 		Transitions                  map[string][]string `yaml:"transitions"`
@@ -80,7 +80,7 @@ func (k *kindYAML) toKindDef() KindDef {
 			ActiveStatus:                 k.Lifecycle.ActiveStatus,
 			TriggerStatus:                k.Lifecycle.TriggerStatus,
 			IsGoalKind:                   k.Lifecycle.IsGoalKind,
-			TrackInMotd:                  k.Lifecycle.TrackInMotd,
+			TrackInBrief:                 k.Lifecycle.TrackInBrief,
 			ActivationRequiresSections:   k.Lifecycle.ActivationRequiresSections,
 			AutoArchiveOnJustifyComplete: k.Lifecycle.AutoArchiveOnJustifyComplete,
 			Transitions:                  k.Lifecycle.Transitions,

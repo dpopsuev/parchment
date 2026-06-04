@@ -7,7 +7,7 @@ vacuumable: true
 lifecycle:
   is_goal_kind: true
   active_status: current
-  track_in_motd: true
+  track_in_brief: true
   auto_archive_on_justify_complete: true
 children: [task, spec, bug, need, ref, doc, decision]
 relations:

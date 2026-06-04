@@ -43,7 +43,7 @@ type KindLifecycle struct {
 	ActiveStatus                 string              `json:"active_status,omitempty" yaml:"active_status,omitempty"`
 	TriggerStatus                string              `json:"trigger_status,omitempty" yaml:"trigger_status,omitempty"`
 	IsGoalKind                   bool                `json:"is_goal_kind,omitempty" yaml:"is_goal_kind,omitempty"`
-	TrackInMotd                  bool                `json:"track_in_motd,omitempty" yaml:"track_in_motd,omitempty"`
+	TrackInBrief                 bool                `json:"track_in_brief,omitempty" yaml:"track_in_brief,omitempty"`
 	ActivationRequiresSections   bool                `json:"activation_requires_sections,omitempty" yaml:"activation_requires_sections,omitempty"`
 	AutoArchiveOnJustifyComplete bool                `json:"auto_archive_on_justify_complete,omitempty" yaml:"auto_archive_on_justify_complete,omitempty"`
 	Transitions                  map[string][]string `json:"transitions,omitempty" yaml:"transitions,omitempty"`
@@ -289,11 +289,11 @@ func (s *Schema) GoalKind() (string, KindDef) {
 	return "", KindDef{}
 }
 
-// MotdKinds returns kinds with TrackInMotd=true.
-func (s *Schema) MotdKinds() map[string]KindDef {
+// BriefKinds returns kinds with TrackInBrief=true.
+func (s *Schema) BriefKinds() map[string]KindDef {
 	out := make(map[string]KindDef)
 	for name, def := range s.Kinds { //nolint:gocritic // rangeValCopy: KindDef map values; pointer map would require larger refactor
-		if def.TrackInMotd {
+		if def.TrackInBrief {
 			out[name] = def
 		}
 	}

@@ -42,20 +42,20 @@ type DefaultsProvider interface {
 	GetVacuumDays() int
 	GetDashboardStale() int
 	GetDashboardStaleCap() int
-	GetMotdRecentHours() int
+	GetBriefRecentHours() int
 	GetTreeMaxDepth() int
 }
 
 // defaultDefaults is used when ProtocolConfig.Defaults is nil.
-var defaultDefaults = &staticDefaults{vacuum: 90, stale: 30, staleCap: 10, motdHours: 48, treeDepth: 10}
+var defaultDefaults = &staticDefaults{vacuum: 90, stale: 30, staleCap: 10, briefHours: 48, treeDepth: 10}
 
-type staticDefaults struct{ vacuum, stale, staleCap, motdHours, treeDepth int }
+type staticDefaults struct{ vacuum, stale, staleCap, briefHours, treeDepth int }
 
-func (d *staticDefaults) GetVacuumDays() int        { return d.vacuum }
-func (d *staticDefaults) GetDashboardStale() int    { return d.stale }
-func (d *staticDefaults) GetDashboardStaleCap() int { return d.staleCap }
-func (d *staticDefaults) GetMotdRecentHours() int   { return d.motdHours }
-func (d *staticDefaults) GetTreeMaxDepth() int      { return d.treeDepth }
+func (d *staticDefaults) GetVacuumDays() int         { return d.vacuum }
+func (d *staticDefaults) GetDashboardStale() int     { return d.stale }
+func (d *staticDefaults) GetDashboardStaleCap() int  { return d.staleCap }
+func (d *staticDefaults) GetBriefRecentHours() int   { return d.briefHours }
+func (d *staticDefaults) GetTreeMaxDepth() int       { return d.treeDepth }
 
 // ProtocolConfig configures scoped ID generation, key resolution, field mutability,
 // and runtime defaults for the Protocol.

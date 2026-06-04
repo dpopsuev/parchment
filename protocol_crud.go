@@ -681,11 +681,12 @@ func (p *Protocol) inferScope(ctx context.Context, explicit, parentID, kind stri
 	if len(p.scopes) == 1 {
 		return p.scopes[0], nil
 	}
-	avail := "none configured"
-	if len(p.scopes) > 0 {
-		avail = strings.Join(p.scopes, ", ")
+	if len(p.scopes) == 0 {
+		// No scopes configured — accept unscoped artifacts rather than refusing.
+		// Occurs when scribe.yaml has no scope_configs and no --scope flag was given.
+		return "", nil
 	}
-	return "", fmt.Errorf("scope is required (available scopes: %s)", avail) //nolint:err113 // sentinel; no caller uses errors.Is on this
+	return "", fmt.Errorf("scope is required (available scopes: %s)", strings.Join(p.scopes, ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 }
 
 func (p *Protocol) resolveScopeKey(ctx context.Context, scope string) (string, error) {

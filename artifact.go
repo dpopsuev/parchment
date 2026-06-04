@@ -179,14 +179,14 @@ func (a *Artifact) ResolvedKind() string {
 // Matches reports whether art satisfies all non-zero filter fields.
 func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic // hugeParam: Filter is read-only in all callers; pointer would complicate call sites
 	if f.Family != "" && len(f.FamilyKinds) > 0 {
-		if !f.FamilyKinds[art.Kind] {
+		if !f.FamilyKinds[art.ResolvedKind()] {
 			return false
 		}
 	}
 	if f.IDPrefix != "" && !strings.HasPrefix(art.ID, f.IDPrefix) {
 		return false
 	}
-	if f.ExcludeKind != "" && art.Kind == f.ExcludeKind {
+	if f.ExcludeKind != "" && art.ResolvedKind() == f.ExcludeKind {
 		return false
 	}
 	if f.ExcludeStatus != "" && art.Status == f.ExcludeStatus {
@@ -195,7 +195,7 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic /
 	if f.ExcludeScope != "" && art.Scope == f.ExcludeScope {
 		return false
 	}
-	if f.Kind != "" && art.Kind != f.Kind {
+	if f.Kind != "" && art.ResolvedKind() != f.Kind {
 		return false
 	}
 	if len(f.Scopes) > 0 { //nolint:nestif // scope filter has legitimate branching; splitting would reduce clarity

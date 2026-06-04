@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite" // SQLite driver registration
@@ -172,9 +173,11 @@ func (c SQLiteConfig) journalMode() string {
 
 // SQLiteStore implements Store on top of SQLite with WAL mode.
 type SQLiteStore struct {
-	writer *sql.DB
-	reader *sql.DB
-	dbPath string
+	writer     *sql.DB
+	reader     *sql.DB
+	dbPath     string
+	stopWAL    context.CancelFunc
+	walStopped sync.WaitGroup
 }
 
 // Writer returns the writer connection for operations like WAL checkpoint.
@@ -291,18 +294,27 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 
 	log.InfoContext(context.Background(), "database opened")
 
-	// Periodic WAL checkpoint every 60s to prevent WAL contention under batch writes
+	walCtx, stopWAL := context.WithCancel(context.Background())
+	st := &SQLiteStore{writer: writer, reader: reader, dbPath: path, stopWAL: stopWAL}
+
+	// Periodic WAL checkpoint every 60s to prevent WAL contention under batch writes.
+	// The goroutine is stopped by Close() via walCtx cancellation.
+	st.walStopped.Add(1)
 	go func() {
+		defer st.walStopped.Done()
 		ticker := time.NewTicker(60 * time.Second)
 		defer ticker.Stop()
-		for range ticker.C {
-			if _, err := writer.ExecContext(context.Background(), "PRAGMA wal_checkpoint(PASSIVE)"); err != nil {
-				log.DebugContext(context.Background(), "WAL checkpoint failed", slog.Any(LogKeyError, err))
+		for {
+			select {
+			case <-ticker.C:
+				if _, err := writer.ExecContext(walCtx, "PRAGMA wal_checkpoint(PASSIVE)"); err != nil {
+					log.DebugContext(walCtx, "WAL checkpoint failed", slog.Any(LogKeyError, err))
+				}
+			case <-walCtx.Done():
+				return
 			}
 		}
 	}()
-
-	st := &SQLiteStore{writer: writer, reader: reader, dbPath: path}
 
 	// Auto-snapshot if last snapshot is stale
 	backend := NewLocalSnapshotBackend(path, writer)
@@ -435,6 +447,10 @@ func reseedScopedSequences(db *sql.DB) error {
 }
 
 func (s *SQLiteStore) Close() error {
+	s.stopWAL()
+	s.walStopped.Wait()
+	// Flush WAL so the -wal/-shm files are removed and temp dirs can be cleaned up.
+	_, _ = s.writer.ExecContext(context.Background(), "PRAGMA wal_checkpoint(TRUNCATE)")
 	_ = s.reader.Close()
 	return s.writer.Close()
 }

@@ -237,7 +237,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 				if targets, ok := art.Links[reqRel]; ok && len(targets) > 0 {
 					hasEdge = true
 				}
-				if reqRel == RelDependsOn && len(art.DependsOn) > 0 {
+				if reqRel == RelDependsOn && len(in.DependsOn) > 0 {
 					hasEdge = true
 				}
 				if !hasEdge {

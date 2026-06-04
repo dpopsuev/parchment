@@ -400,11 +400,13 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 
 
 func (p *Protocol) guardDependsOnComplete(ctx context.Context, art *Artifact) error {
+	// Read depends_on edges from the store — authoritative over art.DependsOn field.
+	edges, _ := p.store.Neighbors(ctx, art.ID, RelDependsOn, Outgoing)
 	var incomplete []string
-	for _, depID := range art.DependsOn {
-		dep, err := p.store.Get(ctx, depID)
+	for _, e := range edges {
+		dep, err := p.store.Get(ctx, e.To)
 		if err != nil {
-			continue // dangling ref, not a blocker
+			continue // dangling edge, not a blocker
 		}
 		if !p.schema.IsTerminal(dep.Status) {
 			incomplete = append(incomplete, fmt.Sprintf("%s [%s]", dep.ID, dep.Status))

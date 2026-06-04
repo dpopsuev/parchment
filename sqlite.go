@@ -1409,6 +1409,43 @@ func (s *SQLiteStore) Neighbors(ctx context.Context, id, rel string, dir Directi
 	return edges, nil
 }
 
+func (s *SQLiteStore) ListEdges(ctx context.Context, ids, relations []string) ([]Edge, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	// Build IN clause for ids.
+	placeholders := make([]string, len(ids))
+	args := make([]any, len(ids)*2)
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+		args[len(ids)+i] = id
+	}
+	inClause := strings.Join(placeholders, ",")
+	q := "SELECT from_id, relation, to_id, weight FROM edges WHERE from_id IN (" + inClause + ") AND to_id IN (" + inClause + ")" //nolint:gosec // G202: inClause is composed entirely of "?" placeholders, not user data
+	if len(relations) > 0 {
+		rph := make([]string, len(relations))
+		for i, r := range relations {
+			rph[i] = "?"
+			args = append(args, r)
+		}
+		q += " AND relation IN (" + strings.Join(rph, ",") + ")"
+	}
+	rows, err := s.reader.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
+	var edges []Edge
+	for rows.Next() {
+		var e Edge
+		if err := rows.Scan(&e.From, &e.Relation, &e.To, &e.Weight); err == nil {
+			edges = append(edges, e)
+		}
+	}
+	return edges, nil
+}
+
 func (s *SQLiteStore) Walk(ctx context.Context, root, rel string, dir Direction, maxDepth int, fn WalkFn) error {
 	visited := make(map[string]bool)
 	return s.walkRecurse(ctx, root, rel, dir, maxDepth, 0, visited, fn)

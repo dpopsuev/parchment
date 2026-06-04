@@ -65,6 +65,9 @@ type GraphStore interface {
 	UpdateEdgeWeight(ctx context.Context, from, to, relation string, weight float64) error
 	Neighbors(ctx context.Context, id, rel string, dir Direction) ([]Edge, error)
 	Walk(ctx context.Context, root string, rel string, dir Direction, maxDepth int, fn WalkFn) error
+	// ListEdges returns all edges where both endpoints are in the given set of
+	// artifact IDs. Pass nil relations to return all relation types.
+	ListEdges(ctx context.Context, ids, relations []string) ([]Edge, error)
 }
 
 // SequenceStore handles atomic ID generation and counters.

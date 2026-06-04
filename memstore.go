@@ -252,6 +252,33 @@ func (m *MemoryStore) Neighbors(_ context.Context, id, rel string, dir Direction
 	return result, nil
 }
 
+func (m *MemoryStore) ListEdges(_ context.Context, ids, relations []string) ([]Edge, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	idSet := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		idSet[id] = true
+	}
+	relSet := make(map[string]bool, len(relations))
+	for _, r := range relations {
+		relSet[r] = true
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var result []Edge
+	for _, e := range m.edges {
+		if !idSet[e.From] || !idSet[e.To] {
+			continue
+		}
+		if len(relSet) > 0 && !relSet[e.Relation] {
+			continue
+		}
+		result = append(result, e)
+	}
+	return result, nil
+}
+
 func (m *MemoryStore) Walk(_ context.Context, root, rel string, dir Direction, maxDepth int, fn WalkFn) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

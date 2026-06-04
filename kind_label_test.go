@@ -70,3 +70,37 @@ func TestCreateArtifact_KindFromLabel(t *testing.T) {
 		t.Errorf("expected Kind=bug, got %q", art.Kind)
 	}
 }
+
+// --- SetField(kind=X) writes label + mirrors field ---
+
+func TestSetField_KindWritesLabel(t *testing.T) {
+	store := parchment.NewMemoryStore()
+	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{IDFormat: "sequential"})
+	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{Kind: "task", Title: "original"})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	results, err := proto.SetField(t.Context(), []string{art.ID}, "kind", "bug")
+	if err != nil {
+		t.Fatalf("SetField: %v", err)
+	}
+	if !results[0].OK {
+		t.Fatalf("SetField failed: %s", results[0].Error)
+	}
+	updated, err := store.Get(t.Context(), art.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if updated.Kind != "bug" {
+		t.Errorf("Kind field: expected bug, got %q", updated.Kind)
+	}
+	var hasKindLabel bool
+	for _, l := range updated.Labels {
+		if l == "kind:bug" {
+			hasKindLabel = true
+		}
+	}
+	if !hasKindLabel {
+		t.Errorf("expected kind:bug in labels, got %v", updated.Labels)
+	}
+}

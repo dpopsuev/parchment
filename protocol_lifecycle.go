@@ -197,6 +197,14 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 			return Result{ID: id, Error: err.Error()}
 		}
 		art.Kind = value
+		// Mirror to labels: remove any existing kind:* label then add the new one.
+		next := make([]string, 0, len(art.Labels))
+		for _, l := range art.Labels {
+			if !strings.HasPrefix(l, LabelPrefixKind) {
+				next = append(next, l)
+			}
+		}
+		art.Labels = append(next, LabelPrefixKind+value) //nolint:gocritic // appendAssign: intentional — next is a temp and art.Labels is the target
 	case FieldDependsOn:
 		if value == "" {
 			art.DependsOn = nil

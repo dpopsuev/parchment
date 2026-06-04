@@ -229,6 +229,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		)}
 	}
 
+	p.stampCompliance(art)
 	if err := p.store.Put(ctx, art); err != nil {
 		return Result{ID: id, Error: err.Error()}
 	}

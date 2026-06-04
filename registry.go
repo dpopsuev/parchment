@@ -116,13 +116,14 @@ type edgeTypeYAML struct {
 
 // labelYAML is the on-disk format for a label definition.
 type labelYAML struct {
-	Name           string  `yaml:"name"`
-	World          string  `yaml:"world"`
-	EvictionPolicy string  `yaml:"eviction_policy"`
-	HalfLifeDays   float64 `yaml:"half_life_days"`
-	AlwaysApply    bool    `yaml:"always_apply"`
-	WhenToApply    string  `yaml:"when_to_apply"`
-	Implies        string  `yaml:"implies"`
+	Name             string   `yaml:"name"`
+	World            string   `yaml:"world"`
+	EvictionPolicy   string   `yaml:"eviction_policy"`
+	HalfLifeDays     float64  `yaml:"half_life_days"`
+	AlwaysApply      bool     `yaml:"always_apply"`
+	RequiredSections []string `yaml:"required_sections"`
+	WhenToApply      string   `yaml:"when_to_apply"`
+	Implies          string   `yaml:"implies"`
 }
 
 // loadRegistryKinds parses all kind YAML files from the embedded registry.
@@ -293,10 +294,11 @@ func seedLabelsFromRegistry(ctx context.Context, s Store) {
 			continue
 		}
 		trait := LabelTrait{
-			World:          l.World,
-			EvictionPolicy: l.EvictionPolicy,
-			HalfLifeDays:   int(l.HalfLifeDays),
-			AlwaysApply:    l.AlwaysApply,
+			World:            l.World,
+			EvictionPolicy:   l.EvictionPolicy,
+			HalfLifeDays:     int(l.HalfLifeDays),
+			AlwaysApply:      l.AlwaysApply,
+			RequiredSections: l.RequiredSections,
 		}
 		b, _ := json.Marshal(trait)
 		var extra map[string]any

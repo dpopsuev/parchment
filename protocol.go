@@ -151,4 +151,11 @@ func (p *Protocol) LabelTrait(labels []string) LabelTrait {
 	return ResolveTrait(p.labelTraits, labels)
 }
 
+// stampCompliance recomputes compliance for art against the in-memory trait
+// map and updates art.Labels and art.Extra in place. Called before every
+// store.Put that touches Labels or Sections.
+func (p *Protocol) stampCompliance(art *Artifact) {
+	StampCompliance(p.labelTraits, art)
+}
+
 // PromoteStash merges patch into a stashed artifact and creates it.

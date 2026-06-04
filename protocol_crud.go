@@ -272,6 +272,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 			}
 		}
 	}
+	p.stampCompliance(art)
 	if err := p.store.Put(ctx, art); err != nil {
 		return nil, err
 	}
@@ -633,6 +634,7 @@ func (p *Protocol) AttachSection(ctx context.Context, id, name, text string) (bo
 		mergeStampFiles(art, text)
 	}
 
+	p.stampCompliance(art)
 	if err := p.store.Put(ctx, art); err != nil {
 		return false, err
 	}

@@ -639,292 +639,59 @@ func (s *Schema) MergeDefaults(defaults *Schema) {
 	}
 }
 
-// DefaultSchema returns the built-in schema with the canonical kind vocabulary.
+
+// DefaultSchema returns the minimal built-in schema used as a structural
+// fallback when no definition artifacts exist in the store. All kind
+// definitions are now owned by the registry YAML (registry/kinds/*.yaml).
 //
-// Deprecated: prefer passing nil to Protocol.New, which calls loadSchema to
-// populate kinds from definition artifacts stored in the database. This function
-// remains public for tests and one-off use only.
-func DefaultSchema() *Schema { //nolint:funlen // data initializer; cannot be shorter without obscuring the schema definition
+// Deprecated: prefer passing nil to Protocol.New which bootstraps from the
+// registry. This function remains for tests that construct a Schema directly.
+func DefaultSchema() *Schema {
 	return &Schema{
-		Kinds: map[string]KindDef{
-			"goal": {
-				KindIdentity:  KindIdentity{Prefix: "GOAL", Code: "GOL", Protected: true, Vacuumable: true, Family: FamilyEffort},
-				KindLifecycle: KindLifecycle{IsGoalKind: true, ActiveStatus: "current", TrackInMotd: true, AutoArchiveOnJustifyComplete: true},
-				Children: []string{"task", "spec", "bug", "need", "ref", "doc", "decision"},
-				Relations: KindRelations{
-					Incoming: []string{RelParentOf},
-					Outgoing: []string{RelSatisfies},
-					Targets:  map[string][]string{RelSatisfies: {"template"}},
-				},
-			},
-			"task": {
-				KindIdentity:  KindIdentity{Prefix: "TASK", Code: "TSK", Family: FamilyEffort, Vacuumable: true},
-				KindLifecycle: KindLifecycle{TriggerStatus: "complete", ActivationRequiresSections: true, Transitions: taskTransitions()},
-				KindSections:  KindSections{MustSections: []string{"context"}, ShouldSections: []string{"checklist", "acceptance"}, CouldSections: []string{"current_architecture", "desired_architecture"}, RequiredFields: []string{FieldPriority}},
-				Children:      []string{},
-				Relations: KindRelations{
-					Outgoing: []string{RelImplements, RelDependsOn, RelSatisfies},
-					Targets:  map[string][]string{RelImplements: {"spec", "bug"}, RelSatisfies: {"template"}},
-				},
-			},
-			"spec": {
-				KindIdentity:  KindIdentity{Prefix: "SPEC", Code: "SPC", Protected: true, Family: FamilyIntent},
-				KindLifecycle: KindLifecycle{ActivationRequiresSections: true, Transitions: intentTransitions()},
-				KindSections:  KindSections{MustSections: []string{"problem"}, ShouldSections: []string{"decision", "acceptance"}, CouldSections: []string{"architecture", "current_architecture", "desired_architecture"}},
-				Children:      []string{},
-				Relations: KindRelations{
-					Incoming: []string{RelImplements, RelJustifies},
-					Outgoing: []string{RelSatisfies},
-					Targets:  map[string][]string{RelSatisfies: {"template"}},
-				},
-			},
-			"bug": {
-				KindIdentity:  KindIdentity{Prefix: "BUG", Code: "BUG", Protected: true, Family: FamilyIntent, Vacuumable: true},
-				KindLifecycle: KindLifecycle{Transitions: intentTransitions()},
-				KindSections:  KindSections{MustSections: []string{"observed"}, ShouldSections: []string{"reproduction"}},
-				Children:      []string{},
-				Relations: KindRelations{
-					Incoming: []string{RelImplements},
-					Outgoing: []string{RelSatisfies},
-					Targets:  map[string][]string{RelSatisfies: {"template"}},
-				},
-			},
-			"need": {
-				KindIdentity:  KindIdentity{Prefix: "NEED", Code: "NED", Protected: true, Family: FamilyIntent},
-				KindLifecycle: KindLifecycle{Transitions: intentTransitions()},
-				KindSections:  KindSections{MustSections: []string{"problem"}, ShouldSections: []string{"value", "acceptance"}},
-				Children:      []string{},
-				Relations: KindRelations{
-					Outgoing: []string{RelJustifies, RelSatisfies},
-					Targets:  map[string][]string{RelJustifies: {"spec"}, RelSatisfies: {"template"}},
-				},
-			},
-			"ref": {
-				KindIdentity: KindIdentity{Prefix: "REF", Code: "REF", Protected: true, Family: FamilySupport},
-				KindSections: KindSections{ShouldSections: []string{"summary", "source"}},
-				Children:     []string{},
-				Relations: KindRelations{
-					Outgoing:         []string{RelDocuments, RelSatisfies},
-					ExpectedOutgoing: []string{RelDocuments},
-					Targets:          map[string][]string{RelSatisfies: {"template"}},
-				},
-			},
-			"doc": {
-				KindIdentity: KindIdentity{Prefix: "DOC", Code: "DOC", Protected: true, Family: FamilySupport},
-				KindSections: KindSections{ShouldSections: []string{"overview"}, CouldSections: []string{"content"}},
-				Children:     []string{},
-				Relations: KindRelations{
-					Outgoing:         []string{RelDocuments, RelSatisfies},
-					ExpectedOutgoing: []string{RelDocuments},
-					Targets:          map[string][]string{RelSatisfies: {"template"}},
-				},
-			},
-			"decision": {
-				KindIdentity:  KindIdentity{Prefix: "ADR", Code: "ADR", Protected: true, Family: FamilyIntent},
-				KindLifecycle: KindLifecycle{Transitions: intentTransitions()},
-				Children:      []string{},
-				Relations: KindRelations{
-					Outgoing: []string{RelSatisfies},
-					Targets:  map[string][]string{RelSatisfies: {"template"}},
-				},
-			},
-			"campaign": {
-				KindIdentity:  KindIdentity{Prefix: "CMP", Code: "CMP", Protected: true, Family: FamilyEffort},
-				KindLifecycle: KindLifecycle{ActiveStatus: "active", TrackInMotd: true},
-				KindSections:  KindSections{MustSections: []string{"mission"}, ShouldSections: []string{"goals", "success_criteria"}},
-				Children:      []string{"goal"},
-				Relations: KindRelations{
-					Outgoing: []string{RelParentOf, RelSatisfies},
-					Targets:  map[string][]string{RelSatisfies: {"template"}},
-				},
-			},
-			"config": {
-				KindIdentity: KindIdentity{Prefix: "CFG", Code: "CFG", Protected: true, Family: FamilySupport},
-				Children:     []string{},
-			},
-			"section": {
-				KindIdentity:  KindIdentity{Prefix: "SEC", Code: "SEC", Family: FamilySupport},
-				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
-				Children:      []string{ChildrenWildcard},
-			},
-			"paragraph": {
-				KindIdentity:  KindIdentity{Prefix: "PAR", Code: "PAR", Family: FamilySupport},
-				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
-				Children:      []string{},
-			},
-			"mirror": {
-				KindIdentity: KindIdentity{Prefix: "MIR", Code: "MIR", Protected: true, Family: FamilySupport, SkipGuards: true},
-				Children:     []string{},
-			},
-			"template": {
-				KindIdentity: KindIdentity{Prefix: "TPL", Code: "TPL", Protected: true, Family: FamilySupport},
-				KindSections: KindSections{MustSections: []string{"content"}},
-				Children:     []string{},
-				Relations: KindRelations{
-					Incoming: []string{RelSatisfies},
-				},
-			},
-			// definition is the meta-kind. Every other kind is stored as a definition
-			// artifact in SchemaScope. This is the only compiled-in kind — all others
-			// are loaded from the store at startup via loadSchema.
-			KindDefinition: {
-				KindIdentity:  KindIdentity{Prefix: "DEF", Code: "DEF", Protected: true, Family: FamilySupport, SkipGuards: true},
-				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
-				Children:      []string{},
-			},
-		},
 		Statuses: []string{
-			"draft", "active", "current", "open",
-			"mature", "allocated", "in_progress", "in_review",
-			"complete", "cancelled", "dismissed", "promoted", //nolint:misspell // British spelling; changing the value would break stored status strings
-			"retired", "archived",
-			// Intent lifecycle statuses.
+			StatusDraft, StatusActive, StatusCurrent, StatusOpen,
+			StatusMature, StatusAllocated, StatusInProgress, StatusInReview,
+			StatusComplete, "cancelled", "dismissed", "promoted", //nolint:misspell // British spelling; changing the value would break stored status strings
+			StatusRetired, StatusArchived,
 			StatusProposed, StatusAccepted, StatusRejected, StatusDeferred,
 		},
 		TerminalStatuses: []string{
-			"complete", "cancelled", "dismissed", "retired", "archived", //nolint:misspell // British spelling; changing the value would break stored status strings
-			StatusAccepted, StatusRejected, // intent decisions are terminal
+			StatusComplete, "cancelled", "dismissed", "retired", StatusArchived, //nolint:misspell // British spelling; changing the value would break stored status strings
+			StatusAccepted, StatusRejected,
 		},
-		ReadonlyStatuses: []string{"archived", StatusAccepted}, //nolint:gocritic // commentedOutCode false positive: this is a regular comment, not commented-out code
+		ReadonlyStatuses: []string{StatusArchived, StatusAccepted}, //nolint:gocritic // commentedOutCode false positive: this is a regular comment, not commented-out code
 		Relations: []string{
-			RelParentOf, RelDependsOn, RelFollows,
-			RelJustifies, RelImplements, RelDocuments, RelSatisfies,
+			RelParentOf, RelDependsOn, RelFollows, RelJustifies,
+			RelImplements, RelDocuments, RelSatisfies,
+			// Knowledge relations — needed by knowledge kinds in registry YAML.
+			RelCites, RelElaborates, RelContradicts, RelSynthesises, RelRemembers,
 		},
 		Guards: Guards{
 			ArchivedReadonly:                     true,
 			CompletionRequiresChildrenComplete:   true,
 			CompletionRequiresDependsOnComplete:  true,
 			DeleteRequiresArchived:               true,
-			AutoCompleteParentOnChildrenTerminal: true,
+			AutoCompleteParentOnChildrenTerminal:  true,
 		},
-		Priorities:      []string{"none", "low", "medium", "high", "critical"},
-		DefaultPriority: "none",
+		Priorities:      []string{"critical", "high", "medium", "low", "none"},
+		DefaultPriority: "medium",
+		Kinds:           registrySchema(), // all kinds from YAML registry
 	}
 }
 
-// intentTransitions defines the lifecycle for intent artifacts
-// (need, spec, bug, decision): draft → proposed → accepted/rejected/deferred.
-// accepted and rejected are terminal. deferred can re-enter as proposed.
-func intentTransitions() map[string][]string {
-	return map[string][]string{
-		StatusDraft:    {StatusProposed, StatusActive, StatusCanceled},
-		StatusActive:   {StatusProposed, StatusDraft, StatusCanceled},
-		StatusProposed: {StatusAccepted, StatusRejected, StatusDeferred, StatusDraft},
-		StatusDeferred: {StatusProposed, StatusCanceled},
-		StatusAccepted: {StatusRetired, StatusArchived}, // readonly — retire or archive
-		StatusRejected: {StatusRetired, StatusArchived}, // terminal
-		StatusCanceled: {StatusDraft, StatusRetired, StatusArchived},
-		StatusRetired:  {},
-		StatusArchived: {},
-	}
-}
-
-// taskTransitions defines the intended lifecycle for task artifacts.
-// Uses constants to avoid raw string linter warnings.
-func taskTransitions() map[string][]string {
-	return map[string][]string{
-		StatusDraft:      {StatusActive, StatusCanceled},
-		StatusActive:     {StatusMature, StatusDraft, StatusCanceled},
-		StatusMature:     {StatusAllocated, StatusActive, StatusCanceled},
-		StatusAllocated:  {StatusInProgress, StatusMature, StatusCanceled},
-		StatusInProgress: {StatusInReview, StatusAllocated, StatusCanceled},
-		StatusInReview:   {StatusComplete, StatusInProgress, StatusCanceled},
-		StatusComplete:   {StatusRetired, StatusArchived},
-		StatusCanceled:   {StatusDraft, StatusRetired, StatusArchived},
-		StatusRetired:    {},
-	}
-}
-
-// KnowledgeSchema extends DefaultSchema with knowledge kinds (note, journal,
-// source, concept, context, rule, skill), fleeting/evergreen statuses, and
-// knowledge relations. Additive — all work kinds are preserved.
-func KnowledgeSchema() *Schema { //nolint:funlen // schema definitions are inherently long
-	s := &Schema{
-		Kinds: map[string]KindDef{
-			// note: the core knowledge unit.
-			// Lifecycle mirrors Zettelkasten: fleeting capture → active processing → evergreen permanence.
-			KindNote: {
-				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "NOT", Code: "n"},
-				KindLifecycle: KindLifecycle{DefaultStatus: StatusFleeting, Transitions: map[string][]string{StatusFleeting: {StatusActive, StatusEvergreen, StatusArchived}, StatusActive: {StatusEvergreen, StatusFleeting, StatusArchived}, StatusEvergreen: {StatusActive, StatusArchived}, StatusArchived: {}}},
-				KindSections:  KindSections{ShouldSections: []string{"body", "connections", "sources"}},
-				Relations: KindRelations{
-					Outgoing: []string{RelCites, RelElaborates, RelSynthesises, RelDocuments},
-					Incoming: []string{RelSynthesises, RelRemembers, RelContradicts},
-				},
-			},
-
-			// journal: daily dated entry. One per day, idempotent create.
-			KindJournal: {
-				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "JRN", Code: "j"},
-				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
-				KindSections:  KindSections{ShouldSections: []string{"body"}},
-				Relations: KindRelations{
-					Outgoing: []string{RelCites, RelDocuments},
-				},
-			},
-
-			// source: ingested external material.
-			KindSource: {
-				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "SRC", Code: "s"},
-				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
-				KindSections:  KindSections{MustSections: []string{"summary"}, ShouldSections: []string{"key-insights", "provenance"}},
-				Relations: KindRelations{
-					Incoming: []string{RelCites},
-				},
-			},
-
-			// concept: atomic definition or idea.
-			KindConcept: {
-				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "CON", Code: "c"},
-				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
-				KindSections:  KindSections{ShouldSections: []string{"definition", "principles", "examples", "applications"}},
-				Relations: KindRelations{
-					Incoming: []string{RelElaborates},
-				},
-			},
-
-			// context: agent's persistent memory about a person, project, or workflow.
-			KindContext: {
-				KindIdentity:  KindIdentity{Family: FamilyKnowledge, Prefix: "CTX", Code: "x", Protected: true},
-				KindLifecycle: KindLifecycle{DefaultStatus: StatusActive},
-				KindSections:  KindSections{ShouldSections: []string{"content", "scope", "confidence"}},
-				Relations: KindRelations{
-					Outgoing: []string{RelRemembers},
-				},
-			},
-
-	
-		},
-
-		// Knowledge statuses added on top of the work statuses.
-		Statuses: []string{StatusFleeting, StatusEvergreen},
-
-		// Knowledge relations.
-		Relations: []string{
-			RelCites, RelElaborates, RelContradicts, RelSynthesises, RelRemembers,
-		},
-	}
-
-	// Merge registry kinds (YAML-defined, operator-overridable) — these take
-	// precedence over the compiled-in DefaultSchema for any kind they define.
-	for name, kd := range registrySchema() { //nolint:gocritic // rangeValCopy: KindDef map values; pointer map would require larger refactor
-		s.Kinds[name] = kd
-	}
-
+// KnowledgeSchema extends DefaultSchema with knowledge statuses and relations.
+// Additive — all work kinds from the registry are preserved.
+// Passing nil to Protocol.New is equivalent and preferred.
+func KnowledgeSchema() *Schema {
 	base := DefaultSchema()
-	// Merge any DefaultSchema kinds not already in registry or knowledge kinds.
-	for k, v := range base.Kinds { //nolint:gocritic // rangeValCopy: KindDef map values; pointer map would require larger refactor
-		if _, exists := s.Kinds[k]; !exists {
-			s.Kinds[k] = v
-		}
-	}
-	s.Statuses = append(s.Statuses, base.Statuses...)
-	s.Relations = append(base.Relations, s.Relations...)
-	s.TerminalStatuses = base.TerminalStatuses
-	s.ReadonlyStatuses = base.ReadonlyStatuses
-	s.Guards = base.Guards
-	s.Priorities = base.Priorities
-	s.DefaultPriority = base.DefaultPriority
 
-	return s
+	// Knowledge lifecycle statuses.
+	base.Statuses = append(base.Statuses, StatusFleeting, StatusEvergreen)
+
+	// Knowledge relations.
+	base.Relations = append(base.Relations,
+		RelCites, RelElaborates, RelContradicts, RelSynthesises, RelRemembers,
+	)
+
+	return base
 }

@@ -8,7 +8,7 @@ lifecycle:
   transitions:
     draft: [proposed, cancelled]
     proposed: [accepted, rejected, deferred, draft]
-    accepted: []
+    accepted: [archived]
     rejected: []
     deferred: [draft]
     cancelled: []

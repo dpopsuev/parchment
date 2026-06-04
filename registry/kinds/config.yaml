@@ -1,0 +1,12 @@
+name: config
+prefix: CFG
+code: CFG
+family: support
+protected: true
+children: []
+when_to_create: |
+  Config artifacts store runtime configuration for Scribe — sticky filter
+  defaults, scope settings. Not for user-facing content.
+agent_note: |
+  Internal kind. Managed by Protocol.GetConfig/SetConfig. Do not create
+  config artifacts manually unless you are configuring scope defaults.

@@ -9,7 +9,7 @@ lifecycle:
     draft: [active, proposed, cancelled]
     active: [accepted, rejected, deferred, draft]
     proposed: [accepted, rejected, deferred, draft]
-    accepted: []
+    accepted: [archived]
     rejected: []
     deferred: [draft]
     cancelled: []

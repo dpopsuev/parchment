@@ -1,0 +1,13 @@
+name: section
+prefix: SEC
+code: SEC
+family: support
+lifecycle:
+  default_status: active
+children: ["*"]
+when_to_create: |
+  Section artifacts are synthetic — derived from artifact sections via the
+  art_id#section_name addressing scheme. Do not create directly.
+agent_note: |
+  Internal synthetic kind. Used for section-level addressing and wikilink
+  resolution. children=["*"] means any kind can nest under a section.

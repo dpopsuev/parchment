@@ -138,10 +138,10 @@ func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force boo
 		if ResolveTrait(p.labelTraits, art.Labels).EvictionPolicy == "protected" {
 			continue
 		}
-		if kd, ok := p.schema.Kinds[art.Kind]; ok && !kd.Vacuumable {
+		if kd, ok := p.schema.Kinds[art.ResolvedKind()]; ok && !kd.Vacuumable {
 			continue
 		}
-		if !force && p.schema.IsProtected(art.Kind) {
+		if !force && p.schema.IsProtected(art.ResolvedKind()) {
 			continue
 		}
 		// Skip artifacts that still have incoming edges — age alone is not enough
@@ -310,7 +310,7 @@ func (p *Protocol) DetectOrphans(ctx context.Context, in OrphanInput) (*OrphanRe
 			continue
 		}
 
-		kd, ok := p.schema.Kinds[art.Kind]
+		kd, ok := p.schema.Kinds[art.ResolvedKind()]
 		if !ok {
 			continue
 		}
@@ -323,8 +323,8 @@ func (p *Protocol) DetectOrphans(ctx context.Context, in OrphanInput) (*OrphanRe
 			}
 			if len(edges) == 0 {
 				report.Orphans = append(report.Orphans, OrphanEntry{
-					ID: art.ID, Kind: art.Kind, Title: art.Title, Status: art.Status,
-					Reason: fmt.Sprintf("%s has no outgoing %s link", art.Kind, rel),
+					ID: art.ID, Kind: art.ResolvedKind(), Title: art.Title, Status: art.Status,
+					Reason: fmt.Sprintf("%s has no outgoing %s link", art.ResolvedKind(), rel),
 				})
 			}
 		}
@@ -573,13 +573,13 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 	report := &CheckReport{TotalScanned: len(arts)}
 
 	for _, art := range arts {
-		kd, knownKind := p.schema.Kinds[art.Kind]
+		kd, knownKind := p.schema.Kinds[art.ResolvedKind()]
 
 		if !knownKind {
 			report.Violations = append(report.Violations, CheckViolation{
-				ID: art.ID, Kind: art.Kind, Title: art.Title,
+				ID: art.ID, Kind: art.ResolvedKind(), Title: art.Title,
 				Category: "unknown_kind",
-				Detail:   fmt.Sprintf("kind %q not in schema", art.Kind),
+				Detail:   fmt.Sprintf("kind %q not in schema", art.ResolvedKind()),
 			})
 			continue
 		}
@@ -587,9 +587,9 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		if art.Parent != "" {
 			parent, err := p.store.Get(ctx, art.Parent)
 			if err == nil {
-				if reason, ok := p.schema.ValidChild(parent.Kind, art.Kind); !ok {
+				if reason, ok := p.schema.ValidChild(parent.ResolvedKind(), art.ResolvedKind()); !ok {
 					report.Violations = append(report.Violations, CheckViolation{
-						ID: art.ID, Kind: art.Kind, Title: art.Title,
+						ID: art.ID, Kind: art.ResolvedKind(), Title: art.Title,
 						Category: "invalid_parent",
 						Detail:   reason,
 					})
@@ -600,7 +600,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		for rel, targets := range art.Links {
 			if !p.schema.ValidRelation(rel) && !p.isRegisteredEdgeType(rel) {
 				report.Violations = append(report.Violations, CheckViolation{
-					ID: art.ID, Kind: art.Kind, Title: art.Title,
+					ID: art.ID, Kind: art.ResolvedKind(), Title: art.Title,
 					Category: "invalid_relation",
 					Detail:   fmt.Sprintf("relation %q not in schema", rel),
 				})
@@ -609,9 +609,9 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 			if len(kd.Relations.Outgoing) > 0 {
 				if !slices.Contains(kd.Relations.Outgoing, rel) {
 					report.Violations = append(report.Violations, CheckViolation{
-						ID: art.ID, Kind: art.Kind, Title: art.Title,
+						ID: art.ID, Kind: art.ResolvedKind(), Title: art.Title,
 						Category: "invalid_relation",
-						Detail:   fmt.Sprintf("kind %q does not allow outgoing %q", art.Kind, rel),
+						Detail:   fmt.Sprintf("kind %q does not allow outgoing %q", art.ResolvedKind(), rel),
 					})
 				}
 			}
@@ -623,7 +623,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 					}
 					if !slices.Contains(validTargets, target.Kind) {
 						report.Violations = append(report.Violations, CheckViolation{
-							ID: art.ID, Kind: art.Kind, Title: art.Title,
+							ID: art.ID, Kind: art.ResolvedKind(), Title: art.Title,
 							Category: "invalid_relation",
 							Detail: fmt.Sprintf("%s target %s (kind %q) not in allowed targets %v for relation %q",
 								art.ID, tid, target.Kind, validTargets, rel),
@@ -643,9 +643,9 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 			}
 			if len(edges) == 0 {
 				report.Violations = append(report.Violations, CheckViolation{
-					ID: art.ID, Kind: art.Kind, Title: art.Title,
+					ID: art.ID, Kind: art.ResolvedKind(), Title: art.Title,
 					Category: "missing_link",
-					Detail:   fmt.Sprintf("%s has no outgoing %s link", art.Kind, reqRel),
+					Detail:   fmt.Sprintf("%s has no outgoing %s link", art.ResolvedKind(), reqRel),
 				})
 			}
 		}
@@ -659,7 +659,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 			for secName, guidance := range expected {
 				if !have[secName] {
 					report.Violations = append(report.Violations, CheckViolation{
-						ID: art.ID, Kind: art.Kind, Title: art.Title,
+						ID: art.ID, Kind: art.ResolvedKind(), Title: art.Title,
 						Category: "missing_template_section",
 						Detail:   fmt.Sprintf("missing section %q required by template %s: %s", secName, tpl.ID, guidance),
 					})
@@ -677,7 +677,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		for cur != "" {
 			if visited[cur] {
 				report.Violations = append(report.Violations, CheckViolation{
-					ID: art.ID, Kind: art.Kind, Title: art.Title,
+					ID: art.ID, Kind: art.ResolvedKind(), Title: art.Title,
 					Category: "parent_cycle",
 					Detail:   fmt.Sprintf("circular parent chain detected at %s", cur),
 				})
@@ -700,7 +700,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		}
 		if !art.UpdatedAt.IsZero() && art.UpdatedAt.Before(staleCutoff) {
 			report.Violations = append(report.Violations, CheckViolation{
-				ID: art.ID, Kind: art.Kind, Title: art.Title,
+				ID: art.ID, Kind: art.ResolvedKind(), Title: art.Title,
 				Category: "stale_draft",
 				Detail:   fmt.Sprintf("last updated %s", art.UpdatedAt.Format("2006-01-02")),
 			})
@@ -712,7 +712,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		if p.schema.IsTerminal(art.Status) {
 			continue
 		}
-		if art.Kind != KindCampaign && art.Kind != KindGoal {
+		if art.ResolvedKind() != KindCampaign && art.ResolvedKind() != KindGoal {
 			continue
 		}
 		children, _ := p.store.Children(ctx, art.ID)
@@ -728,7 +728,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		}
 		if allTerminal {
 			report.Violations = append(report.Violations, CheckViolation{
-				ID: art.ID, Kind: art.Kind, Title: art.Title,
+				ID: art.ID, Kind: art.ResolvedKind(), Title: art.Title,
 				Category: "completable",
 				Detail:   fmt.Sprintf("all %d children are terminal but %s is %s", len(children), art.ID, art.Status),
 			})
@@ -740,13 +740,13 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		if p.schema.IsTerminal(art.Status) {
 			continue
 		}
-		if art.Kind == KindSpec || art.Kind == KindBug {
+		if art.ResolvedKind() == KindSpec || art.ResolvedKind() == KindBug {
 			edges, _ := p.store.Neighbors(ctx, art.ID, RelImplements, Incoming)
 			if len(edges) == 0 {
 				report.Violations = append(report.Violations, CheckViolation{
-					ID: art.ID, Kind: art.Kind, Title: art.Title,
+					ID: art.ID, Kind: art.ResolvedKind(), Title: art.Title,
 					Category: "unimplemented_spec",
-					Detail:   fmt.Sprintf("no task implements this %s", art.Kind),
+					Detail:   fmt.Sprintf("no task implements this %s", art.ResolvedKind()),
 				})
 			}
 		}
@@ -759,7 +759,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		if p.schema.IsTerminal(art.Status) {
 			continue
 		}
-		key := scopeKindTitle{art.Scope, art.Kind, art.Title}
+		key := scopeKindTitle{art.Scope, art.ResolvedKind(), art.Title}
 		titleGroups[key] = append(titleGroups[key], art.ID)
 	}
 	for key, ids := range titleGroups {
@@ -777,17 +777,17 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		if art.Status != StatusDraft {
 			continue
 		}
-		if art.Kind == KindTemplate || art.Kind == KindGoal || art.Kind == KindCampaign {
+		if art.ResolvedKind() == KindTemplate || art.ResolvedKind() == KindGoal || art.ResolvedKind() == KindCampaign {
 			continue
 		}
-		if _, known := p.schema.Kinds[art.Kind]; !known {
+		if _, known := p.schema.Kinds[art.ResolvedKind()]; !known {
 			continue // already flagged as unknown_kind
 		}
 		if art.Goal == "" && len(art.Sections) == 0 && art.Parent == "" {
 			edges, _ := p.store.Neighbors(ctx, art.ID, "", Outgoing)
 			if len(edges) == 0 {
 				report.Violations = append(report.Violations, CheckViolation{
-					ID: art.ID, Kind: art.Kind, Title: art.Title,
+					ID: art.ID, Kind: art.ResolvedKind(), Title: art.Title,
 					Category: "empty_artifact",
 					Detail:   "no goal, no sections, no parent, no outgoing edges",
 				})
@@ -812,7 +812,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		prefix := strings.SplitN(art.ID, "-", 2)[0]
 		if !strings.EqualFold(prefix, expectedKey) {
 			report.Violations = append(report.Violations, CheckViolation{
-				ID: art.ID, Kind: art.Kind, Title: art.Title,
+				ID: art.ID, Kind: art.ResolvedKind(), Title: art.Title,
 				Category: "id_prefix_mismatch",
 				Detail:   fmt.Sprintf("ID prefix %q does not match scope %q key %q", prefix, art.Scope, expectedKey),
 			})
@@ -854,7 +854,7 @@ func (p *Protocol) CheckFix(ctx context.Context, scope string) (*CheckReport, []
 					changed = true
 					continue
 				}
-				kd := p.schema.Kinds[art.Kind]
+				kd := p.schema.Kinds[art.ResolvedKind()]
 				if len(kd.Relations.Outgoing) > 0 {
 					if !slices.Contains(kd.Relations.Outgoing, rel) {
 						delete(art.Links, rel)

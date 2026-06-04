@@ -73,7 +73,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	}
 	if in.Parent != "" {
 		if parent, err := p.store.Get(ctx, in.Parent); err == nil {
-			if reason, ok := p.schema.ValidChild(parent.Kind, in.Kind); !ok {
+			if reason, ok := p.schema.ValidChild(parent.ResolvedKind(), in.Kind); !ok {
 				return nil, fmt.Errorf("%s", reason) //nolint:err113 // runtime values required in message; no static sentinel possible
 			}
 		}
@@ -181,24 +181,24 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	}
 	// Skip template, edge enforcement, and duplicate checks for SkipGuards kinds (e.g. mirror)
 	skipGuards := false
-	if kd, ok := p.schema.Kinds[art.Kind]; ok {
+	if kd, ok := p.schema.Kinds[art.ResolvedKind()]; ok {
 		skipGuards = kd.SkipGuards
 	}
 
 	if !skipGuards { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity
 		// Auto-link template if no satisfies link provided
 		if art.Links == nil || len(art.Links[RelSatisfies]) == 0 {
-			if tplID := p.findTemplateForKind(ctx, art.Kind, scope); tplID != "" {
+			if tplID := p.findTemplateForKind(ctx, art.ResolvedKind(), scope); tplID != "" {
 				if art.Links == nil {
 					art.Links = make(map[string][]string)
 				}
 				art.Links[RelSatisfies] = []string{tplID}
 				slog.DebugContext(ctx, "auto-linked template",
-					slog.String("artifact_kind", art.Kind), slog.String("scope", scope), slog.String("template_id", tplID)) //nolint:sloglint // artifact_kind/scope/template_id have no LogKey constants
+					slog.String("artifact_kind", art.ResolvedKind()), slog.String("scope", scope), slog.String("template_id", tplID)) //nolint:sloglint // artifact_kind/scope/template_id have no LogKey constants
 			}
 		}
 		// Check mandatory outgoing edges
-		if kd, ok := p.schema.Kinds[art.Kind]; ok {
+		if kd, ok := p.schema.Kinds[art.ResolvedKind()]; ok {
 			for _, reqRel := range kd.Relations.RequiredOutgoing {
 				hasEdge := false
 				if targets, ok := art.Links[reqRel]; ok && len(targets) > 0 {
@@ -212,7 +212,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 				if reqRel == RelDependsOn {
 					hint = fmt.Sprintf("depends_on: [\"<target-id>\"] or links: {%q: [\"<target-id>\"]}", reqRel)
 				}
-					return nil, fmt.Errorf("%s requires a %s edge — add it at creation time via %s", art.Kind, reqRel, hint) //nolint:err113 // runtime values required in message; no static sentinel possible
+					return nil, fmt.Errorf("%s requires a %s edge — add it at creation time via %s", art.ResolvedKind(), reqRel, hint) //nolint:err113 // runtime values required in message; no static sentinel possible
 				}
 			}
 		}
@@ -230,7 +230,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 			}
 		}
 		// Duplicate awareness: warn if similar non-terminal artifact exists
-		if existing, _ := p.store.List(ctx, Filter{Kind: art.Kind, Scope: art.Scope}); len(existing) > 0 {
+		if existing, _ := p.store.List(ctx, Filter{Kind: art.ResolvedKind(), Scope: art.Scope}); len(existing) > 0 {
 			for _, e := range existing {
 				if !p.schema.IsTerminal(e.Status) && e.Title == art.Title {
 					slog.WarnContext(ctx, "duplicate title detected on create",
@@ -508,7 +508,7 @@ func (p *Protocol) SearchArtifacts(ctx context.Context, query string, in ListInp
 				continue
 			}
 			// Apply filters
-			if in.Kind != "" && art.Kind != in.Kind {
+			if in.Kind != "" && art.ResolvedKind() != in.Kind {
 				continue
 			}
 			if in.Status != "" && art.Status != in.Status {
@@ -810,7 +810,7 @@ func (p *Protocol) retireSingle(ctx context.Context, id string, cascade bool) er
 	art.Status = StatusRetired
 	slog.InfoContext(ctx, "retired",
 		slog.String(LogKeyID, id),
-		slog.String(LogKeyKind, art.Kind))
+		slog.String(LogKeyKind, art.ResolvedKind()))
 	return p.store.Put(ctx, art)
 }
 
@@ -938,7 +938,7 @@ func (p *Protocol) SearchSemantic(ctx context.Context, query string, in ListInpu
 		if in.Scope != "" && art.Scope != in.Scope {
 			continue
 		}
-		if in.Kind != "" && art.Kind != in.Kind {
+		if in.Kind != "" && art.ResolvedKind() != in.Kind {
 			continue
 		}
 		results = append(results, art)

@@ -158,6 +158,24 @@ type Page struct {
 	Total      int         `json:"total"`                 // COUNT(*) for the same filter (no pagination)
 }
 
+// LabelPrefixKind is the label namespace for kind membership.
+const LabelPrefixKind = "kind:"
+
+// ResolvedKind returns the artifact's kind. The Kind field is authoritative;
+// if empty, the first "kind:<name>" label is used. Both paths will be
+// equivalent once the Kind field is fully deprecated in favor of labels.
+func (a *Artifact) ResolvedKind() string {
+	if a.Kind != "" {
+		return a.Kind
+	}
+	for _, l := range a.Labels {
+		if strings.HasPrefix(l, LabelPrefixKind) {
+			return strings.TrimPrefix(l, LabelPrefixKind)
+		}
+	}
+	return ""
+}
+
 // Matches reports whether art satisfies all non-zero filter fields.
 func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic // hugeParam: Filter is read-only in all callers; pointer would complicate call sites
 	if f.Family != "" && len(f.FamilyKinds) > 0 {

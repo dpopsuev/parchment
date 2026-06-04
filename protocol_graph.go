@@ -194,14 +194,14 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 			if err != nil {
 				return nil, fmt.Errorf("failed to resolve satisfies target %s: %w", tid, err)
 			}
-			if tpl.Kind != KindTemplate {
-				slog.WarnContext(ctx, "satisfies link target is not a template", slog.String("source_id", sourceID), slog.String("target_id", tid), slog.String("target_kind", tpl.Kind)) //nolint:sloglint // source_id/target_id/target_kind have no LogKey constants
-				return nil, fmt.Errorf("satisfies link target %s is not a template (kind=%s)", tid, tpl.Kind) //nolint:err113 // sentinel; no caller uses errors.Is on this
+			if tpl.ResolvedKind() != KindTemplate {
+				slog.WarnContext(ctx, "satisfies link target is not a template", slog.String("source_id", sourceID), slog.String("target_id", tid), slog.String("target_kind", tpl.ResolvedKind())) //nolint:sloglint // source_id/target_id/target_kind have no LogKey constants
+				return nil, fmt.Errorf("satisfies link target %s is not a template (kind=%s)", tid, tpl.ResolvedKind()) //nolint:err113 // sentinel; no caller uses errors.Is on this
 			}
 			// Temporarily add link to artifact for conformance check
 			artWithLink := &Artifact{
 				ID:       art.ID,
-				Kind:     art.Kind,
+				Kind:     art.ResolvedKind(),
 				Sections: art.Sections,
 				Links:    map[string][]string{RelSatisfies: {tid}},
 			}
@@ -338,7 +338,7 @@ func (p *Protocol) ArtifactTree(ctx context.Context, in TreeInput) (*TreeNode, e
 		return p.buildTree(ctx, root), nil
 	}
 
-	node := &TreeNode{ID: root.ID, Kind: root.Kind, Status: root.Status, Title: root.Title, Scope: root.Scope}
+	node := &TreeNode{ID: root.ID, Kind: root.ResolvedKind(), Status: root.Status, Title: root.Title, Scope: root.Scope}
 	visited := map[string]bool{root.ID: true}
 	p.buildGraphTree(ctx, node, rel, storeDir, depth, 1, visited)
 	return node, nil
@@ -405,7 +405,7 @@ func (p *Protocol) TopoSort(ctx context.Context, rootID string) ([]TopoEntry, er
 		partial := make([]TopoEntry, 0, len(arts))
 		for id, art := range arts {
 			partial = append(partial, TopoEntry{
-				ID: id, Kind: art.Kind, Status: art.Status,
+				ID: id, Kind: art.ResolvedKind(), Status: art.Status,
 				Title: art.Title, Priority: art.Priority,
 			})
 		}
@@ -416,7 +416,7 @@ func (p *Protocol) TopoSort(ctx context.Context, rootID string) ([]TopoEntry, er
 	for _, id := range order {
 		art := arts[id]
 		result = append(result, TopoEntry{
-			ID: id, Kind: art.Kind, Status: art.Status,
+			ID: id, Kind: art.ResolvedKind(), Status: art.Status,
 			Title: art.Title, Priority: art.Priority,
 		})
 	}
@@ -433,7 +433,7 @@ type TopoEntry struct {
 }
 
 func (p *Protocol) buildTree(ctx context.Context, art *Artifact) *TreeNode {
-	node := &TreeNode{ID: art.ID, Kind: art.Kind, Status: art.Status, Title: art.Title, Scope: art.Scope}
+	node := &TreeNode{ID: art.ID, Kind: art.ResolvedKind(), Status: art.Status, Title: art.Title, Scope: art.Scope}
 	children, _ := p.store.Children(ctx, art.ID)
 	for _, ch := range children {
 		node.Children = append(node.Children, p.buildTree(ctx, ch))

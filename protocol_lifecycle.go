@@ -55,7 +55,7 @@ func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 {
 	}
 
 	// 3. Sections: filled should-sections
-	shouldSections := p.schema.GetShouldSections(art.Kind)
+	shouldSections := p.schema.GetShouldSections(art.ResolvedKind())
 	if len(shouldSections) > 0 {
 		filled := 0
 		have := make(map[string]bool)
@@ -176,7 +176,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 	case FieldParent:
 		if value != "" {
 			if parent, err := p.store.Get(ctx, value); err == nil {
-				if reason, ok := p.schema.ValidChild(parent.Kind, art.Kind); !ok {
+				if reason, ok := p.schema.ValidChild(parent.ResolvedKind(), art.ResolvedKind()); !ok {
 					return Result{ID: id, Error: reason}
 				}
 			}
@@ -234,7 +234,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 	// scope+rename_id: generate a new ID from the new scope's key and migrate.
 	if field == FieldScope && opt.RenameID { //nolint:nestif // scope key resolution has legitimate branching; splitting into helper would just move it
 		scopeKey, _, _ := p.store.GetScopeKey(ctx, value)
-		kindCode := p.resolveKindCode(art.Kind)
+		kindCode := p.resolveKindCode(art.ResolvedKind())
 		var newID string
 		var genErr error
 		if scopeKey != "" {
@@ -242,7 +242,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		} else {
 			prefix := scopeKey + kindCode
 			if prefix == "" {
-				prefix = art.Kind
+				prefix = art.ResolvedKind()
 			}
 			newID, genErr = p.store.NextID(ctx, prefix)
 		}
@@ -265,14 +265,14 @@ func (p *Protocol) setStatus(ctx context.Context, art *Artifact, status string) 
 
 
 func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status string, force bool) Result { //nolint:gocyclo,funlen // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol.go
-	reason, valid := p.schema.ValidTransition(art.Kind, art.Status, status)
+	reason, valid := p.schema.ValidTransition(art.ResolvedKind(), art.Status, status)
 	if !valid {
 		if !force {
 			return Result{ID: art.ID, Error: reason}
 		}
 		slog.WarnContext(ctx, "forced status transition bypasses lifecycle model",
 			slog.String(LogKeyID, art.ID),
-			slog.String(LogKeyKind, art.Kind),
+			slog.String(LogKeyKind, art.ResolvedKind()),
 			slog.String(LogKeyFrom, art.Status),
 			slog.String(LogKeyTo, status),
 			slog.String(LogKeyReason, reason))
@@ -338,17 +338,17 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 
 	slog.InfoContext(ctx, "lifecycle transition",
 		slog.String(LogKeyID, art.ID),
-		slog.String(LogKeyKind, art.Kind),
+		slog.String(LogKeyKind, art.ResolvedKind()),
 		slog.String(LogKeyFrom, oldStatus),
 		slog.String(LogKeyTo, status))
 
-	triggerStatus := p.schema.TriggerStatusFor(art.Kind)
+	triggerStatus := p.schema.TriggerStatusFor(art.ResolvedKind())
 	r := Result{ID: art.ID, OK: true}
 	var info []string
 	if len(followsWarnings) > 0 {
 		info = append(info, fmt.Sprintf("warning: activating before followed artifacts complete: %s", strings.Join(followsWarnings, ", ")))
 	}
-	if p.schema.AutoArchiveOnJustifyComplete(art.Kind) && status == triggerStatus {
+	if p.schema.AutoArchiveOnJustifyComplete(art.ResolvedKind()) && status == triggerStatus {
 		if extra := p.autoArchiveGoal(ctx, art); extra != "" {
 			info = append(info, extra)
 		}
@@ -359,11 +359,11 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 		}
 	}
 	// Auto-enrichment: on task completion, update implementing spec
-	if art.Kind == KindTask && status == StatusComplete { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
+	if art.ResolvedKind() == KindTask && status == StatusComplete { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
 		if targets, ok := art.Links[RelImplements]; ok {
 			for _, specID := range targets {
 				spec, err := p.store.Get(ctx, specID)
-				if err != nil || spec.Kind != KindSpec {
+				if err != nil || spec.ResolvedKind() != KindSpec {
 					continue
 				}
 				entry := fmt.Sprintf("- %s: %s (completed)", art.ID, art.Title)
@@ -446,7 +446,7 @@ func (p *Protocol) autoArchiveGoal(ctx context.Context, art *Artifact) string {
 		if err != nil {
 			continue
 		}
-		if !p.schema.Kinds[goal.Kind].IsGoalKind || goal.Status != goalDef.ActiveStatus {
+		if !p.schema.Kinds[goal.ResolvedKind()].IsGoalKind || goal.Status != goalDef.ActiveStatus {
 			continue
 		}
 		goal.Status = p.schema.ReadonlyStatuses[0]

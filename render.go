@@ -14,7 +14,7 @@ func RenderMarkdown(art *Artifact) string { //nolint:gocyclo // display logic is
 
 	fmt.Fprintf(&b, "# %s: %s\n\n", art.ID, art.Title)
 
-	renderWriteField(&b, "Kind", art.Kind)
+	renderWriteField(&b, "Kind", art.ResolvedKind())
 	renderWriteField(&b, "Status", art.Status)
 	if art.Scope != "" {
 		renderWriteField(&b, "Scope", art.Scope)
@@ -230,7 +230,7 @@ func RenderVaultMarkdown(art *Artifact) string {
 	if art.Alias != "" {
 		fmt.Fprintf(&b, "alias: %s\n", art.Alias)
 	}
-	fmt.Fprintf(&b, "kind: %s\n", art.Kind)
+	fmt.Fprintf(&b, "kind: %s\n", art.ResolvedKind())
 	fmt.Fprintf(&b, "status: %s\n", art.Status)
 	if art.Scope != "" {
 		fmt.Fprintf(&b, "scope: %s\n", art.Scope)

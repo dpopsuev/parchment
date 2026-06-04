@@ -26,8 +26,8 @@ type RuleDef struct {
 // ParseRule parses a kind=rule artifact into a RuleDef.
 // Returns an error if required sections (trigger, when, action, message) are missing.
 func ParseRule(art *Artifact) (*RuleDef, error) {
-	if art.Kind != KindRule {
-		return nil, fmt.Errorf("artifact %s is kind=%s, want kind=rule", art.ID, art.Kind) //nolint:err113 // user-facing hint
+	if art.ResolvedKind() != KindRule {
+		return nil, fmt.Errorf("artifact %s is kind=%s, want kind=rule", art.ID, art.ResolvedKind()) //nolint:err113 // user-facing hint
 	}
 	sections := make(map[string]string, len(art.Sections))
 	for _, sec := range art.Sections {
@@ -167,7 +167,7 @@ type RuleResult struct {
 //
 // Predicate syntax (simple AND-chain, intentionally minimal):
 //   to=active                — matches toStatus == "active"
-//   kind=task                — matches art.Kind == "task"
+//   kind=task                — matches art.ResolvedKind() == "task"
 //   priority==""             — matches art.Priority == ""
 //   status=draft             — matches art.Status == "draft"
 //   AND                      — conjunction (all must match)
@@ -235,14 +235,14 @@ func matchesTerm(term string, art *Artifact, toStatus string) bool {
 func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResult {
 	switch rule.Check {
 	case CheckActivationSections:
-		if !p.schema.ActivationRequiresSections(art.Kind) {
+		if !p.schema.ActivationRequiresSections(art.ResolvedKind()) {
 			return nil
 		}
-		if shouldMissing := p.schema.MissingShouldSections(art.Kind, art.Sections); len(shouldMissing) > 0 {
+		if shouldMissing := p.schema.MissingShouldSections(art.ResolvedKind(), art.Sections); len(shouldMissing) > 0 {
 			msg := rule.Message + " (recommended: " + strings.Join(shouldMissing, ", ") + ")"
 			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: msg}
 		}
-		if expMissing := p.schema.MissingSections(art.Kind, art.Sections); len(expMissing) > 0 {
+		if expMissing := p.schema.MissingSections(art.ResolvedKind(), art.Sections); len(expMissing) > 0 {
 			msg := rule.Message + " (expected: " + strings.Join(expMissing, ", ") + ")"
 			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: msg}
 		}
@@ -301,7 +301,7 @@ func fieldValue(field string, art *Artifact, toStatus string) string {
 	case "to":
 		return toStatus
 	case FieldKind:
-		return art.Kind
+		return art.ResolvedKind()
 	case "status":
 		return art.Status
 	case "priority":

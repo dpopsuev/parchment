@@ -949,3 +949,17 @@ func (p *Protocol) SearchSemantic(ctx context.Context, query string, in ListInpu
 }
 
 
+
+// MigrateID atomically renames an artifact from oldID to newID.
+// In a single transaction: updates the artifact row, all edge from_id/to_id
+// references, parent fields on children, depends_on arrays, and registers
+// oldID as an alias on the renamed artifact for backward-compat lookup.
+func (p *Protocol) MigrateID(ctx context.Context, oldID, newID string) error {
+	if oldID == "" || newID == "" {
+		return fmt.Errorf("oldID and newID are both required") //nolint:err113 // sentinel; no caller uses errors.Is on this
+	}
+	if oldID == newID {
+		return nil
+	}
+	return p.store.RenameID(ctx, oldID, newID)
+}

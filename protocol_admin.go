@@ -915,25 +915,3 @@ func (p *Protocol) CheckFix(ctx context.Context, scope string) (*CheckReport, []
 
 	return report, fixes, nil
 }
-
-// MigrateResult describes what the migration did.
-type MigrateResult struct {
-	SatisfiesRemoved int          `json:"satisfies_removed"`
-	Fixes            []string     `json:"fixes"`
-	Report           *CheckReport `json:"report"`
-}
-
-// Migrate performs legacy data cleanup, then runs CheckFix.
-// Note: satisfies edges are no longer removed — the relation is now used for
-// template binding (artifact satisfies template).
-func (p *Protocol) Migrate(ctx context.Context) (*MigrateResult, error) {
-	result := &MigrateResult{}
-
-	report, fixes, err := p.CheckFix(ctx, "")
-	if err != nil {
-		return nil, err
-	}
-	result.Report = report
-	result.Fixes = fixes
-	return result, nil
-}

@@ -167,6 +167,56 @@ const LabelPrefixStatus = "status:"
 // LabelPrefixScope is the label namespace for scope membership.
 const LabelPrefixScope = "scope:"
 
+// LabelPrefixPriority is the label namespace for priority.
+const LabelPrefixPriority = "priority:"
+
+// LabelPrefixSprint is the label namespace for sprint assignment.
+const LabelPrefixSprint = "sprint:"
+
+// ResolvedPriority returns the artifact's priority. The Priority field is
+// authoritative; if empty, the first "priority:<value>" label is used.
+func (a *Artifact) ResolvedPriority() string {
+	if a.Priority != "" {
+		return a.Priority
+	}
+	for _, l := range a.Labels {
+		if strings.HasPrefix(l, LabelPrefixPriority) {
+			return strings.TrimPrefix(l, LabelPrefixPriority)
+		}
+	}
+	return ""
+}
+
+// ResolvedSprint returns the artifact's sprint. The Sprint field is
+// authoritative; if empty, the first "sprint:<value>" label is used.
+func (a *Artifact) ResolvedSprint() string {
+	if a.Sprint != "" {
+		return a.Sprint
+	}
+	for _, l := range a.Labels {
+		if strings.HasPrefix(l, LabelPrefixSprint) {
+			return strings.TrimPrefix(l, LabelPrefixSprint)
+		}
+	}
+	return ""
+}
+
+// mirrorLabel replaces any existing label with the given prefix with a new
+// one built from prefix+value. If value is empty the label is simply removed.
+// Used by SetField to keep system label mirrors consistent with field writes.
+func mirrorLabel(labels []string, prefix, value string) []string {
+	out := make([]string, 0, len(labels)+1)
+	for _, l := range labels {
+		if !strings.HasPrefix(l, prefix) {
+			out = append(out, l)
+		}
+	}
+	if value != "" {
+		out = append(out, prefix+value)
+	}
+	return out
+}
+
 // ResolvedKind returns the artifact's kind. The Kind field is authoritative;
 // if empty, the first "kind:<name>" label is used. Both paths will be
 // equivalent once the Kind field is fully deprecated in favor of labels.
@@ -258,7 +308,7 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic /
 	if f.Parent != "" && art.Parent != f.Parent {
 		return false
 	}
-	if f.Sprint != "" && art.Sprint != f.Sprint {
+	if f.Sprint != "" && art.ResolvedSprint() != f.Sprint {
 		return false
 	}
 	return f.MatchLabels(art)

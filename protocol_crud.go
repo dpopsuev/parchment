@@ -161,12 +161,15 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	if status == "" {
 		status = p.schema.DefaultStatus(in.Kind)
 	}
-	// Seed labels with scope, kind, and status mirrors so label-based queries work.
-	seedLabels := make([]string, 0, len(in.Labels)+3)
+	// Seed labels with system mirrors (scope, kind, status, priority, sprint)
+	// so label-based queries work without reading individual fields.
+	seedLabels := make([]string, 0, len(in.Labels)+5)
 	for _, l := range in.Labels {
 		if !strings.HasPrefix(l, LabelPrefixScope) &&
 			!strings.HasPrefix(l, LabelPrefixKind) &&
-			!strings.HasPrefix(l, LabelPrefixStatus) {
+			!strings.HasPrefix(l, LabelPrefixStatus) &&
+			!strings.HasPrefix(l, LabelPrefixPriority) &&
+			!strings.HasPrefix(l, LabelPrefixSprint) {
 			seedLabels = append(seedLabels, l)
 		}
 	}
@@ -178,6 +181,9 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	}
 	if status != "" {
 		seedLabels = append(seedLabels, LabelPrefixStatus+status)
+	}
+	if in.Priority != "" {
+		seedLabels = append(seedLabels, LabelPrefixPriority+in.Priority)
 	}
 	art := &Artifact{
 		ID: id, Alias: in.Alias, Kind: in.Kind, Scope: scope,

@@ -190,21 +190,16 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 			return Result{ID: id, Error: fmt.Sprintf("invalid priority %q — valid: %s", value, strings.Join(p.schema.Priorities, ", "))}
 		}
 		art.Priority = value
+		art.Labels = mirrorLabel(art.Labels, LabelPrefixPriority, value)
 	case FieldSprint:
 		art.Sprint = value
+		art.Labels = mirrorLabel(art.Labels, LabelPrefixSprint, value)
 	case FieldKind:
 		if err := ValidateKind(value, p.vocab); err != nil {
 			return Result{ID: id, Error: err.Error()}
 		}
 		art.Kind = value
-		// Mirror to labels: remove any existing kind:* label then add the new one.
-		next := make([]string, 0, len(art.Labels))
-		for _, l := range art.Labels {
-			if !strings.HasPrefix(l, LabelPrefixKind) {
-				next = append(next, l)
-			}
-		}
-		art.Labels = append(next, LabelPrefixKind+value) //nolint:gocritic // appendAssign: intentional — next is a temp and art.Labels is the target
+		art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, value)
 	case FieldDependsOn:
 		if value == "" {
 			art.DependsOn = nil
@@ -339,14 +334,7 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 
 	oldStatus := art.Status
 	art.Status = status
-	// Mirror to labels: remove any existing status:* label then add the new one.
-	next := make([]string, 0, len(art.Labels))
-	for _, l := range art.Labels {
-		if !strings.HasPrefix(l, LabelPrefixStatus) {
-			next = append(next, l)
-		}
-	}
-	art.Labels = append(next, LabelPrefixStatus+status) //nolint:gocritic // appendAssign: intentional — next is a temp and art.Labels is the target
+	art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, status)
 	if err := p.store.Put(ctx, art); err != nil {
 		return Result{ID: art.ID, Error: err.Error()}
 	}

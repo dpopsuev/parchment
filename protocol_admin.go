@@ -6,14 +6,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"maps"
 	"regexp"
 	"slices"
 	"sort"
 	"strings"
 	"time"
 )
-
 
 type BulkMutationInput struct {
 	Scope       string `json:"scope,omitempty"`
@@ -412,18 +410,6 @@ func (p *Protocol) GetScopeLabels(ctx context.Context, scope string) ([]string, 
 
 func (p *Protocol) ListScopeInfo(ctx context.Context) ([]ScopeInfo, error) {
 	return p.store.ListScopeInfo(ctx)
-}
-
-// ListKindCodes returns kind -> code mappings (schema + config overlay).
-func (p *Protocol) ListKindCodes() map[string]string {
-	result := make(map[string]string)
-	for kind, def := range p.schema.Kinds { //nolint:gocritic // rangeValCopy: KindDef map values; pointer map would require larger refactor
-		if def.Code != "" {
-			result[kind] = def.Code
-		}
-	}
-	maps.Copy(result, p.kindCodes)
-	return result
 }
 
 // Export writes all artifacts (optionally filtered by scope) as JSON-lines to w.

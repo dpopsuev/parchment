@@ -300,14 +300,6 @@ func (s *Schema) MotdKinds() map[string]KindDef {
 	return out
 }
 
-// ActiveStatusFor returns the ActiveStatus for a kind, defaulting to "active".
-func (s *Schema) ActiveStatusFor(kind string) string {
-	if kd, ok := s.Kinds[kind]; ok && kd.ActiveStatus != "" {
-		return kd.ActiveStatus
-	}
-	return "active"
-}
-
 // TriggerStatusFor returns the status that triggers side effects (auto-archive,
 // auto-activate-next). Defaults to "complete" if not set on the kind.
 func (s *Schema) TriggerStatusFor(kind string) string {

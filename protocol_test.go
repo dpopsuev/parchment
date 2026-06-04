@@ -2156,20 +2156,6 @@ func TestListScopeInfo(t *testing.T) {
 	}
 }
 
-// --- ListKindCodes ---
-
-func TestListKindCodes(t *testing.T) {
-	t.Parallel()
-	proto, _ := newProto(t)
-
-	codes := proto.ListKindCodes()
-	if codes["task"] != "TSK" {
-		t.Errorf("expected task code 'TSK', got %q", codes["task"])
-	}
-	if codes["bug"] != "BUG" {
-		t.Errorf("expected bug code 'BUG', got %q", codes["bug"])
-	}
-}
 
 // --- GetConfig ---
 

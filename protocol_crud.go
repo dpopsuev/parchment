@@ -2,7 +2,6 @@ package parchment
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -628,12 +627,6 @@ func (p *Protocol) AttachSection(ctx context.Context, id, name, text string) (bo
 		art.Sections = append(art.Sections, Section{Name: name, Text: text})
 	}
 
-	// Bidirectional code linking: when stamps section is attached,
-	// auto-extract file paths from evidence and merge into Components.Files.
-	if name == "stamps" {
-		mergeStampFiles(art, text)
-	}
-
 	p.stampCompliance(art)
 	if err := p.store.Put(ctx, art); err != nil {
 		return false, err
@@ -912,42 +905,7 @@ func (p *Protocol) archiveSingle(ctx context.Context, id string) error {
 
 // --- helpers ---
 
-// stampEntry is the expected shape of a single stamp in the stamps section.
-type stampEntry struct {
-	Field    string `json:"field"`
-	Status   string `json:"status"`
-	Evidence string `json:"evidence"` // "file:line" or "file"
-}
 
-// mergeStampFiles extracts file paths from stamps section evidence and
-// merges them into Components.Files. This creates bidirectional linking:
-// stamps reference code, Components.Files references back.
-func mergeStampFiles(art *Artifact, stampsJSON string) {
-	var stamps []stampEntry
-	if err := json.Unmarshal([]byte(stampsJSON), &stamps); err != nil {
-		return // not valid JSON — skip silently
-	}
-
-	seen := make(map[string]bool)
-	for _, f := range art.Components.Files {
-		seen[f] = true
-	}
-
-	for _, s := range stamps {
-		if s.Evidence == "" {
-			continue
-		}
-		// Extract file path from "file:line" format.
-		file := s.Evidence
-		if idx := strings.LastIndex(file, ":"); idx > 0 {
-			file = file[:idx]
-		}
-		if file != "" && !seen[file] {
-			seen[file] = true
-			art.Components.Files = append(art.Components.Files, file)
-		}
-	}
-}
 
 // SearchSemantic finds artifacts by vector similarity.
 // If the Protocol has no EmbedFunc configured, it returns an error.

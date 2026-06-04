@@ -491,12 +491,11 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	criteria := []byte("[]")
 	links, _ := json.Marshal(art.Links)
 	extra, _ := json.Marshal(art.Extra)
-	components, _ := json.Marshal(art.Components)
 	annotations, _ := json.Marshal(art.Annotations)
 
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO artifacts (uid, id, alias, kind, scope, status, parent, title, goal, depends_on, labels, priority, sprint, sections, features, criteria, links, extra, components, annotations, created_at, updated_at, inserted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO artifacts (uid, id, alias, kind, scope, status, parent, title, goal, depends_on, labels, priority, sprint, sections, features, criteria, links, extra, annotations, created_at, updated_at, inserted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(uid) DO UPDATE SET
 			id=excluded.id, alias=excluded.alias, kind=excluded.kind, scope=excluded.scope, status=excluded.status,
 			parent=excluded.parent, title=excluded.title, goal=excluded.goal,
@@ -504,12 +503,12 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 			priority=excluded.priority, sprint=excluded.sprint,
 			sections=excluded.sections, features=excluded.features,
 			criteria=excluded.criteria, links=excluded.links,
-			extra=excluded.extra, components=excluded.components,
+			extra=excluded.extra,
 			annotations=excluded.annotations, updated_at=excluded.updated_at`,
 		art.UID, art.ID, art.Alias, art.Kind, art.Scope, art.Status, art.Parent, art.Title, art.Goal,
 		string(dependsOn), string(labels), art.Priority, art.Sprint,
 		string(sections), string(features), string(criteria), string(links), string(extra),
-		string(components), string(annotations),
+		string(annotations),
 		art.CreatedAt.Format(time.RFC3339Nano), art.UpdatedAt.Format(time.RFC3339Nano),
 		art.InsertedAt.Format(time.RFC3339Nano),
 	)
@@ -556,15 +555,15 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO artifacts (uid, id, alias, kind, scope, status, parent, title, goal,
 			depends_on, labels, priority, sprint, sections, features, criteria, links,
-			extra, components, annotations, created_at, updated_at, inserted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			extra, annotations, created_at, updated_at, inserted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(uid) DO UPDATE SET
 			id=excluded.id, alias=excluded.alias, kind=excluded.kind, scope=excluded.scope,
 			status=excluded.status, parent=excluded.parent, title=excluded.title,
 			goal=excluded.goal, depends_on=excluded.depends_on, labels=excluded.labels,
 			priority=excluded.priority, sprint=excluded.sprint, sections=excluded.sections,
 			features=excluded.features, criteria=excluded.criteria, links=excluded.links,
-			extra=excluded.extra, components=excluded.components,
+			extra=excluded.extra,
 			annotations=excluded.annotations, updated_at=excluded.updated_at`)
 	if err != nil {
 		for i := range errs {
@@ -597,14 +596,13 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 		criteria := []byte("[]")
 		links, _ := json.Marshal(art.Links)
 		extra, _ := json.Marshal(art.Extra)
-		components, _ := json.Marshal(art.Components)
 		annotations, _ := json.Marshal(art.Annotations)
 
 		_, execErr := stmt.ExecContext(ctx,
 			art.UID, art.ID, art.Alias, art.Kind, art.Scope, art.Status, art.Parent,
 			art.Title, art.Goal, string(dependsOn), string(labels), art.Priority, art.Sprint,
 			string(sections), string(features), string(criteria), string(links), string(extra),
-			string(components), string(annotations),
+			string(annotations),
 			art.CreatedAt.Format(time.RFC3339Nano),
 			art.UpdatedAt.Format(time.RFC3339Nano),
 			art.InsertedAt.Format(time.RFC3339Nano),
@@ -679,7 +677,6 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 	criteria := []byte("[]")
 	links, _ := json.Marshal(art.Links)
 	extra, _ := json.Marshal(art.Extra)
-	components, _ := json.Marshal(art.Components)
 	annotations, _ := json.Marshal(art.Annotations)
 
 	old, _ := scanArtifact(tx.QueryRowContext(ctx, "SELECT "+artifactColumns+" FROM artifacts WHERE id = ?", art.ID))
@@ -689,12 +686,12 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 			alias=?, kind=?, scope=?, status=?, parent=?, title=?, goal=?,
 			depends_on=?, labels=?, priority=?, sprint=?,
 			sections=?, features=?, criteria=?, links=?,
-			extra=?, components=?, annotations=?, updated_at=?
+			extra=?, annotations=?, updated_at=?
 		WHERE id=?`,
 		art.Alias, art.Kind, art.Scope, art.Status, art.Parent, art.Title, art.Goal,
 		string(dependsOn), string(labels), art.Priority, art.Sprint,
 		string(sections), string(features), string(criteria), string(links),
-		string(extra), string(components), string(annotations),
+		string(extra), string(annotations),
 		art.UpdatedAt.Format(time.RFC3339Nano),
 		art.ID,
 	)
@@ -1669,18 +1666,18 @@ func scanArtifactRows(rows *sql.Rows) (*Artifact, error) {
 
 // artifactColumns is the explicit column list for SELECT queries.
 // Must match the scan order in scanRow exactly.
-const artifactColumns = `uid, id, alias, kind, scope, status, parent, title, goal, depends_on, labels, priority, sprint, sections, features, criteria, links, extra, components, annotations, created_at, updated_at, inserted_at`
+const artifactColumns = `uid, id, alias, kind, scope, status, parent, title, goal, depends_on, labels, priority, sprint, sections, features, criteria, links, extra, annotations, created_at, updated_at, inserted_at`
 
 func scanRow(s rowScanner) (*Artifact, error) {
 	var art Artifact
-	var dependsOn, labels, sections, features, criteria, links, extra, components, annotations string
+	var dependsOn, labels, sections, features, criteria, links, extra, annotations string
 	var createdAt, updatedAt, insertedAt string
 
 	err := s.Scan(
 		&art.UID, &art.ID, &art.Alias, &art.Kind, &art.Scope, &art.Status, &art.Parent, &art.Title, &art.Goal,
 		&dependsOn, &labels, &art.Priority, &art.Sprint,
 		&sections, &features, &criteria, &links, &extra,
-		&components, &annotations,
+		&annotations,
 		&createdAt, &updatedAt, &insertedAt,
 	)
 	if err != nil {
@@ -1697,7 +1694,6 @@ func scanRow(s rowScanner) (*Artifact, error) {
 		{sections, &art.Sections, "sections"},
 		{links, &art.Links, "links"},
 		{extra, &art.Extra, "extra"},
-		{components, &art.Components, "components"},
 		{annotations, &art.Annotations, "annotations"},
 	} {
 		if err := json.Unmarshal([]byte(pair.data), pair.dst); err != nil {

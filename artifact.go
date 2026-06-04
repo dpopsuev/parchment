@@ -24,7 +24,6 @@ type Artifact struct {
 	Sections    []Section           `json:"sections,omitempty"`
 	Links       map[string][]string `json:"links,omitempty"`
 	Extra       map[string]any      `json:"extra,omitempty"`
-	Components  ComponentMap        `json:"components,omitempty"`
 	Annotations []Annotation        `json:"annotations,omitempty"`
 	CreatedAt   time.Time           `json:"created_at"`
 	UpdatedAt   time.Time           `json:"updated_at"`
@@ -74,14 +73,6 @@ const (
 	RelSynthesises = "synthesises" //nolint:misspell // British spelling; changing the value would break existing stored edges
 	RelRemembers   = "remembers"   // context → note/concept (agent bookmarked this)
 )
-
-// ComponentMap describes what code an artifact will create or modify.
-// Enables spatial overlap detection for cascade invalidation.
-type ComponentMap struct {
-	Directories []string `json:"directories,omitempty"`
-	Files       []string `json:"files,omitempty"`
-	Symbols     []string `json:"symbols,omitempty"`
-}
 
 // Annotation is operator feedback on an artifact without mutating core fields.
 type Annotation struct {

@@ -1531,29 +1531,6 @@ func TestCascade_FollowsDependsOn(t *testing.T) {
 	}
 }
 
-func TestCascade_SpatialOverlap(t *testing.T) {
-	t.Parallel()
-	proto, store := newProto(t)
-	ctx := context.Background()
-
-	a := createTask(t, proto, "task touching file")
-	b := createTask(t, proto, "other task touching same file")
-
-	// Set up ComponentMap overlap
-	artA, _ := store.Get(ctx, a.ID)
-	artA.Components.Files = []string{"pkg/foo.go"}
-	store.Put(ctx, artA)
-
-	artB, _ := store.Get(ctx, b.ID)
-	artB.Components.Files = []string{"pkg/foo.go", "pkg/bar.go"}
-	store.Put(ctx, artB)
-
-	affected := proto.Cascade(ctx, a.ID)
-	if len(affected) != 1 {
-		t.Errorf("expected 1 spatially affected, got %d: %v", len(affected), affected)
-	}
-}
-
 // --- GetArtifactEdges ---
 
 func TestGetArtifactEdges_BothDirections(t *testing.T) {
@@ -2267,34 +2244,6 @@ func TestStash_PutAndGet(t *testing.T) {
 }
 
 // --- DetectOverlaps ---
-
-func TestDetectOverlaps_FileOverlap(t *testing.T) {
-	t.Parallel()
-	proto, store := newProto(t)
-	ctx := context.Background()
-
-	a := createTask(t, proto, "task A")
-	b := createTask(t, proto, "task B")
-
-	// Set both to active status and add overlapping files
-	artA, _ := store.Get(ctx, a.ID)
-	artA.Status = "active"
-	artA.Components.Files = []string{"pkg/handler.go"}
-	store.Put(ctx, artA)
-
-	artB, _ := store.Get(ctx, b.ID)
-	artB.Status = "active"
-	artB.Components.Files = []string{"pkg/handler.go"}
-	store.Put(ctx, artB)
-
-	report, err := proto.DetectOverlaps(ctx, parchment.OverlapInput{})
-	if err != nil {
-		t.Fatalf("DetectOverlaps: %v", err)
-	}
-	if report.TotalOverlaps == 0 {
-		t.Error("expected at least 1 overlap for shared file")
-	}
-}
 
 // --- DetectOrphans ---
 

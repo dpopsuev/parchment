@@ -73,23 +73,12 @@ func (p *Protocol) wouldCycle(ctx context.Context, from, to string) (bool, []str
 	return false, nil
 }
 
-// Cascade finds all artifacts transitively affected by a change to the given artifact.
-// Two-phase detection: explicit dependency edges + spatial overlap (ComponentMap file intersection).
-// Returns the IDs of affected artifacts (excludes the changed artifact itself).
+// Cascade finds all artifacts transitively affected by a change to changedID
+// by following incoming depends_on edges. Returns IDs of affected artifacts,
+// excluding changedID itself.
 func (p *Protocol) Cascade(ctx context.Context, changedID string) []string {
-	changed, err := p.store.Get(ctx, changedID)
-	if err != nil {
-		return nil
-	}
-
 	affected := make(map[string]bool)
-
-	// Phase 1: Follow depends_on edges transitively.
 	p.cascadeDeps(ctx, changedID, affected)
-
-	// Phase 2: Find spatial overlaps via ComponentMap file intersection.
-	p.cascadeOverlaps(ctx, changed, affected)
-
 	ids := make([]string, 0, len(affected))
 	for id := range affected {
 		ids = append(ids, id)
@@ -99,58 +88,14 @@ func (p *Protocol) Cascade(ctx context.Context, changedID string) []string {
 }
 
 func (p *Protocol) cascadeDeps(ctx context.Context, changedID string, affected map[string]bool) {
-	// Walk incoming depends_on edges: find artifacts that depend on changedID.
 	_ = p.store.Walk(ctx, changedID, RelDependsOn, Incoming, 0, func(_ int, e Edge) bool {
 		depID := e.From
 		if !affected[depID] {
 			affected[depID] = true
-			// Recurse: anything depending on the dependent is also affected.
 			p.cascadeDeps(ctx, depID, affected)
 		}
 		return true
 	})
-}
-
-func (p *Protocol) cascadeOverlaps(ctx context.Context, changed *Artifact, affected map[string]bool) {
-	changedFiles := make(map[string]bool, len(changed.Components.Files))
-	for _, f := range changed.Components.Files {
-		changedFiles[f] = true
-	}
-	changedSymbols := make(map[string]bool, len(changed.Components.Symbols))
-	for _, sym := range changed.Components.Symbols {
-		changedSymbols[sym] = true
-	}
-	if len(changedFiles) == 0 && len(changedSymbols) == 0 {
-		return
-	}
-
-	// Scan all artifacts for file and symbol overlap. O(n) — acceptable for
-	// artifact counts typical in Scribe (< 10K). SQL-side component indexing
-	// would make this O(log n) but is deferred until code-mapping scale demands it.
-	// Exclude SchemaScope — definition artifacts are not work artifacts.
-	all, err := p.store.List(ctx, Filter{ExcludeScope: SchemaScope})
-	if err != nil {
-		return
-	}
-	for _, art := range all {
-		if art.ID == changed.ID || affected[art.ID] {
-			continue
-		}
-		for _, f := range art.Components.Files {
-			if changedFiles[f] {
-				affected[art.ID] = true
-				break
-			}
-		}
-		if !affected[art.ID] {
-			for _, sym := range art.Components.Symbols {
-				if changedSymbols[sym] {
-					affected[art.ID] = true
-					break
-				}
-			}
-		}
-	}
 }
 
 func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string, targetIDs []string, weight float64) ([]Result, error) { //nolint:gocyclo,cyclop // link has many validation branches; splitting would increase call depth

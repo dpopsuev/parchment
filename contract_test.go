@@ -262,9 +262,8 @@ func TestSQLiteStore_MigrationCompat(t *testing.T) {
 
 	// Write a new artifact with the new fields.
 	err = s.Put(ctx, &Artifact{
-		UID: "new-uid", ID: "NEW-TSK-1", Kind: "task", Status: "draft",
+		UID:         "new-uid", ID: "NEW-TSK-1", Kind: "task", Status: "draft",
 		Title:       "new artifact",
-		Components:  ComponentMap{Files: []string{"test.go"}},
 		Annotations: []Annotation{{Kind: "+", Comment: "good"}},
 		CreatedAt:   art.CreatedAt, UpdatedAt: art.CreatedAt,
 	})
@@ -272,13 +271,10 @@ func TestSQLiteStore_MigrationCompat(t *testing.T) {
 		t.Fatalf("failed to write new artifact: %v", err)
 	}
 
-	// Read it back — verify components + annotations round-trip.
+	// Read it back — verify annotations round-trip.
 	got, err := s.Get(ctx, "NEW-TSK-1")
 	if err != nil {
 		t.Fatal(err)
-	}
-	if len(got.Components.Files) != 1 || got.Components.Files[0] != "test.go" {
-		t.Errorf("components = %+v, want [test.go]", got.Components)
 	}
 	if len(got.Annotations) != 1 || got.Annotations[0].Kind != "+" {
 		t.Errorf("annotations = %+v, want [{+ good}]", got.Annotations)

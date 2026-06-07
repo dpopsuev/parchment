@@ -138,3 +138,37 @@ func TestVocab_ContainsKindNames(t *testing.T) {
 		t.Errorf("Vocab() does not contain %q: %v", parchment.KindTask, vocab)
 	}
 }
+
+// TestFilter_Kinds verifies that Kinds []string works as an OR filter on kind.
+func TestFilter_Kinds(t *testing.T) {
+	// Given: artifacts of three kinds
+	// When: Filter.Kinds lists two of them
+	// Then: both match; the third does not
+	t.Parallel()
+	ctx := context.Background()
+	s := parchment.NewMemoryStore()
+	p := parchment.New(s, parchment.DefaultSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
+
+	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindTask, Title: "task", Scope: "test", Priority: "none", Sections: []parchment.Section{{Name: "context", Text: "x"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindBug, Title: "bug", Scope: "test", Sections: []parchment.Section{{Name: "context", Text: "x"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindSpec, Title: "spec", Scope: "test"}); err != nil {
+		t.Fatal(err)
+	}
+
+	arts, err := p.ListArtifacts(ctx, parchment.ListInput{Kinds: []string{parchment.KindTask, parchment.KindBug}, Scope: "test"})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(arts) != 2 {
+		t.Errorf("got %d artifacts, want 2 (task+bug)", len(arts))
+	}
+	for _, a := range arts {
+		if a.Kind != parchment.KindTask && a.Kind != parchment.KindBug {
+			t.Errorf("unexpected kind %q in result", a.Kind)
+		}
+	}
+}

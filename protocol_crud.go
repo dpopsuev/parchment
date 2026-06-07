@@ -346,6 +346,7 @@ func (p *Protocol) DeleteArtifact(ctx context.Context, id string, force bool) er
 type ListInput struct {
 	Family         string   `json:"family,omitempty"` // filter by kind family: intent, effort, knowledge, support
 	Kind           string   `json:"kind,omitempty"`
+	Kinds          []string `json:"kinds,omitempty"` // OR within kind dimension; takes precedence over Kind
 	Scope          string   `json:"scope,omitempty"`
 	Status         string   `json:"status,omitempty"`
 	Parent         string   `json:"parent,omitempty"`
@@ -390,7 +391,7 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 
 	f := Filter{
 		Family: in.Family,
-		Kind: in.Kind, Status: in.Status,
+		Kind: in.Kind, Kinds: in.Kinds, Status: in.Status,
 		Parent: in.Parent, Sprint: in.Sprint,
 		IDPrefix:       in.IDPrefix,
 		ExcludeKind:    in.ExcludeKind,

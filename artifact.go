@@ -114,6 +114,7 @@ type Filter struct {
 	Family          string            // restrict to a kind family (intent, effort, knowledge, support)
 	FamilyKinds     map[string]bool   // populated at query time: kind → true for the requested family
 	Kind            string
+	Kinds           []string // OR within the kind dimension: kind IN (kinds...). Takes precedence over Kind when non-empty.
 	ExcludeKind     string
 	ExcludeStatus   string // exclude artifacts with this status
 	ExcludeScope    string // exclude artifacts with this scope (used to hide _schema)
@@ -270,7 +271,18 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic /
 	if f.ExcludeScope != "" && art.ResolvedScope() == f.ExcludeScope {
 		return false
 	}
-	if f.Kind != "" && art.ResolvedKind() != f.Kind {
+	if len(f.Kinds) > 0 {
+		matched := false
+		for _, k := range f.Kinds {
+			if art.ResolvedKind() == k {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	} else if f.Kind != "" && art.ResolvedKind() != f.Kind {
 		return false
 	}
 	if len(f.Scopes) > 0 { //nolint:nestif // scope filter has legitimate branching; splitting would reduce clarity

@@ -54,7 +54,15 @@ type ArtifactStore interface {
 	PutEmbedding(ctx context.Context, artifactID, model, contentHash string, vec []float32) error
 	GetEmbedding(ctx context.Context, artifactID, model string) ([]float32, error)
 	GetEmbeddingHash(ctx context.Context, artifactID, model string) string
-	SearchSemantic(ctx context.Context, model string, query []float32, n int) ([]string, error)
+	SearchSemantic(ctx context.Context, model string, query []float32, n int) ([]SearchResult, error)
+}
+
+// SearchResult is one entry returned by SearchSemantic.
+// Score is cosine similarity in [0, 1]; higher means more relevant.
+// Results are ordered descending by Score.
+type SearchResult struct {
+	ID    string
+	Score float32
 }
 
 // GraphStore handles explicit edge operations and traversal.

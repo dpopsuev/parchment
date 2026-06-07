@@ -223,8 +223,8 @@ func TestEmbeddingStore_SearchSemantic_RanksCloserFirst(t *testing.T) {
 	if len(ids) == 0 {
 		t.Fatal("SearchSemantic returned no results")
 	}
-	if ids[0] != "TST-CONF" {
-		t.Errorf("top result must be TST-CONF (closer to query), got %s", ids[0])
+	if ids[0].ID != "TST-CONF" {
+		t.Errorf("top result must be TST-CONF (closer to query), got %s", ids[0].ID)
 	}
 }
 
@@ -243,8 +243,8 @@ func TestEmbeddingStore_SearchSemantic_SkipsUnindexed(t *testing.T) {
 	_ = s.PutEmbedding(ctx, "TST-INDEXED", "test", "", []float32{1.0, 0.0})
 
 	ids, _ := s.SearchSemantic(ctx, "test", []float32{1.0, 0.0}, 5)
-	for _, id := range ids {
-		if id == "TST-NONE" {
+	for _, r := range ids {
+		if r.ID == "TST-NONE" {
 			t.Error("SearchSemantic must skip artifacts without embeddings")
 		}
 	}
@@ -321,8 +321,8 @@ func TestProtocol_SemanticRecall_BeatsFTSOnSemantic(t *testing.T) {
 		t.Fatal("SearchSemantic returned no results")
 	}
 	// The template/conformance note should rank above the PTP note.
-	if results[0].Title != "template draft on missing sections" {
-		t.Errorf("semantic recall ranked wrong: got %q first", results[0].Title)
+	if results[0].Artifact.Title != "template draft on missing sections" {
+		t.Errorf("semantic recall ranked wrong: got %q first", results[0].Artifact.Title)
 	}
 }
 

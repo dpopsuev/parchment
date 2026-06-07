@@ -584,42 +584,32 @@ func (m *MemoryStore) GetEmbedding(_ context.Context, artifactID, model string) 
 	return cp, nil
 }
 
-func (m *MemoryStore) SearchSemantic(_ context.Context, model string, query []float32, n int) ([]string, error) {
+func (m *MemoryStore) SearchSemantic(_ context.Context, model string, query []float32, n int) ([]SearchResult, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	type scored struct {
-		id    string
-		score float32
-	}
-	var results []scored
+	var results []SearchResult
 	for key, vec := range m.embeddings {
 		// key format: "artifactID:model"
 		colonIdx := len(key) - len(model) - 1
 		if colonIdx < 0 || key[colonIdx:] != ":"+model {
 			continue
 		}
-		artifactID := key[:colonIdx]
-		sim := CosineSimilarity(query, vec)
-		results = append(results, scored{artifactID, sim})
+		results = append(results, SearchResult{ID: key[:colonIdx], Score: CosineSimilarity(query, vec)})
 	}
 
 	// Sort descending by score; break ties by ID ascending for determinism.
 	sort.Slice(results, func(i, j int) bool {
-		if results[i].score != results[j].score {
-			return results[i].score > results[j].score
+		if results[i].Score != results[j].Score {
+			return results[i].Score > results[j].Score
 		}
-		return results[i].id < results[j].id
+		return results[i].ID < results[j].ID
 	})
 
 	if n > len(results) {
 		n = len(results)
 	}
-	ids := make([]string, n)
-	for i := range ids {
-		ids[i] = results[i].id
-	}
-	return ids, nil
+	return results[:n], nil
 }
 
 // --- New store interface methods ---

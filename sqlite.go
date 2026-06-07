@@ -1981,7 +1981,7 @@ func (s *SQLiteStore) GetEmbeddingHash(ctx context.Context, artifactID, model st
 	return hash
 }
 
-func (s *SQLiteStore) SearchSemantic(ctx context.Context, model string, query []float32, n int) ([]string, error) {
+func (s *SQLiteStore) SearchSemantic(ctx context.Context, model string, query []float32, n int) ([]SearchResult, error) {
 	rows, err := s.reader.QueryContext(ctx,
 		`SELECT artifact_id, vector FROM artifact_embeddings WHERE model=?`, model)
 	if err != nil {
@@ -1989,25 +1989,20 @@ func (s *SQLiteStore) SearchSemantic(ctx context.Context, model string, query []
 	}
 	defer rows.Close() //nolint:errcheck // best-effort close on read-only query
 
-	type scored struct {
-		id    string
-		score float32
-	}
-	var results []scored
+	var results []SearchResult
 	for rows.Next() {
 		var id string
 		var blob []byte
 		if err := rows.Scan(&id, &blob); err != nil {
 			continue
 		}
-		vec := blobToVec(blob)
-		sim := CosineSimilarity(query, vec)
-		results = append(results, scored{id, sim})
+		sim := CosineSimilarity(query, blobToVec(blob))
+		results = append(results, SearchResult{ID: id, Score: sim})
 	}
 
 	// Sort descending by cosine similarity.
 	for i := 1; i < len(results); i++ {
-		for j := i; j > 0 && results[j].score > results[j-1].score; j-- {
+		for j := i; j > 0 && results[j].Score > results[j-1].Score; j-- {
 			results[j], results[j-1] = results[j-1], results[j]
 		}
 	}
@@ -2015,11 +2010,7 @@ func (s *SQLiteStore) SearchSemantic(ctx context.Context, model string, query []
 	if n > len(results) {
 		n = len(results)
 	}
-	ids := make([]string, n)
-	for i := range ids {
-		ids[i] = results[i].id
-	}
-	return ids, nil
+	return results[:n], nil
 }
 
 // ─── MetricsStore ─────────────────────────────────────────────────────────────

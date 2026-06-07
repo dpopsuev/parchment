@@ -967,10 +967,17 @@ func (p *Protocol) archiveSingle(ctx context.Context, id string) error {
 
 
 
+// ScoredArtifact pairs an artifact with its cosine similarity score.
+// Score is in [0, 1]; higher means more relevant. Results are ordered descending.
+type ScoredArtifact struct {
+	Artifact *Artifact
+	Score    float32
+}
+
 // SearchSemantic finds artifacts by vector similarity.
 // If the Protocol has no EmbedFunc configured, it returns an error.
 // The query text is embedded, then compared against stored embeddings.
-func (p *Protocol) SearchSemantic(ctx context.Context, query string, in ListInput) ([]*Artifact, error) { //nolint:gocritic // hugeParam: ListInput value semantics intentional, matching all other Protocol methods
+func (p *Protocol) SearchSemantic(ctx context.Context, query string, in ListInput) ([]ScoredArtifact, error) { //nolint:gocritic // hugeParam: ListInput value semantics intentional, matching all other Protocol methods
 	if p.embedFunc == nil {
 		return nil, fmt.Errorf("semantic search requires EmbedFunc in ProtocolConfig") //nolint:err113 // agent-facing configuration error
 	}
@@ -978,13 +985,13 @@ func (p *Protocol) SearchSemantic(ctx context.Context, query string, in ListInpu
 	if err != nil {
 		return nil, fmt.Errorf("embed query: %w", err)
 	}
-	ids, err := p.store.SearchSemantic(ctx, p.embedModel, queryVec, 20)
+	hits, err := p.store.SearchSemantic(ctx, p.embedModel, queryVec, 20)
 	if err != nil {
 		return nil, fmt.Errorf("semantic search: %w", err)
 	}
-	var results []*Artifact
-	for _, id := range ids {
-		art, err := p.store.Get(ctx, id)
+	var results []ScoredArtifact
+	for _, hit := range hits {
+		art, err := p.store.Get(ctx, hit.ID)
 		if err != nil {
 			continue
 		}
@@ -994,7 +1001,7 @@ func (p *Protocol) SearchSemantic(ctx context.Context, query string, in ListInpu
 		if in.Kind != "" && art.ResolvedKind() != in.Kind {
 			continue
 		}
-		results = append(results, art)
+		results = append(results, ScoredArtifact{Artifact: art, Score: hit.Score})
 		if in.Limit > 0 && len(results) >= in.Limit {
 			break
 		}

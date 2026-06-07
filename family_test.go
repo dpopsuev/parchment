@@ -2,6 +2,7 @@ package parchment
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 )
 
@@ -103,6 +104,52 @@ func TestSchema_KindsForFamily(t *testing.T) {
 	knowledge := s.KindsForFamily("knowledge")
 	if len(knowledge) == 0 {
 		t.Error("KindsForFamily(knowledge) returned empty")
+	}
+}
+
+// TestFilter_FamilyFilter_SQLite verifies that family filtering is applied by
+// SQLiteStore, not just the in-memory post-scan pass.
+// Previously FamilyKinds was ignored in buildWhereClause, so the SQL query
+// returned all rows and the filter was silently dropped.
+func TestFilter_FamilyFilter_SQLite(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	s, err := OpenSQLite(filepath.Join(t.TempDir(), "family.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close() //nolint:errcheck // deferred close in test
+
+	if err := s.SetScopeKey(ctx, "test", "TST", false); err != nil {
+		t.Fatal(err)
+	}
+	p := New(s, KnowledgeSchema(), []string{"test"}, nil, ProtocolConfig{})
+
+	if _, err := p.CreateArtifact(ctx, CreateInput{Kind: KindNote, Title: "a note", Scope: "test"}); err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+	if _, err := p.CreateArtifact(ctx, CreateInput{
+		Kind: KindTask, Title: "a task", Scope: "test", Priority: "none",
+		Sections: []Section{{Name: "context", Text: "ctx"}},
+	}); err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+
+	knowledge, err := p.ListArtifacts(ctx, ListInput{Family: "knowledge", Scope: "test"})
+	if err != nil {
+		t.Fatalf("list knowledge: %v", err)
+	}
+	if len(knowledge) != 1 || knowledge[0].Kind != KindNote {
+		t.Errorf("list knowledge: got %d artifacts, want 1 note", len(knowledge))
+	}
+
+	effort, err := p.ListArtifacts(ctx, ListInput{Family: "effort", Scope: "test"})
+	if err != nil {
+		t.Fatalf("list effort: %v", err)
+	}
+	if len(effort) != 1 || effort[0].Kind != KindTask {
+		t.Errorf("list effort: got %d artifacts, want 1 task", len(effort))
 	}
 }
 

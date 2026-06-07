@@ -219,6 +219,15 @@ func (m *MemoryStore) AddEdge(_ context.Context, e Edge) error {
 	return nil
 }
 
+func (m *MemoryStore) BulkAddEdge(ctx context.Context, edges []Edge) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, e := range edges {
+		m.edges[edgeKey(e.From, e.Relation, e.To)] = e
+	}
+	return nil
+}
+
 func (m *MemoryStore) RemoveEdge(_ context.Context, e Edge) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

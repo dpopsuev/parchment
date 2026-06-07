@@ -59,6 +59,10 @@ type ArtifactStore interface {
 // GraphStore handles explicit edge operations and traversal.
 type GraphStore interface {
 	AddEdge(ctx context.Context, e Edge) error
+	// BulkAddEdge inserts multiple edges in a single transaction.
+	// INSERT OR IGNORE semantics: existing edges are silently skipped.
+	// Returns the first error encountered; partial writes may have occurred.
+	BulkAddEdge(ctx context.Context, edges []Edge) error
 	RemoveEdge(ctx context.Context, e Edge) error
 	// UpdateEdgeWeight sets the weight on an existing edge. The edge must
 	// already exist. Callers pass 0.0 to reset to boolean-existence semantics.

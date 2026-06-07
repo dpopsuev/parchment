@@ -1358,6 +1358,32 @@ func (s *SQLiteStore) AddEdge(ctx context.Context, e Edge) error {
 	return err
 }
 
+// BulkAddEdge inserts all edges in a single transaction — orders of magnitude
+// faster than N individual AddEdge calls because SQLite auto-commit overhead
+// (one WAL write per call) is paid only once.
+func (s *SQLiteStore) BulkAddEdge(ctx context.Context, edges []Edge) error {
+	if len(edges) == 0 {
+		return nil
+	}
+	tx, err := s.writer.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck // deferred rollback on error path
+	stmt, err := tx.PrepareContext(ctx,
+		"INSERT OR IGNORE INTO edges (from_id, relation, to_id, weight) VALUES (?, ?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close() //nolint:errcheck // stmt is closed before tx commits
+	for _, e := range edges {
+		if _, err := stmt.ExecContext(ctx, e.From, e.Relation, e.To, e.Weight); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func (s *SQLiteStore) UpdateEdgeWeight(ctx context.Context, from, to, relation string, weight float64) error {
 	res, err := s.writer.ExecContext(ctx,
 		"UPDATE edges SET weight = ? WHERE from_id = ? AND relation = ? AND to_id = ?",

@@ -11,9 +11,14 @@ import (
 	"time"
 )
 
-// LabelEncoded is the label added to an artifact after its embedding is stored.
-// Removed automatically when the artifact's content hash changes.
-const LabelEncoded = "encoded"
+// LabelEncodedPrefix is the prefix for model-tagged encoding labels.
+// The full label is "encoded:<model>" (e.g. "encoded:nomic-embed-text").
+// Using a model-specific label means switching embedding models automatically
+// invalidates old embeddings — artifacts get re-embedded without any manual reset.
+const LabelEncodedPrefix = "encoded:"
+
+// LabelEncoded returns the model-tagged encoding label for a given model name.
+func LabelEncoded(model string) string { return LabelEncodedPrefix + model }
 
 // ContentHash returns a stable sha256 hash of the artifact fields that affect
 // its embedding: title, goal, and section text. Labels and status are excluded
@@ -29,18 +34,19 @@ func ContentHash(art *Artifact) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-// stripEncodedIfStale removes the "encoded" label when the artifact's content
-// has changed since it was last embedded. Called on every write path.
+// stripEncodedIfStale removes the model-tagged "encoded:<model>" label when
+// the artifact's content has changed since it was last embedded.
 func (p *Protocol) stripEncodedIfStale(ctx context.Context, art *Artifact) {
-	if !slices.Contains(art.Labels, LabelEncoded) {
+	if p.embedModel == "" {
 		return
 	}
-	if p.embedModel == "" {
+	label := LabelEncoded(p.embedModel)
+	if !slices.Contains(art.Labels, label) {
 		return
 	}
 	stored := p.store.GetEmbeddingHash(ctx, art.ID, p.embedModel)
 	if stored == "" || stored != ContentHash(art) {
-		art.Labels = slices.DeleteFunc(art.Labels, func(l string) bool { return l == LabelEncoded })
+		art.Labels = slices.DeleteFunc(art.Labels, func(l string) bool { return l == label })
 	}
 }
 

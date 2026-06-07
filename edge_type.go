@@ -9,12 +9,24 @@ import (
 
 const KindEdgeTypeDefinition = "edge_type_definition"
 
+// KindPair is a source+target kind constraint for AllowedPairs.
+// An empty field matches any kind.
+type KindPair struct {
+	Source string `json:"source,omitempty"`
+	Target string `json:"target,omitempty"`
+}
+
 // EdgeTypeTrait carries behavioral constraints for a named relation type.
 // Zero value means unbounded, directed, no domain constraints — open world default.
 type EdgeTypeTrait struct {
-	MaxOutgoing    int    `json:"max_outgoing,omitempty"`
-	MaxIncoming    int    `json:"max_incoming,omitempty"`
-	Directionality string `json:"directionality,omitempty"`
+	MaxOutgoing      int        `json:"max_outgoing,omitempty"`
+	MaxIncoming      int        `json:"max_incoming,omitempty"`
+	Directionality   string     `json:"directionality,omitempty"`
+	CycleGuard       bool       `json:"cycle_guard,omitempty"`       // reject edges that would create a cycle
+	CascadeArchive   bool       `json:"cascade_archive,omitempty"`   // archiving source cascades to all targets
+	CompletionRollup bool       `json:"completion_rollup,omitempty"` // all targets complete → source auto-transitions
+	AllowedPairs     []KindPair `json:"allowed_pairs,omitempty"`     // empty = open world
+	ConformanceCheck bool       `json:"conformance_check,omitempty"` // source must satisfy target's required sections
 }
 
 func loadEdgeTypeTraits(ctx context.Context, s Store) map[string]EdgeTypeTrait {
@@ -41,7 +53,48 @@ func extraToEdgeTypeTrait(extra map[string]any) EdgeTypeTrait {
 	if v, ok := extra["directionality"].(string); ok {
 		t.Directionality = v
 	}
+	if v, ok := extra["cycle_guard"].(bool); ok {
+		t.CycleGuard = v
+	}
+	if v, ok := extra["cascade_archive"].(bool); ok {
+		t.CascadeArchive = v
+	}
+	if v, ok := extra["completion_rollup"].(bool); ok {
+		t.CompletionRollup = v
+	}
+	if v, ok := extra["conformance_check"].(bool); ok {
+		t.ConformanceCheck = v
+	}
+	if raw, ok := extra["allowed_pairs"]; ok {
+		if pairs := decodeKindPairs(raw); pairs != nil {
+			t.AllowedPairs = pairs
+		}
+	}
 	return t
+}
+
+// decodeKindPairs handles both []KindPair (in-memory) and []any (JSON round-trip).
+func decodeKindPairs(raw any) []KindPair {
+	switch v := raw.(type) {
+	case []KindPair:
+		return v
+	case []any:
+		pairs := make([]KindPair, 0, len(v))
+		for _, item := range v {
+			if m, ok := item.(map[string]any); ok {
+				p := KindPair{}
+				if s, ok := m["source"].(string); ok {
+					p.Source = s
+				}
+				if t, ok := m["target"].(string); ok {
+					p.Target = t
+				}
+				pairs = append(pairs, p)
+			}
+		}
+		return pairs
+	}
+	return nil
 }
 
 func edgeTypeTraitToExtra(t EdgeTypeTrait) map[string]any {
@@ -55,6 +108,21 @@ func edgeTypeTraitToExtra(t EdgeTypeTrait) map[string]any {
 	if t.Directionality != "" {
 		extra["directionality"] = t.Directionality
 	}
+	if t.CycleGuard {
+		extra["cycle_guard"] = true
+	}
+	if t.CascadeArchive {
+		extra["cascade_archive"] = true
+	}
+	if t.CompletionRollup {
+		extra["completion_rollup"] = true
+	}
+	if t.ConformanceCheck {
+		extra["conformance_check"] = true
+	}
+	if len(t.AllowedPairs) > 0 {
+		extra["allowed_pairs"] = t.AllowedPairs
+	}
 	return extra
 }
 
@@ -64,10 +132,20 @@ var defaultEdgeTypes = []struct {
 	whenToUse string
 	semantics string
 }{
-	{RelParentOf, EdgeTypeTrait{MaxIncoming: 1},
+	{RelParentOf, EdgeTypeTrait{
+		MaxIncoming:      1,
+		CascadeArchive:   true,
+		CompletionRollup: true,
+		AllowedPairs: []KindPair{
+			{Source: KindCampaign, Target: KindGoal},
+			{Source: KindGoal, Target: KindTask},
+			{Source: KindGoal, Target: KindSpec},
+			{Source: KindGoal, Target: KindBug},
+		},
+	},
 		"Use parent_of to place an artifact inside a container (goal inside campaign, task inside goal). Each artifact has at most one parent.",
 		"Structural containment. parent_of drives tree/briefing traversal and auto-completion propagation. A child completing does not block its parent — all children must be terminal."},
-	{RelDependsOn, EdgeTypeTrait{},
+	{RelDependsOn, EdgeTypeTrait{CycleGuard: true},
 		"Use depends_on when artifact B cannot begin until artifact A is complete. This is a hard sequencing constraint — TopoSort respects it and cycle detection enforces it.",
 		"Blocking dependency. TopoSort produces a work order respecting depends_on edges. Creating a cycle returns an error. Active artifacts with unresolved depends_on are flagged by detect(check=orphans)."},
 	{RelFollows, EdgeTypeTrait{},
@@ -82,7 +160,7 @@ var defaultEdgeTypes = []struct {
 	{RelDocuments, EdgeTypeTrait{},
 		"Use documents when a doc or ref artifact describes another artifact — a doc documents a spec, a ref documents a source.",
 		"Documentation link. Surfaced in briefing. No structural enforcement."},
-	{RelSatisfies, EdgeTypeTrait{},
+	{RelSatisfies, EdgeTypeTrait{ConformanceCheck: true},
 		"Use satisfies when an artifact conforms to a template — a task satisfies a task template. Template conformance is checked at promotion to active.",
 		"Template conformance. LinkArtifacts(satisfies) triggers a conformance check: the source artifact must have all sections marked required by the template."},
 	{RelCites, EdgeTypeTrait{},

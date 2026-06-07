@@ -106,12 +106,22 @@ func (k *kindYAML) toKindDef() KindDef {
 
 // edgeTypeYAML is the on-disk format for an edge type definition.
 type edgeTypeYAML struct {
-	Name           string `yaml:"name"`
-	MaxOutgoing    int    `yaml:"max_outgoing"`
-	MaxIncoming    int    `yaml:"max_incoming"`
-	Directionality string `yaml:"directionality"`
-	WhenToUse      string `yaml:"when_to_use"`
-	Semantics      string `yaml:"semantics"`
+	Name             string          `yaml:"name"`
+	MaxOutgoing      int             `yaml:"max_outgoing"`
+	MaxIncoming      int             `yaml:"max_incoming"`
+	Directionality   string          `yaml:"directionality"`
+	CycleGuard       bool            `yaml:"cycle_guard"`
+	CascadeArchive   bool            `yaml:"cascade_archive"`
+	CompletionRollup bool            `yaml:"completion_rollup"`
+	ConformanceCheck bool            `yaml:"conformance_check"`
+	AllowedPairs     []kindPairYAML  `yaml:"allowed_pairs"`
+	WhenToUse        string          `yaml:"when_to_use"`
+	Semantics        string          `yaml:"semantics"`
+}
+
+type kindPairYAML struct {
+	Source string `yaml:"source"`
+	Target string `yaml:"target"`
 }
 
 // labelYAML is the on-disk format for a label definition.
@@ -256,10 +266,19 @@ func seedEdgeTypesFromRegistry(ctx context.Context, s Store) {
 		if _, err := s.Get(ctx, id); err == nil {
 			continue
 		}
+		pairs := make([]KindPair, len(et.AllowedPairs))
+		for i, p := range et.AllowedPairs {
+			pairs[i] = KindPair(p)
+		}
 		trait := EdgeTypeTrait{
-			MaxOutgoing:    et.MaxOutgoing,
-			MaxIncoming:    et.MaxIncoming,
-			Directionality: et.Directionality,
+			MaxOutgoing:      et.MaxOutgoing,
+			MaxIncoming:      et.MaxIncoming,
+			Directionality:   et.Directionality,
+			CycleGuard:       et.CycleGuard,
+			CascadeArchive:   et.CascadeArchive,
+			CompletionRollup: et.CompletionRollup,
+			ConformanceCheck: et.ConformanceCheck,
+			AllowedPairs:     pairs,
 		}
 		art := &Artifact{
 			ID:         id,

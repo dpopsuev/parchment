@@ -1,5 +1,16 @@
 name: parent_of
 max_incoming: 1
+cascade_archive: true
+completion_rollup: true
+allowed_pairs:
+  - source: campaign
+    target: goal
+  - source: goal
+    target: task
+  - source: goal
+    target: spec
+  - source: goal
+    target: bug
 when_to_use: |
   Use parent_of to place an artifact inside a container: a goal inside a
   campaign, a task inside a goal. Each artifact has at most one parent.

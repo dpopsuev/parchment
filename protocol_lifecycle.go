@@ -209,7 +209,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 				newDeps[i] = strings.TrimSpace(newDeps[i])
 			}
 			for _, dep := range newDeps {
-				if cycle, path := p.wouldCycle(ctx, id, dep); cycle {
+				if cycle, path := p.wouldCycle(ctx, RelDependsOn, id, dep); cycle {
 					return Result{ID: id, Error: fmt.Sprintf("depends_on cycle detected: %s", strings.Join(path, " → "))}
 				}
 			}
@@ -363,6 +363,11 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 			info = append(info, extra)
 		}
 	}
+	if p.schema.IsTerminal(status) {
+		if extra := p.completionRollup(ctx, art); extra != "" {
+			info = append(info, extra)
+		}
+	}
 	// Auto-enrichment: on task completion, update implementing spec
 	if art.ResolvedKind() == KindTask && status == StatusComplete { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
 		if targets, ok := art.Links[RelImplements]; ok {
@@ -463,6 +468,41 @@ func (p *Protocol) autoArchiveGoal(ctx context.Context, art *Artifact) string {
 		parts = append(parts, fmt.Sprintf("archived %s: %s", goal.ID, goal.Title))
 	}
 	return strings.Join(parts, "\n")
+}
+
+// completionRollup checks every incoming relation with CompletionRollup=true.
+// For each such source, if all its outgoing edges of that relation are terminal,
+// the source is auto-transitioned to complete.
+func (p *Protocol) completionRollup(ctx context.Context, art *Artifact) string {
+	var msgs []string
+	for relation, trait := range p.edgeTypeTraits {
+		if !trait.CompletionRollup {
+			continue
+		}
+		sources, _ := p.store.Neighbors(ctx, art.ID, relation, Incoming)
+		for _, e := range sources {
+			source, err := p.store.Get(ctx, e.From)
+			if err != nil || p.schema.IsTerminal(source.Status) {
+				continue
+			}
+			targets, _ := p.store.Neighbors(ctx, source.ID, relation, Outgoing)
+			allDone := true
+			for _, t := range targets {
+				child, err := p.store.Get(ctx, t.To)
+				if err != nil || !p.schema.IsTerminal(child.Status) {
+					allDone = false
+					break
+				}
+			}
+			if allDone && len(targets) > 0 {
+				r := p.setStatus(ctx, source, StatusComplete)
+				if r.OK {
+					msgs = append(msgs, fmt.Sprintf("auto-completed %s: %s", source.ID, source.Title))
+				}
+			}
+		}
+	}
+	return strings.Join(msgs, "; ")
 }
 
 func (p *Protocol) autoCompleteParent(ctx context.Context, art *Artifact) string {

@@ -655,13 +655,13 @@ func TestArchiveArtifact_Single(t *testing.T) {
 }
 
 func TestArchiveArtifact_BlockedByNonTerminalChild(t *testing.T) {
-	// Archive does not cascade. A non-terminal child blocks the parent.
+	// parent_of has CascadeArchive=true — archiving a goal cascades to its task children.
 	t.Parallel()
 	proto, _ := newProto(t)
 	ctx := context.Background()
 
 	parent := createGoal(t, proto, "parent goal")
-	_ = mustCreate(t, proto, parchment.CreateInput{
+	child := mustCreate(t, proto, parchment.CreateInput{
 		Kind: "task", Title: "active child",
 		Scope: "test", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
@@ -671,22 +671,25 @@ func TestArchiveArtifact_BlockedByNonTerminalChild(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ArchiveArtifact: %v", err)
 	}
-	// Should fail — child is non-terminal.
-	if len(results) > 0 && results[0].OK {
-		t.Error("expected archive to fail when non-terminal children exist")
+	// CascadeArchive on parent_of archives the child first, then the parent.
+	if len(results) == 0 || !results[0].OK {
+		t.Errorf("expected archive to succeed via CascadeArchive; got: %v", results)
 	}
-	if len(results) > 0 && results[0].Error == "" {
-		t.Error("expected error message about non-terminal child")
+	got, _ := proto.GetArtifact(ctx, child.ID)
+	if got.Status != parchment.StatusArchived {
+		t.Errorf("child should be archived by cascade; status = %s", got.Status)
 	}
 }
 
 func TestArchiveArtifact_BlockedByActiveChild(t *testing.T) {
+	// parent_of has CascadeArchive=true: archiving a goal with an active task child
+	// succeeds by cascading the archive to the child first.
 	t.Parallel()
 	proto, _ := newProto(t)
 	ctx := context.Background()
 
 	parent := createGoal(t, proto, "parent with active child")
-	mustCreate(t, proto, parchment.CreateInput{
+	child := mustCreate(t, proto, parchment.CreateInput{
 		Kind:   "task",
 		Title:  "active child",
 		Scope:  "test",
@@ -696,7 +699,6 @@ func TestArchiveArtifact_BlockedByActiveChild(t *testing.T) {
 		},
 	})
 
-	// Non-cascade archive should fail when child is not readonly
 	results, err := proto.ArchiveArtifact(ctx, []string{parent.ID}, false)
 	if err != nil {
 		t.Fatalf("ArchiveArtifact: %v", err)
@@ -704,11 +706,12 @@ func TestArchiveArtifact_BlockedByActiveChild(t *testing.T) {
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
 	}
-	if results[0].OK {
-		t.Error("expected failure when archiving parent with active child (no cascade)")
+	if !results[0].OK {
+		t.Errorf("expected cascade archive to succeed; got error: %s", results[0].Error)
 	}
-	if results[0].Error == "" {
-		t.Error("expected error message")
+	got, _ := proto.GetArtifact(ctx, child.ID)
+	if got.Status != parchment.StatusArchived {
+		t.Errorf("child should be archived by cascade; status = %s", got.Status)
 	}
 }
 

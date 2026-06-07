@@ -1,4 +1,5 @@
 name: satisfies
+conformance_check: true
 when_to_use: |
   Use satisfies when an artifact conforms to a template. Template conformance
   is checked at promotion to active.

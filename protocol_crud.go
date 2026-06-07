@@ -762,6 +762,21 @@ func (p *Protocol) resolveKindCode(kind string) string {
 // behind the 1342-artifact silent-archive incident (PRC-BUG-10). Use RetireArtifact
 // with cascade=true for whole-tree terminal operations; archive individual artifacts
 // explicitly. When dryRun is true the affected IDs are returned but no mutation occurs.
+// cascadeArchiveBefore archives all artifacts reachable via CascadeArchive relations
+// before the source is archived, so the children-terminal check in archiveSingle passes.
+func (p *Protocol) cascadeArchiveBefore(ctx context.Context, id string) {
+	for relation, trait := range p.edgeTypeTraits {
+		if !trait.CascadeArchive {
+			continue
+		}
+		targets, _ := p.store.Neighbors(ctx, id, relation, Outgoing)
+		for _, e := range targets {
+			p.cascadeArchiveBefore(ctx, e.To)
+			_ = p.archiveSingle(ctx, e.To)
+		}
+	}
+}
+
 func (p *Protocol) ArchiveArtifact(ctx context.Context, ids []string, dryRun bool) ([]Result, error) {
 	slog.InfoContext(ctx, "archive",
 		slog.Int(LogKeyCount, len(ids)),
@@ -774,6 +789,7 @@ func (p *Protocol) ArchiveArtifact(ctx context.Context, ids []string, dryRun boo
 		return results, nil
 	}
 	return p.applyToEach(ctx, ids, "archive", func(id string) error {
+		p.cascadeArchiveBefore(ctx, id)
 		return p.archiveSingle(ctx, id)
 	})
 }

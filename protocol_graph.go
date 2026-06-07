@@ -22,6 +22,19 @@ type TreeNode struct {
 	Children  []*TreeNode `json:"children,omitempty"`
 }
 
+// kindPairAllowed returns true if (source, target) matches any entry in pairs.
+// An empty Source or Target field in a pair matches any kind.
+func kindPairAllowed(pairs []KindPair, source, target string) bool {
+	for _, p := range pairs {
+		sourceOK := p.Source == "" || p.Source == source
+		targetOK := p.Target == "" || p.Target == target
+		if sourceOK && targetOK {
+			return true
+		}
+	}
+	return false
+}
+
 // wouldCycleParent returns true if setting parentID as the parent of childID
 // would create a cycle. Walks up the parent chain from parentID; if childID
 // is encountered, the assignment would close a loop. When childID is empty
@@ -50,16 +63,16 @@ func (p *Protocol) wouldCycleParent(ctx context.Context, parentID, childID strin
 
 // --- Links ---
 
-// wouldCycle returns true if adding a depends_on edge from -> to would
-// create a cycle. It walks outgoing depends_on edges from 'to'; if 'from'
-// is reachable, the edge would close a loop. Returns the cycle path.
-func (p *Protocol) wouldCycle(ctx context.Context, from, to string) (bool, []string) { //nolint:gocritic // unnamedResult: (found, path) pair is idiomatic for cycle detection
+// wouldCycle returns true if adding an edge from -> to via relation would
+// create a cycle. It walks outgoing edges of the same relation from 'to';
+// if 'from' is reachable, the edge would close a loop.
+func (p *Protocol) wouldCycle(ctx context.Context, relation, from, to string) (bool, []string) { //nolint:gocritic // unnamedResult: (found, path) pair is idiomatic for cycle detection
 	if from == to {
 		return true, []string{from, from}
 	}
 	path := []string{to}
 	found := false
-	_ = p.store.Walk(ctx, to, RelDependsOn, Outgoing, 0, func(_ int, e Edge) bool {
+	_ = p.store.Walk(ctx, to, relation, Outgoing, 0, func(_ int, e Edge) bool {
 		path = append(path, e.To)
 		if e.To == from {
 			found = true
@@ -112,17 +125,18 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 		return nil, fmt.Errorf("unknown relation %q; valid: %s", relation, strings.Join(p.RegisteredRelations(), ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 
-	if trait := p.ResolveEdgeTrait(relation); trait.MaxOutgoing > 0 {
+	trait := p.ResolveEdgeTrait(relation)
+	if trait.MaxOutgoing > 0 {
 		existing, _ := p.store.Neighbors(ctx, sourceID, relation, Outgoing)
 		if len(existing)+len(targetIDs) > trait.MaxOutgoing {
 			return nil, fmt.Errorf("%s already has %d outgoing %q edge(s); max is %d", sourceID, len(existing), relation, trait.MaxOutgoing) //nolint:err113 // domain constraint
 		}
 	}
 
-	if relation == RelDependsOn {
+	if trait.CycleGuard {
 		for _, tid := range targetIDs {
-			if cycle, path := p.wouldCycle(ctx, sourceID, tid); cycle {
-				return nil, fmt.Errorf("depends_on cycle detected: %s", strings.Join(path, " → ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
+			if cycle, path := p.wouldCycle(ctx, relation, sourceID, tid); cycle {
+				return nil, fmt.Errorf("%s cycle detected: %s", relation, strings.Join(path, " → ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 			}
 		}
 	}
@@ -132,26 +146,36 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 		return nil, err
 	}
 
-	// Template enforcement: validate source artifact conforms to template sections before adding satisfies link
-	if relation == RelSatisfies {
+	if len(trait.AllowedPairs) > 0 {
+		for _, tid := range targetIDs {
+			target, err := p.store.Get(ctx, tid)
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve %s target %s: %w", relation, tid, err)
+			}
+			if !kindPairAllowed(trait.AllowedPairs, art.ResolvedKind(), target.ResolvedKind()) {
+				return nil, fmt.Errorf("%s→%s is not a valid %s pair", art.ResolvedKind(), target.ResolvedKind(), relation) //nolint:err113 // domain constraint
+			}
+		}
+	}
+
+	if trait.ConformanceCheck {
 		for _, tid := range targetIDs {
 			tpl, err := p.store.Get(ctx, tid)
 			if err != nil {
-				return nil, fmt.Errorf("failed to resolve satisfies target %s: %w", tid, err)
+				return nil, fmt.Errorf("failed to resolve %s target %s: %w", relation, tid, err)
 			}
 			if tpl.ResolvedKind() != KindTemplate {
-				slog.WarnContext(ctx, "satisfies link target is not a template", slog.String("source_id", sourceID), slog.String("target_id", tid), slog.String("target_kind", tpl.ResolvedKind())) //nolint:sloglint // source_id/target_id/target_kind have no LogKey constants
-				return nil, fmt.Errorf("satisfies link target %s is not a template (kind=%s)", tid, tpl.ResolvedKind()) //nolint:err113 // sentinel; no caller uses errors.Is on this
+				slog.WarnContext(ctx, "conformance_check link target is not a template", slog.String("source_id", sourceID), slog.String("target_id", tid), slog.String("target_kind", tpl.ResolvedKind())) //nolint:sloglint // source_id/target_id/target_kind have no LogKey constants
+				return nil, fmt.Errorf("conformance_check target %s is not a template (kind=%s)", tid, tpl.ResolvedKind()) //nolint:err113 // sentinel; no caller uses errors.Is on this
 			}
-			// Temporarily add link to artifact for conformance check
 			artWithLink := &Artifact{
 				ID:       art.ID,
 				Kind:     art.ResolvedKind(),
 				Sections: art.Sections,
-				Links:    map[string][]string{RelSatisfies: {tid}},
+				Links:    map[string][]string{relation: {tid}},
 			}
 			if err := p.checkTemplateConformance(ctx, artWithLink, true); err != nil {
-				slog.WarnContext(ctx, "satisfies link blocked by template enforcement", slog.String("source_id", sourceID), slog.String("target_id", tid), slog.Any(LogKeyError, err)) //nolint:sloglint // source_id/target_id have no LogKey constants
+				slog.WarnContext(ctx, "conformance_check blocked link", slog.String("source_id", sourceID), slog.String("target_id", tid), slog.Any(LogKeyError, err)) //nolint:sloglint // source_id/target_id have no LogKey constants
 				return nil, err
 			}
 		}

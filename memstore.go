@@ -24,7 +24,8 @@ type MemoryStore struct {
 	scopeKeys   map[string]scopeKeyEntry
 	scopeLabels map[string][]string
 	// embeddings["artifactID:model"] = vector
-	embeddings map[string][]float32
+	embeddings      map[string][]float32
+	embeddingHashes map[string]string
 	// metrics tracks access counts and timestamps per artifact ID.
 	metrics map[string]ArtifactMetrics
 	events  []Event
@@ -48,7 +49,8 @@ func NewMemoryStore() *MemoryStore {
 		sequences:   make(map[string]int64),
 		scopeKeys:   make(map[string]scopeKeyEntry),
 		scopeLabels: make(map[string][]string),
-		embeddings:  make(map[string][]float32),
+		embeddings:      make(map[string][]float32),
+		embeddingHashes: make(map[string]string),
 		metrics:     make(map[string]ArtifactMetrics),
 	}
 }
@@ -554,13 +556,20 @@ func (m *MemoryStore) Load(path string) error {
 
 func embeddingKey(artifactID, model string) string { return artifactID + ":" + model }
 
-func (m *MemoryStore) PutEmbedding(_ context.Context, artifactID, model string, vec []float32) error {
+func (m *MemoryStore) PutEmbedding(_ context.Context, artifactID, model, contentHash string, vec []float32) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	cp := make([]float32, len(vec))
 	copy(cp, vec)
 	m.embeddings[embeddingKey(artifactID, model)] = cp
+	m.embeddingHashes[embeddingKey(artifactID, model)] = contentHash
 	return nil
+}
+
+func (m *MemoryStore) GetEmbeddingHash(_ context.Context, artifactID, model string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.embeddingHashes[embeddingKey(artifactID, model)]
 }
 
 func (m *MemoryStore) GetEmbedding(_ context.Context, artifactID, model string) ([]float32, error) {

@@ -178,7 +178,7 @@ func TestEmbeddingStore_PutGet(t *testing.T) {
 	}
 
 	vec := []float32{0.1, 0.2, 0.3, 0.4}
-	if err := s.PutEmbedding(ctx, "TST-1", "test-model", vec); err != nil {
+	if err := s.PutEmbedding(ctx, "TST-1", "test-model", "", vec); err != nil {
 		t.Fatalf("PutEmbedding: %v", err)
 	}
 
@@ -213,8 +213,8 @@ func TestEmbeddingStore_SearchSemantic_RanksCloserFirst(t *testing.T) {
 
 	// Embed: conformance artifact close to query, PTP artifact far.
 	queryVec := []float32{1.0, 0.0, 0.0} // represents "conformance"
-	_ = s.PutEmbedding(ctx, "TST-CONF", "test", []float32{0.9, 0.1, 0.0})  // close
-	_ = s.PutEmbedding(ctx, "TST-PTP", "test", []float32{0.0, 0.0, 1.0})   // far
+	_ = s.PutEmbedding(ctx, "TST-CONF", "test", "", []float32{0.9, 0.1, 0.0})  // close
+	_ = s.PutEmbedding(ctx, "TST-PTP", "test", "", []float32{0.0, 0.0, 1.0})   // far
 
 	ids, err := s.SearchSemantic(ctx, "test", queryVec, 5)
 	if err != nil {
@@ -240,7 +240,7 @@ func TestEmbeddingStore_SearchSemantic_SkipsUnindexed(t *testing.T) {
 	} {
 		_ = s.Put(ctx, art)
 	}
-	_ = s.PutEmbedding(ctx, "TST-INDEXED", "test", []float32{1.0, 0.0})
+	_ = s.PutEmbedding(ctx, "TST-INDEXED", "test", "", []float32{1.0, 0.0})
 
 	ids, _ := s.SearchSemantic(ctx, "test", []float32{1.0, 0.0}, 5)
 	for _, id := range ids {
@@ -309,8 +309,8 @@ func TestProtocol_SemanticRecall_BeatsFTSOnSemantic(t *testing.T) {
 	// Librarian sidecar supplies embeddings externally.
 	confVec, _ := embedFn(ctx, "template conformance deferred, artifact created in draft")
 	ptpVec, _ := embedFn(ctx, "ptp clock synchronization holdover test")
-	_ = store.PutEmbedding(ctx, conf.ID, parchment.DefaultEmbedModel, confVec)
-	_ = store.PutEmbedding(ctx, ptp.ID, parchment.DefaultEmbedModel, ptpVec)
+	_ = store.PutEmbedding(ctx, conf.ID, parchment.DefaultEmbedModel, "", confVec)
+	_ = store.PutEmbedding(ctx, ptp.ID, parchment.DefaultEmbedModel, "", ptpVec)
 
 	// Query uses no keywords from either artifact — pure semantic.
 	results, err := proto.SearchSemantic(ctx, "validation deferred until status change", parchment.ListInput{Scope: "test"})

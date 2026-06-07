@@ -2,6 +2,7 @@ package parchment
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -9,6 +10,45 @@ import (
 	"strings"
 	"time"
 )
+
+// LabelEncoded is the label added to an artifact after its embedding is stored.
+// Removed automatically when the artifact's content hash changes.
+const LabelEncoded = "encoded"
+
+// ContentHash returns a stable sha256 hash of the artifact fields that affect
+// its embedding: title, goal, and section text. Labels and status are excluded
+// to avoid a self-referential loop where adding LabelEncoded invalidates the hash.
+func ContentHash(art *Artifact) string {
+	h := sha256.New()
+	_, _ = h.Write([]byte(art.Title))
+	_, _ = h.Write([]byte(art.Goal))
+	for _, s := range art.Sections {
+		_, _ = h.Write([]byte(s.Name))
+		_, _ = h.Write([]byte(s.Text))
+	}
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+// stripEncodedIfStale removes the "encoded" label when the artifact's content
+// has changed since it was last embedded. Called on every write path.
+func (p *Protocol) stripEncodedIfStale(ctx context.Context, art *Artifact) {
+	if !slices.Contains(art.Labels, LabelEncoded) {
+		return
+	}
+	if p.embedModel == "" {
+		return
+	}
+	stored := p.store.GetEmbeddingHash(ctx, art.ID, p.embedModel)
+	if stored == "" || stored != ContentHash(art) {
+		art.Labels = slices.DeleteFunc(art.Labels, func(l string) bool { return l == LabelEncoded })
+	}
+}
+
+// StoreEmbedding stores a vector alongside its content hash and is the public
+// write path used by the background embedder in Scribe.
+func (p *Protocol) StoreEmbedding(ctx context.Context, artifactID, model, contentHash string, vec []float32) error {
+	return p.store.PutEmbedding(ctx, artifactID, model, contentHash, vec)
+}
 
 func (p *Protocol) PromoteStash(ctx context.Context, stashID string, patch CreateInput) (*Artifact, error) { //nolint:gocritic // hugeParam: value semantics intentional, changing to pointer would require updating all callers including MCP handlers
 	stashed, err := p.stash.Get(stashID)
@@ -272,6 +312,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		}
 	}
 	p.stampCompliance(art)
+	p.stripEncodedIfStale(ctx, art)
 	if err := p.store.Put(ctx, art); err != nil {
 		return nil, err
 	}
@@ -629,6 +670,7 @@ func (p *Protocol) AttachSection(ctx context.Context, id, name, text string) (bo
 	}
 
 	p.stampCompliance(art)
+	p.stripEncodedIfStale(ctx, art)
 	if err := p.store.Put(ctx, art); err != nil {
 		return false, err
 	}
@@ -681,6 +723,7 @@ func (p *Protocol) DetachSection(ctx context.Context, id, name string) (bool, er
 		return false, nil
 	}
 	art.Sections = append(art.Sections[:idx], art.Sections[idx+1:]...)
+	p.stripEncodedIfStale(ctx, art)
 	if err := p.store.Put(ctx, art); err != nil {
 		return false, err
 	}

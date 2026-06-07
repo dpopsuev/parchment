@@ -51,8 +51,9 @@ type ArtifactStore interface {
 	// is registered as an alias on the renamed artifact for backward-compat lookup.
 	RenameID(ctx context.Context, oldID, newID string) error
 	// Embedding operations — optional semantic layer over FTS5.
-	PutEmbedding(ctx context.Context, artifactID, model string, vec []float32) error
+	PutEmbedding(ctx context.Context, artifactID, model, contentHash string, vec []float32) error
 	GetEmbedding(ctx context.Context, artifactID, model string) ([]float32, error)
+	GetEmbeddingHash(ctx context.Context, artifactID, model string) string
 	SearchSemantic(ctx context.Context, model string, query []float32, n int) ([]string, error)
 }
 

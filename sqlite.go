@@ -84,9 +84,10 @@ CREATE TABLE IF NOT EXISTS scoped_sequences (
 );
 
 CREATE TABLE IF NOT EXISTS artifact_embeddings (
-	artifact_id TEXT NOT NULL,
-	model       TEXT NOT NULL,
-	vector      BLOB NOT NULL,
+	artifact_id  TEXT NOT NULL,
+	model        TEXT NOT NULL,
+	vector       BLOB NOT NULL,
+	content_hash TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (artifact_id, model)
 );
 
@@ -260,6 +261,8 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 		)`)
 	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: index may already exist
 		"CREATE INDEX IF NOT EXISTS idx_artifact_properties_key ON artifact_properties(key, value_text)")
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
+		"ALTER TABLE artifact_embeddings ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''")
 	// Backfill artifact_labels from existing artifacts JSON column.
 	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: best-effort backfill
 		`INSERT OR IGNORE INTO artifact_labels (artifact_id, label)
@@ -1949,11 +1952,11 @@ func blobToVec(b []byte) []float32 {
 	return v
 }
 
-func (s *SQLiteStore) PutEmbedding(ctx context.Context, artifactID, model string, vec []float32) error {
+func (s *SQLiteStore) PutEmbedding(ctx context.Context, artifactID, model, contentHash string, vec []float32) error {
 	_, err := s.writer.ExecContext(ctx,
-		`INSERT INTO artifact_embeddings (artifact_id, model, vector) VALUES (?, ?, ?)
-		 ON CONFLICT(artifact_id, model) DO UPDATE SET vector=excluded.vector`,
-		artifactID, model, vecToBlob(vec))
+		`INSERT INTO artifact_embeddings (artifact_id, model, vector, content_hash) VALUES (?, ?, ?, ?)
+		 ON CONFLICT(artifact_id, model) DO UPDATE SET vector=excluded.vector, content_hash=excluded.content_hash`,
+		artifactID, model, vecToBlob(vec), contentHash)
 	return err
 }
 
@@ -1966,6 +1969,16 @@ func (s *SQLiteStore) GetEmbedding(ctx context.Context, artifactID, model string
 		return nil, err
 	}
 	return blobToVec(blob), nil
+}
+
+// GetEmbeddingHash returns the content_hash stored alongside the embedding,
+// or empty string if no embedding exists yet.
+func (s *SQLiteStore) GetEmbeddingHash(ctx context.Context, artifactID, model string) string {
+	var hash string
+	_ = s.reader.QueryRowContext(ctx,
+		`SELECT content_hash FROM artifact_embeddings WHERE artifact_id=? AND model=?`,
+		artifactID, model).Scan(&hash)
+	return hash
 }
 
 func (s *SQLiteStore) SearchSemantic(ctx context.Context, model string, query []float32, n int) ([]string, error) {

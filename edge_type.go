@@ -42,14 +42,22 @@ func loadEdgeTypeTraits(ctx context.Context, s Store) map[string]EdgeTypeTrait {
 	return traits
 }
 
+// extraInt reads an integer from a map[string]any, accepting both int and float64
+// (JSON decoding produces float64; direct in-memory storage may use int).
+func extraInt(extra map[string]any, key string) int {
+	switch v := extra[key].(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	}
+	return 0
+}
+
 func extraToEdgeTypeTrait(extra map[string]any) EdgeTypeTrait {
 	var t EdgeTypeTrait
-	if v, ok := extra["max_outgoing"].(float64); ok {
-		t.MaxOutgoing = int(v)
-	}
-	if v, ok := extra["max_incoming"].(float64); ok {
-		t.MaxIncoming = int(v)
-	}
+	t.MaxOutgoing = extraInt(extra, "max_outgoing")
+	t.MaxIncoming = extraInt(extra, "max_incoming")
 	if v, ok := extra["directionality"].(string); ok {
 		t.Directionality = v
 	}
@@ -96,6 +104,10 @@ func decodeKindPairs(raw any) []KindPair {
 	}
 	return nil
 }
+
+// EdgeTypeTraitToExtra serializes a trait to the map[string]any format used in Artifact.Extra.
+// Exported for test helpers that seed edge_type_definition artifacts directly into the store.
+func EdgeTypeTraitToExtra(t EdgeTypeTrait) map[string]any { return edgeTypeTraitToExtra(t) }
 
 func edgeTypeTraitToExtra(t EdgeTypeTrait) map[string]any {
 	extra := make(map[string]any)
@@ -218,6 +230,12 @@ func SeedEdgeTypeTraits(ctx context.Context, s Store) {
 				slog.String(LogKeyID, id), slog.Any(LogKeyError, err))
 		}
 	}
+}
+
+// RefreshEdgeTraits reloads edge type traits from the store.
+// Use in tests that seed edge_type_definition artifacts after Protocol construction.
+func (p *Protocol) RefreshEdgeTraits(ctx context.Context) {
+	p.edgeTypeTraits = loadEdgeTypeTraits(ctx, p.store)
 }
 
 func (p *Protocol) ResolveEdgeTrait(relation string) EdgeTypeTrait {

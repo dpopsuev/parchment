@@ -132,6 +132,14 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 			return nil, fmt.Errorf("%s already has %d outgoing %q edge(s); max is %d", sourceID, len(existing), relation, trait.MaxOutgoing) //nolint:err113 // domain constraint
 		}
 	}
+	if trait.MaxIncoming > 0 {
+		for _, tid := range targetIDs {
+			incoming, _ := p.store.Neighbors(ctx, tid, relation, Incoming)
+			if len(incoming)+1 > trait.MaxIncoming {
+				return nil, fmt.Errorf("%s already has %d incoming %q edge(s); max is %d", tid, len(incoming), relation, trait.MaxIncoming) //nolint:err113 // domain constraint
+			}
+		}
+	}
 
 	if trait.CycleGuard {
 		for _, tid := range targetIDs {

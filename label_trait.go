@@ -60,6 +60,62 @@ func loadLabelTraits(ctx context.Context, s Store) map[string]LabelTrait {
 	return traits
 }
 
+// LoadLabelTraitsWithComposition reads label_definition artifacts and follows
+// "composes" edges to inherit parent traits. Child's own traits take precedence
+// over composed parent traits (explicit wins). Replaces loadLabelTraits once
+// all label_definition artifacts have composes edges seeded (PRC-TSK-138).
+func LoadLabelTraitsWithComposition(ctx context.Context, s Store) map[string]LabelTrait {
+	arts, err := s.List(ctx, Filter{Kind: KindLabelDefinition, Scope: SchemaScope})
+	if err != nil {
+		slog.WarnContext(ctx, "load label traits with composition: list failed", slog.Any(LogKeyError, err))
+		return nil
+	}
+	// Pass 1: build raw trait map and ID→artifact index.
+	raw := make(map[string]LabelTrait, len(arts))
+	artByID := make(map[string]*Artifact, len(arts))
+	for _, art := range arts {
+		lt, err := extraToLabelTrait(art.Extra)
+		if err != nil {
+			slog.WarnContext(ctx, "load label traits: unmarshal failed",
+				slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, err))
+			continue
+		}
+		raw[art.Title] = lt
+		artByID[art.ID] = art
+	}
+	// Pass 2: follow composes edges and merge parent traits into child.
+	// Child's own fields take precedence (own != zero wins over composed).
+	for _, art := range arts {
+		edges, err := s.Neighbors(ctx, art.ID, "composes", Outgoing)
+		if err != nil || len(edges) == 0 {
+			continue
+		}
+		own := raw[art.Title]
+		for _, e := range edges {
+			parent, ok := artByID[e.To]
+			if !ok {
+				continue
+			}
+			p := raw[parent.Title]
+			if own.EvictionPolicy == "" && p.EvictionPolicy != "" {
+				own.EvictionPolicy = p.EvictionPolicy
+			}
+			if own.World == "" && p.World != "" {
+				own.World = p.World
+			}
+			if own.HalfLifeDays == 0 && p.HalfLifeDays != 0 {
+				own.HalfLifeDays = p.HalfLifeDays
+			}
+			if !own.AlwaysApply && p.AlwaysApply {
+				own.AlwaysApply = p.AlwaysApply
+			}
+			own.RequiredSections = unionStrings(own.RequiredSections, p.RequiredSections)
+		}
+		raw[art.Title] = own
+	}
+	return raw
+}
+
 // ResolveTrait merges the traits of all expanded labels into one LabelTrait.
 // EvictionPolicy: most restrictive wins (protected > normal > aggressive).
 // HalfLifeDays: maximum wins (most lenient half-life protects the artifact).

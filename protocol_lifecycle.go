@@ -15,7 +15,7 @@ func (p *Protocol) RegisterGate(g QualityGate) { p.gates = append(p.gates, g) }
 // Components: checklist items, child completion, section coverage.
 func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 { //nolint:gocyclo // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
 	// Terminal artifacts are 100% complete by definition
-	if p.schema.IsTerminal(art.ResolvedStatus()) {
+	if p.IsTerminal(art.ResolvedStatus()) {
 		return 1.0
 	}
 
@@ -47,7 +47,7 @@ func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 {
 	if err == nil && len(children) > 0 {
 		done := 0
 		for _, ch := range children {
-			if p.schema.IsTerminal(ch.ResolvedStatus()) {
+			if p.IsTerminal(ch.ResolvedStatus()) {
 				done++
 			}
 		}
@@ -55,7 +55,7 @@ func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 {
 	}
 
 	// 3. Sections: filled should-sections
-	shouldSections := p.schema.GetShouldSections(art.ResolvedKind())
+	shouldSections := p.ShouldSections(art.ResolvedKind())
 	if len(shouldSections) > 0 {
 		filled := 0
 		have := make(map[string]bool)
@@ -144,7 +144,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		return Result{ID: id, Error: err.Error()}
 	}
 
-	if !opt.BypassGuards && p.schema.Guards.ArchivedReadonly && p.schema.IsReadonly(art.ResolvedStatus()) {
+	if !opt.BypassGuards && p.schema.Guards.ArchivedReadonly && p.IsReadonly(art.ResolvedStatus()) {
 		return Result{ID: id, Error: fmt.Sprintf("%s: %s", ErrArchived, id)}
 	}
 
@@ -176,7 +176,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 	case FieldParent:
 		if value != "" {
 			if parent, err := p.store.Get(ctx, value); err == nil {
-				if reason, ok := p.schema.ValidChild(parent.ResolvedKind(), art.ResolvedKind()); !ok {
+				if reason, ok := p.ValidChild(parent.ResolvedKind(), art.ResolvedKind()); !ok {
 					return Result{ID: id, Error: reason}
 				}
 			}
@@ -305,7 +305,7 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 	}
 
 	// Quality gates: check before terminal status transitions.
-	if p.schema.IsTerminal(status) && len(p.gates) > 0 {
+	if p.IsTerminal(status) && len(p.gates) > 0 {
 		for _, gate := range p.gates {
 			result, err := gate.Validate(ctx, art)
 			if err != nil {
@@ -327,7 +327,7 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 			if err != nil {
 				continue
 			}
-			if !p.schema.IsTerminal(preceded.ResolvedStatus()) {
+			if !p.IsTerminal(preceded.ResolvedStatus()) {
 				followsWarnings = append(followsWarnings, fmt.Sprintf("%s is %s", preceded.ID, preceded.ResolvedStatus()))
 			}
 		}
@@ -357,12 +357,12 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 			info = append(info, extra)
 		}
 	}
-	if p.schema.Guards.AutoCompleteParentOnChildrenTerminal && p.schema.IsTerminal(status) {
+	if p.schema.Guards.AutoCompleteParentOnChildrenTerminal && p.IsTerminal(status) {
 		if extra := p.autoCompleteParent(ctx, art); extra != "" {
 			info = append(info, extra)
 		}
 	}
-	if p.schema.IsTerminal(status) {
+	if p.IsTerminal(status) {
 		if extra := p.completionRollup(ctx, art); extra != "" {
 			info = append(info, extra)
 		}
@@ -413,7 +413,7 @@ func (p *Protocol) guardDependsOnComplete(ctx context.Context, art *Artifact) er
 		if err != nil {
 			continue // dangling edge, not a blocker
 		}
-		if !p.schema.IsTerminal(dep.ResolvedStatus()) {
+		if !p.IsTerminal(dep.ResolvedStatus()) {
 			incomplete = append(incomplete, fmt.Sprintf("%s [%s]", dep.ID, dep.ResolvedStatus()))
 		}
 	}
@@ -431,7 +431,7 @@ func (p *Protocol) guardChildrenComplete(ctx context.Context, art *Artifact) err
 	}
 	var incomplete []string
 	for _, ch := range children {
-		if !p.schema.IsTerminal(ch.ResolvedStatus()) {
+		if !p.IsTerminal(ch.ResolvedStatus()) {
 			incomplete = append(incomplete, fmt.Sprintf("%s [%s]", ch.ID, ch.ResolvedStatus()))
 		}
 	}
@@ -481,14 +481,14 @@ func (p *Protocol) completionRollup(ctx context.Context, art *Artifact) string {
 		sources, _ := p.store.Neighbors(ctx, art.ID, relation, Incoming)
 		for _, e := range sources {
 			source, err := p.store.Get(ctx, e.From)
-			if err != nil || p.schema.IsTerminal(source.ResolvedStatus()) {
+			if err != nil || p.IsTerminal(source.ResolvedStatus()) {
 				continue
 			}
 			targets, _ := p.store.Neighbors(ctx, source.ID, relation, Outgoing)
 			allDone := true
 			for _, t := range targets {
 				child, err := p.store.Get(ctx, t.To)
-				if err != nil || !p.schema.IsTerminal(child.ResolvedStatus()) {
+				if err != nil || !p.IsTerminal(child.ResolvedStatus()) {
 					allDone = false
 					break
 				}
@@ -509,7 +509,7 @@ func (p *Protocol) autoCompleteParent(ctx context.Context, art *Artifact) string
 		return ""
 	}
 	parent, err := p.store.Get(ctx, art.Parent)
-	if err != nil || p.schema.IsTerminal(parent.ResolvedStatus()) {
+	if err != nil || p.IsTerminal(parent.ResolvedStatus()) {
 		return ""
 	}
 	children, err := p.store.Children(ctx, parent.ID)
@@ -517,7 +517,7 @@ func (p *Protocol) autoCompleteParent(ctx context.Context, art *Artifact) string
 		return ""
 	}
 	for _, ch := range children {
-		if !p.schema.IsTerminal(ch.ResolvedStatus()) {
+		if !p.IsTerminal(ch.ResolvedStatus()) {
 			return ""
 		}
 	}

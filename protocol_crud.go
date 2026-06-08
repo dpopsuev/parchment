@@ -117,7 +117,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	}
 	if in.Parent != "" {
 		if parent, err := p.store.Get(ctx, in.Parent); err == nil {
-			if reason, ok := p.schema.ValidChild(parent.ResolvedKind(), kind); !ok {
+			if reason, ok := p.ValidChild(parent.ResolvedKind(), kind); !ok {
 				return nil, fmt.Errorf("%s", reason) //nolint:err113 // runtime values required in message; no static sentinel possible
 			}
 		}
@@ -194,7 +194,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	}
 	status := labelValue(in.Labels, LabelPrefixStatus)
 	if status == "" {
-		status = p.schema.DefaultStatus(kind)
+		status = p.DefaultStatus(kind)
 	}
 	// Seed labels with system mirrors (scope, kind, status, priority, sprint)
 	// so label-based queries work without reading individual fields.
@@ -302,7 +302,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		// Duplicate awareness: warn if similar non-terminal artifact exists
 		if existing, _ := p.store.List(ctx, Filter{Labels: []string{LabelPrefixKind + art.ResolvedKind()}, Scope: art.Scope}); len(existing) > 0 {
 			for _, e := range existing {
-				if !p.schema.IsTerminal(e.ResolvedStatus()) && e.Title == art.Title {
+				if !p.IsTerminal(e.ResolvedStatus()) && e.Title == art.Title {
 					slog.WarnContext(ctx, "duplicate title detected on create",
 						slog.String("new_id", art.ID), slog.String("existing_id", e.ID), slog.String("title", art.Title)) //nolint:sloglint // new_id/existing_id have no LogKey constants
 				}
@@ -369,7 +369,7 @@ func (p *Protocol) DeleteArtifact(ctx context.Context, id string, force bool) er
 		if err != nil {
 			return err
 		}
-		if !p.schema.IsReadonly(art.ResolvedStatus()) {
+		if !p.IsReadonly(art.ResolvedStatus()) {
 			return fmt.Errorf("%w: %s (status: %s)", ErrNotArchived, id, art.ResolvedStatus())
 		}
 	}
@@ -520,7 +520,7 @@ func (p *Protocol) populateFamilyKinds(f *Filter) {
 	if f.Family == "" {
 		return
 	}
-	kinds := p.schema.KindsForFamily(f.Family)
+	kinds := p.KindsForFamily(f.Family)
 	f.FamilyKinds = make(map[string]bool, len(kinds))
 	for _, k := range kinds {
 		f.FamilyKinds[k] = true
@@ -635,7 +635,7 @@ func (p *Protocol) AttachSection(ctx context.Context, id, name, text string) (bo
 	if err != nil {
 		return false, err
 	}
-	if p.schema.Guards.ArchivedReadonly && p.schema.IsReadonly(art.ResolvedStatus()) {
+	if p.schema.Guards.ArchivedReadonly && p.IsReadonly(art.ResolvedStatus()) {
 		return false, fmt.Errorf("%w: %s", ErrArchived, art.ID)
 	}
 	replaced := false
@@ -684,7 +684,7 @@ func (p *Protocol) DetachSection(ctx context.Context, id, name string) (bool, er
 	if err != nil {
 		return false, err
 	}
-	if p.schema.Guards.ArchivedReadonly && p.schema.IsReadonly(art.ResolvedStatus()) {
+	if p.schema.Guards.ArchivedReadonly && p.IsReadonly(art.ResolvedStatus()) {
 		return false, fmt.Errorf("%w: %s", ErrArchived, art.ID)
 	}
 	if tpl := p.resolveTemplate(ctx, art); tpl != nil {
@@ -860,7 +860,7 @@ func (p *Protocol) retireSingle(ctx context.Context, id string, cascade bool) er
 	if art.ResolvedStatus() == StatusRetired {
 		return nil // idempotent
 	}
-	if p.schema.IsReadonly(art.ResolvedStatus()) {
+	if p.IsReadonly(art.ResolvedStatus()) {
 		return fmt.Errorf("%s is %s (readonly) — de-archive before retiring", id, art.ResolvedStatus()) //nolint:err113 // domain error
 	}
 	children, err := p.store.Children(ctx, id)
@@ -872,7 +872,7 @@ func (p *Protocol) retireSingle(ctx context.Context, id string, cascade bool) er
 			if err := p.retireSingle(ctx, ch.ID, true); err != nil {
 				return fmt.Errorf("cascade retire %s: %w", ch.ID, err)
 			}
-		} else if !p.schema.IsTerminal(ch.ResolvedStatus()) {
+		} else if !p.IsTerminal(ch.ResolvedStatus()) {
 			return fmt.Errorf("cannot retire %s: child %s is %s (use cascade to retire the whole tree)", id, ch.ID, ch.ResolvedStatus()) //nolint:err113 // domain error
 		}
 	}
@@ -898,7 +898,7 @@ func (p *Protocol) DeArchive(ctx context.Context, ids []string, cascade bool) ([
 			results = append(results, Result{ID: id, Error: err.Error()})
 			continue
 		}
-		if !p.schema.IsReadonly(art.ResolvedStatus()) {
+		if !p.IsReadonly(art.ResolvedStatus()) {
 			results = append(results, Result{ID: id, Error: fmt.Sprintf("%s is not archived (status: %s)", id, art.ResolvedStatus())})
 			continue
 		}
@@ -911,7 +911,7 @@ func (p *Protocol) DeArchive(ctx context.Context, ids []string, cascade bool) ([
 		if cascade {
 			children, _ := p.store.Children(ctx, id)
 			for _, ch := range children {
-				if p.schema.IsReadonly(ch.ResolvedStatus()) {
+				if p.IsReadonly(ch.ResolvedStatus()) {
 					ch.Labels = mirrorLabel(ch.Labels, LabelPrefixStatus, StatusDraft)
 					_ = p.store.Put(ctx, ch)
 				}
@@ -926,7 +926,7 @@ func (p *Protocol) archiveSingle(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	if p.schema.IsReadonly(art.ResolvedStatus()) {
+	if p.IsReadonly(art.ResolvedStatus()) {
 		return nil
 	}
 	// No cascade — archive is single-artifact only. Children must already be
@@ -936,7 +936,7 @@ func (p *Protocol) archiveSingle(ctx context.Context, id string) error {
 		return err
 	}
 	for _, ch := range children {
-		if !p.schema.IsTerminal(ch.ResolvedStatus()) {
+		if !p.IsTerminal(ch.ResolvedStatus()) {
 			return fmt.Errorf("cannot archive %s: child %s is %s — retire or complete children first", id, ch.ID, ch.ResolvedStatus()) //nolint:err113 // domain error
 		}
 	}

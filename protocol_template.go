@@ -170,7 +170,7 @@ func (p *Protocol) checkTemplateConformance(ctx context.Context, art *Artifact, 
 	}
 	if creation {
 		mustSet := make(map[string]bool)
-		for _, s := range p.schema.GetMustSections(art.ResolvedKind()) {
+		for _, s := range p.MustSections(art.ResolvedKind()) {
 			mustSet[s] = true
 		}
 		filtered := make(map[string]string, len(mustSet))
@@ -238,7 +238,7 @@ func (p *Protocol) checkTemplateConformancePromote(ctx context.Context, art *Art
 
 	// Build the required set: sections with "required:" prefix OR in schema MustSections.
 	mustSet := make(map[string]bool)
-	for _, s := range p.schema.GetMustSections(art.ResolvedKind()) {
+	for _, s := range p.MustSections(art.ResolvedKind()) {
 		mustSet[s] = true
 	}
 	required := make(map[string]string)

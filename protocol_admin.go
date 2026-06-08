@@ -288,7 +288,7 @@ func (p *Protocol) DetectOrphans(ctx context.Context, in OrphanInput) (*OrphanRe
 
 	report := &OrphanReport{}
 	for _, art := range arts {
-		if p.schema.IsTerminal(art.ResolvedStatus()) {
+		if p.IsTerminal(art.ResolvedStatus()) {
 			continue
 		}
 
@@ -570,7 +570,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		if art.Parent != "" {
 			parent, err := p.store.Get(ctx, art.Parent)
 			if err == nil {
-				if reason, ok := p.schema.ValidChild(parent.ResolvedKind(), art.ResolvedKind()); !ok {
+				if reason, ok := p.ValidChild(parent.ResolvedKind(), art.ResolvedKind()); !ok {
 					report.Violations = append(report.Violations, CheckViolation{
 						ID: art.ID, Labels: art.Labels, Title: art.Title,
 						Category: "invalid_parent",
@@ -617,7 +617,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		}
 
 		for _, reqRel := range kd.Relations.RequiredOutgoing {
-			if p.schema.IsTerminal(art.ResolvedStatus()) {
+			if p.IsTerminal(art.ResolvedStatus()) {
 				continue
 			}
 			edges, err := p.store.Neighbors(ctx, art.ID, reqRel, Outgoing)
@@ -678,7 +678,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 	// Stale drafts (non-terminal, not updated in 7+ days)
 	staleCutoff := time.Now().Add(-7 * 24 * time.Hour)
 	for _, art := range arts {
-		if p.schema.IsTerminal(art.ResolvedStatus()) {
+		if p.IsTerminal(art.ResolvedStatus()) {
 			continue
 		}
 		if !art.UpdatedAt.IsZero() && art.UpdatedAt.Before(staleCutoff) {
@@ -692,10 +692,10 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 
 	// Blocked campaigns/goals: all children terminal but parent not terminal
 	for _, art := range arts {
-		if p.schema.IsTerminal(art.ResolvedStatus()) {
+		if p.IsTerminal(art.ResolvedStatus()) {
 			continue
 		}
-		if art.ResolvedKind() != KindCampaign && art.ResolvedKind() != KindGoal {
+		if !p.IsContainerKind(art.ResolvedKind()) {
 			continue
 		}
 		children, _ := p.store.Children(ctx, art.ID)
@@ -704,7 +704,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		}
 		allTerminal := true
 		for _, ch := range children {
-			if !p.schema.IsTerminal(ch.ResolvedStatus()) {
+			if !p.IsTerminal(ch.ResolvedStatus()) {
 				allTerminal = false
 				break
 			}
@@ -720,10 +720,10 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 
 	// Spec/task mismatch
 	for _, art := range arts {
-		if p.schema.IsTerminal(art.ResolvedStatus()) {
+		if p.IsTerminal(art.ResolvedStatus()) {
 			continue
 		}
-		if art.ResolvedKind() == KindSpec || art.ResolvedKind() == KindBug {
+		if p.RequiresImplementation(art.ResolvedKind()) {
 			edges, _ := p.store.Neighbors(ctx, art.ID, RelImplements, Incoming)
 			if len(edges) == 0 {
 				report.Violations = append(report.Violations, CheckViolation{
@@ -740,7 +740,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 	titleGroups := make(map[scopeKindTitle][]string)
 	titleGroupLabels := make(map[scopeKindTitle][]string)
 	for _, art := range arts {
-		if p.schema.IsTerminal(art.ResolvedStatus()) {
+		if p.IsTerminal(art.ResolvedStatus()) {
 			continue
 		}
 		key := scopeKindTitle{art.Scope, art.ResolvedKind(), art.Title}
@@ -764,7 +764,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		if art.ResolvedStatus() != StatusDraft {
 			continue
 		}
-		if art.ResolvedKind() == KindTemplate || art.ResolvedKind() == KindGoal || art.ResolvedKind() == KindCampaign {
+		if p.SkipEmptyCheck(art.ResolvedKind()) {
 			continue
 		}
 		if _, known := p.schema.Kinds[art.ResolvedKind()]; !known {

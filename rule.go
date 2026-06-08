@@ -270,7 +270,7 @@ func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResul
 		children, err := p.store.Children(context.Background(), art.ID)
 		if err == nil {
 			for _, ch := range children {
-			if !p.schema.IsReadonly(ch.ResolvedStatus()) {
+			if !p.IsReadonly(ch.ResolvedStatus()) {
 				return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock,
 					Message: rule.Message + ": child " + ch.ID + " is " + ch.ResolvedStatus()}
 			}

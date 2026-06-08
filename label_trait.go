@@ -30,6 +30,25 @@ type LabelTrait struct {
 
 	// AlwaysApply includes this artifact in every context_read response.
 	AlwaysApply bool `json:"always_apply,omitempty"`
+
+	// Lifecycle fields — for status:X label definitions.
+	Terminal bool `json:"terminal,omitempty"`
+	Readonly bool `json:"readonly,omitempty"`
+
+	// Kind fields — for kind:X label definitions.
+	DefaultStatus          string   `json:"default_status,omitempty"`
+	ActiveStatus           string   `json:"active_status,omitempty"`
+	Transitions            []string `json:"trait_transitions,omitempty"`
+	AllowedChildren        []string `json:"allowed_children,omitempty"`
+	Family                 string   `json:"family,omitempty"`
+	MustSections           []string `json:"must_sections,omitempty"`
+	ShouldSections         []string `json:"should_sections,omitempty"`
+	CouldSections          []string `json:"could_sections,omitempty"`
+	IDPrefix               string   `json:"id_prefix,omitempty"`
+	IsContainerKind        bool     `json:"is_container_kind,omitempty"`
+	RequiresImplementation bool     `json:"requires_implementation,omitempty"`
+	SkipEmptyCheck         bool     `json:"skip_empty_check,omitempty"`
+	Vacuumable             bool     `json:"vacuumable,omitempty"`
 }
 
 // ConflictPolicy for LabelTrait is ConflictUnion — label traits accumulate
@@ -110,6 +129,41 @@ func LoadLabelTraitsWithComposition(ctx context.Context, s Store) map[string]Lab
 				own.AlwaysApply = p.AlwaysApply
 			}
 			own.RequiredSections = unionStrings(own.RequiredSections, p.RequiredSections)
+			if !own.Terminal && p.Terminal {
+				own.Terminal = p.Terminal
+			}
+			if !own.Readonly && p.Readonly {
+				own.Readonly = p.Readonly
+			}
+			if !own.IsContainerKind && p.IsContainerKind {
+				own.IsContainerKind = p.IsContainerKind
+			}
+			if !own.RequiresImplementation && p.RequiresImplementation {
+				own.RequiresImplementation = p.RequiresImplementation
+			}
+			if !own.SkipEmptyCheck && p.SkipEmptyCheck {
+				own.SkipEmptyCheck = p.SkipEmptyCheck
+			}
+			if !own.Vacuumable && p.Vacuumable {
+				own.Vacuumable = p.Vacuumable
+			}
+			if own.DefaultStatus == "" && p.DefaultStatus != "" {
+				own.DefaultStatus = p.DefaultStatus
+			}
+			if own.ActiveStatus == "" && p.ActiveStatus != "" {
+				own.ActiveStatus = p.ActiveStatus
+			}
+			if own.Family == "" && p.Family != "" {
+				own.Family = p.Family
+			}
+			if own.IDPrefix == "" && p.IDPrefix != "" {
+				own.IDPrefix = p.IDPrefix
+			}
+			own.Transitions = unionStrings(own.Transitions, p.Transitions)
+			own.AllowedChildren = unionStrings(own.AllowedChildren, p.AllowedChildren)
+			own.MustSections = unionStrings(own.MustSections, p.MustSections)
+			own.ShouldSections = unionStrings(own.ShouldSections, p.ShouldSections)
+			own.CouldSections = unionStrings(own.CouldSections, p.CouldSections)
 		}
 		raw[art.Title] = own
 	}
@@ -143,6 +197,41 @@ func ResolveTrait(traits map[string]LabelTrait, labels []string) LabelTrait {
 		if lt.AlwaysApply {
 			merged.AlwaysApply = true
 		}
+		if lt.Terminal {
+			merged.Terminal = true
+		}
+		if lt.Readonly {
+			merged.Readonly = true
+		}
+		if lt.IsContainerKind {
+			merged.IsContainerKind = true
+		}
+		if lt.RequiresImplementation {
+			merged.RequiresImplementation = true
+		}
+		if lt.SkipEmptyCheck {
+			merged.SkipEmptyCheck = true
+		}
+		if lt.Vacuumable {
+			merged.Vacuumable = true
+		}
+		if lt.DefaultStatus != "" && merged.DefaultStatus == "" {
+			merged.DefaultStatus = lt.DefaultStatus
+		}
+		if lt.ActiveStatus != "" && merged.ActiveStatus == "" {
+			merged.ActiveStatus = lt.ActiveStatus
+		}
+		if lt.Family != "" && merged.Family == "" {
+			merged.Family = lt.Family
+		}
+		if lt.IDPrefix != "" && merged.IDPrefix == "" {
+			merged.IDPrefix = lt.IDPrefix
+		}
+		merged.Transitions = unionStrings(merged.Transitions, lt.Transitions)
+		merged.AllowedChildren = unionStrings(merged.AllowedChildren, lt.AllowedChildren)
+		merged.MustSections = unionStrings(merged.MustSections, lt.MustSections)
+		merged.ShouldSections = unionStrings(merged.ShouldSections, lt.ShouldSections)
+		merged.CouldSections = unionStrings(merged.CouldSections, lt.CouldSections)
 	}
 	return merged
 }
@@ -198,6 +287,32 @@ var defaultLabelTraits = []struct {
 	{"decision", LabelTrait{EvictionPolicy: "protected"},
 		"Apply 'decision' to notes created via admin(action=decision) — cached answers to recurring questions. Not the same as kind=decision (ADR); this is a lightweight key-value cache.",
 		"Protected from eviction. Queryable via admin(action=decision, snapshot_action=check, check=<key>)."},
+
+	// Status lifecycle traits.
+	{"status:draft", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"status:active", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"status:complete", LabelTrait{Terminal: true, Readonly: false}, "", ""},
+	{"status:archived", LabelTrait{Terminal: true, Readonly: true}, "", ""},
+	{"status:retired", LabelTrait{Terminal: true, Readonly: false}, "", ""},
+	{"status:open", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"status:in_progress", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"status:in_review", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"status:mature", LabelTrait{Terminal: true, Readonly: false}, "", ""},
+	{"status:fleeting", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"status:evergreen", LabelTrait{Terminal: true, Readonly: false}, "", ""},
+
+	// Kind lifecycle traits.
+	{"kind:task", LabelTrait{Family: "work", DefaultStatus: "draft", Vacuumable: true}, "", ""},
+	{"kind:spec", LabelTrait{Family: "work", DefaultStatus: "draft", RequiresImplementation: true, Vacuumable: true}, "", ""},
+	{"kind:bug", LabelTrait{Family: "work", DefaultStatus: "draft", RequiresImplementation: true, Vacuumable: true}, "", ""},
+	{"kind:goal", LabelTrait{Family: "work", DefaultStatus: "draft", IsContainerKind: true, SkipEmptyCheck: true, Vacuumable: true}, "", ""},
+	{"kind:campaign", LabelTrait{Family: "work", DefaultStatus: "draft", IsContainerKind: true, SkipEmptyCheck: true, Vacuumable: true}, "", ""},
+	{"kind:note", LabelTrait{Family: "knowledge", DefaultStatus: "fleeting", Vacuumable: true}, "", ""},
+	{"kind:concept", LabelTrait{Family: "knowledge", DefaultStatus: "active", Vacuumable: true}, "", ""},
+	{"kind:source", LabelTrait{Family: "knowledge", DefaultStatus: "active", Vacuumable: true}, "", ""},
+	{"kind:template", LabelTrait{Family: "support", DefaultStatus: "active", SkipEmptyCheck: true}, "", ""},
+	{"kind:decision", LabelTrait{Family: "support", DefaultStatus: "proposed"}, "", ""},
+	{"kind:config", LabelTrait{Family: "support", DefaultStatus: "active", SkipEmptyCheck: true}, "", ""},
 }
 
 // SeedLabelTraits writes default label_definition artifacts into SchemaScope.

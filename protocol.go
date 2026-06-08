@@ -79,8 +79,9 @@ type ProtocolConfig struct {
 type Protocol struct {
 	store            Store
 	schema           *Schema
-	labelTraits      map[string]LabelTrait
-	edgeTypeTraits   map[string]EdgeTypeTrait
+	traits           *TraitStore             // unified trait store (Step 2)
+	labelTraits      map[string]LabelTrait   // deprecated: use traits.LabelMap()
+	edgeTypeTraits   map[string]EdgeTypeTrait // deprecated: use traits.EdgeMap()
 	scopes           []string
 	vocab            []string
 	idFormat         string
@@ -119,6 +120,14 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 		SeedRules(context.Background(), s)
 		p.labelTraits = loadLabelTraits(context.Background(), s)
 		p.edgeTypeTraits = loadEdgeTypeTraits(context.Background(), s)
+		// Unified TraitStore — bridges from the existing maps (Step 2 strangler seam).
+		p.traits = NewTraitStore()
+		for k, v := range p.labelTraits {
+			p.traits.PutLabel(k, v)
+		}
+		for k, v := range p.edgeTypeTraits {
+			p.traits.PutEdge(k, v)
+		}
 		rules, _ := p.LoadRules(context.Background())
 		p.rules = rules
 	}

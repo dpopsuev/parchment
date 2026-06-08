@@ -29,6 +29,10 @@ type EdgeTypeTrait struct {
 	ConformanceCheck bool       `json:"conformance_check,omitempty"` // source must satisfy target's required sections
 }
 
+// ConflictPolicy for EdgeTypeTrait is ConflictUnion — edge traits accumulate
+// across edge type definitions; the merged result covers all contributing sources.
+func (e EdgeTypeTrait) ConflictPolicy() ConflictPolicy { return ConflictUnion }
+
 func loadEdgeTypeTraits(ctx context.Context, s Store) map[string]EdgeTypeTrait {
 	arts, err := s.List(ctx, Filter{Kind: KindEdgeTypeDefinition, Scope: SchemaScope})
 	if err != nil {

@@ -32,6 +32,10 @@ type LabelTrait struct {
 	AlwaysApply bool `json:"always_apply,omitempty"`
 }
 
+// ConflictPolicy for LabelTrait is ConflictUnion — label traits accumulate
+// across labels; the merged result is the union of all contributing labels.
+func (l LabelTrait) ConflictPolicy() ConflictPolicy { return ConflictUnion }
+
 // loadLabelTraits reads label_definition artifacts from SchemaScope and returns
 // a map keyed by label slug (artifact Title). Mirrors extraToKindDef pattern.
 func loadLabelTraits(ctx context.Context, s Store) map[string]LabelTrait {

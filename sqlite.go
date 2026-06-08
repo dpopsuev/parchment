@@ -1811,6 +1811,25 @@ func scanRow(s rowScanner) (*Artifact, error) {
 		}
 	}
 
+	// Hydrate view fields from labels when the stored column is empty.
+	// Labels are the canonical source; the Kind/Scope/Status/Priority/Sprint
+	// columns become a write-through cache eliminated in a later migration.
+	if art.Kind == "" {
+		art.Kind = art.ResolvedKind()
+	}
+	if art.Scope == "" {
+		art.Scope = art.ResolvedScope()
+	}
+	if art.Status == "" {
+		art.Status = art.ResolvedStatus()
+	}
+	if art.Priority == "" {
+		art.Priority = art.ResolvedPriority()
+	}
+	if art.Sprint == "" {
+		art.Sprint = art.ResolvedSprint()
+	}
+
 	return &art, nil
 }
 

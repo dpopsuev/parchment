@@ -253,6 +253,39 @@ func (a *Artifact) ResolvedScope() string {
 }
 
 // Matches reports whether art satisfies all non-zero filter fields.
+// Normalize translates entity-field predicates (Kind, Status, Scope, etc.)
+// into label predicates and clears the originating fields. Safe to call
+// multiple times — idempotent. Called at List/ListPage boundaries.
+func (f Filter) Normalize() Filter { //nolint:gocritic // hugeParam: value semantics intentional; Filter is read-only in all callers
+	out := f
+	if out.Kind != "" {
+		out.Labels = mirrorLabel(out.Labels, LabelPrefixKind, out.Kind)
+		out.Kind = ""
+	}
+	// Kinds is OR semantics → LabelsOr, not Labels (AND).
+	for _, k := range out.Kinds {
+		out.LabelsOr = append(out.LabelsOr, LabelPrefixKind+k)
+	}
+	if len(out.Kinds) > 0 {
+		out.Kinds = nil
+	}
+	if out.Status != "" {
+		out.Labels = mirrorLabel(out.Labels, LabelPrefixStatus, out.Status)
+		out.Status = ""
+	}
+	// Scope normalization deferred — requires MigrateSystemLabels to have run
+	// on all stores first, including the _schema scope. Until then, Scope/Scopes
+	// remain as column-based filters in buildWhereClause.
+	if out.Sprint != "" {
+		out.Labels = mirrorLabel(out.Labels, LabelPrefixSprint, out.Sprint)
+		out.Sprint = ""
+	}
+	// ExcludeKind and ExcludeStatus normalization deferred — requires all artifacts
+	// to carry system labels first (MigrateSystemLabels). Until then, these stay
+	// as column predicates in buildWhereClause.
+	return out
+}
+
 func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic // hugeParam: Filter is read-only in all callers; pointer would complicate call sites
 	if f.Family != "" && len(f.FamilyKinds) > 0 {
 		if !f.FamilyKinds[art.ResolvedKind()] {

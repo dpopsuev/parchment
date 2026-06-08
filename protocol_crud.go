@@ -466,6 +466,7 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 	}
 	p.populateScopeLabelIndex(ctx, &f)
 	p.populateFamilyKinds(&f)
+	f = f.Normalize()
 	arts, err := p.store.List(ctx, f)
 	if err != nil {
 		return arts, err

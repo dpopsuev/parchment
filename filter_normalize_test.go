@@ -1,31 +1,27 @@
 package parchment_test
 
 import (
-	"slices"
 	"testing"
 
 	"github.com/dpopsuev/parchment"
 )
 
-func TestFilter_Normalize_KindToLabel(t *testing.T) {
+func TestFilter_Normalize_KindPreserved(t *testing.T) {
+	// Kind normalization deferred — Kind stays as column predicate until
+	// MigrateSystemLabels confirms all artifacts carry kind: labels.
 	f := parchment.Filter{Kind: "task"}
 	n := f.Normalize()
-	if !slices.Contains(n.Labels, "kind:task") {
-		t.Errorf("Normalize should add kind:task label, got %v", n.Labels)
-	}
-	if n.Kind != "" {
-		t.Errorf("Normalize should clear Kind field, got %q", n.Kind)
+	if n.Kind != "task" {
+		t.Errorf("Kind should be preserved (deferred normalization), got %q", n.Kind)
 	}
 }
 
-func TestFilter_Normalize_StatusToLabel(t *testing.T) {
+func TestFilter_Normalize_StatusPreserved(t *testing.T) {
+	// Status normalization deferred — same reason as Kind.
 	f := parchment.Filter{Status: "active"}
 	n := f.Normalize()
-	if !slices.Contains(n.Labels, "status:active") {
-		t.Errorf("Normalize should add status:active label, got %v", n.Labels)
-	}
-	if n.Status != "" {
-		t.Errorf("Normalize should clear Status field, got %q", n.Status)
+	if n.Status != "active" {
+		t.Errorf("Status should be preserved (deferred normalization), got %q", n.Status)
 	}
 }
 
@@ -40,20 +36,21 @@ func TestFilter_Normalize_ScopePreserved(t *testing.T) {
 }
 
 func TestFilter_Normalize_Idempotent(t *testing.T) {
-	f := parchment.Filter{Kind: "task", Status: "active", Scope: "scribe"}
+	// Sprint IS normalized. Kind/Status/Scope are NOT (deferred).
+	f := parchment.Filter{Sprint: "2026-W24"}
 	once := f.Normalize()
 	twice := once.Normalize()
-	if once.Kind != twice.Kind || once.Status != twice.Status {
+	if once.Sprint != twice.Sprint {
 		t.Error("Normalize must be idempotent")
 	}
-	kindCount := 0
+	sprintCount := 0
 	for _, l := range twice.Labels {
-		if l == "kind:task" {
-			kindCount++
+		if l == "sprint:2026-W24" {
+			sprintCount++
 		}
 	}
-	if kindCount != 1 {
-		t.Errorf("kind:task must appear exactly once after double Normalize, got %d", kindCount)
+	if sprintCount != 1 {
+		t.Errorf("sprint:2026-W24 must appear exactly once after double Normalize, got %d", sprintCount)
 	}
 }
 

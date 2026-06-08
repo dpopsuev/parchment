@@ -122,13 +122,9 @@ type Store interface {
 }
 
 // DBSizer is an optional interface for stores that can report database size.
-// SQLiteStore implements this.
 type DBSizer interface {
 	DBSizeBytes(ctx context.Context) (int64, error)
 }
-
-// Compile-time interface verification.
-var _ Store = (*SQLiteStore)(nil)
 
 // neighborArtifacts is the shared implementation for Store.NeighborArtifacts.
 func neighborArtifacts(ctx context.Context, s Store, id, rel string, dir Direction) ([]*Artifact, error) {

@@ -319,11 +319,6 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 		}
 	}()
 
-	// Auto-snapshot if last snapshot is stale
-	backend := NewLocalSnapshotBackend(path, writer)
-	snapshotter := NewSnapshotter(backend, st)
-	snapshotter.AutoSnapshot(context.Background(), cfg.Snapshots)
-
 	return st, nil
 }
 
@@ -2134,7 +2129,7 @@ func (s *SQLiteStore) BulkGetMetrics(ctx context.Context, ids []string) (map[str
 	return out, rows.Err()
 }
 
-// Compile-time MetricsStore verification.
+var _ Store        = (*SQLiteStore)(nil)
 var _ MetricsStore = (*SQLiteStore)(nil)
 
 

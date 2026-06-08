@@ -236,10 +236,11 @@ func seedKindsFromRegistry(ctx context.Context, s Store) {
 		}
 		art := &Artifact{
 			ID:         id,
-			Kind:       KindDefinition,
+			Kind:       KindLabelDefinition, // collapsed: kind_definition → label_definition
 			Scope:      SchemaScope,
 			Title:      k.Name,
 			Status:     StatusActive,
+			Labels:     []string{LabelPrefixKind + KindDefinition},
 			Extra:      extra,
 			CreatedAt:  now,
 			UpdatedAt:  now,

@@ -34,9 +34,10 @@ func TestSeedDefinitions_KindArtifact_HasGuidanceSections(t *testing.T) {
 	ctx := context.Background()
 	parchment.SeedDefinitions(ctx, s)
 
-	// Find the task kind_definition artifact
+	// Find the task kind_definition artifact.
+	// Dual-read: accepts both legacy KindDefinition and collapsed KindLabelDefinition.
 	arts, err := s.List(ctx, parchment.Filter{
-		Kind:  parchment.KindDefinition,
+		Kinds: []string{parchment.KindDefinition, parchment.KindLabelDefinition},
 		Scope: parchment.SchemaScope,
 	})
 	if err != nil {

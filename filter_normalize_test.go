@@ -6,22 +6,43 @@ import (
 	"github.com/dpopsuev/parchment"
 )
 
-func TestFilter_Normalize_KindPreserved(t *testing.T) {
-	// Kind normalization deferred — Kind stays as column predicate until
-	// MigrateSystemLabels confirms all artifacts carry kind: labels.
+func TestFilter_Normalize_KindToLabel(t *testing.T) {
+	// Given: Kind field set on filter
+	// When:  Normalize() runs (migration complete, v1.0.0+)
+	// Then:  Kind cleared; kind:task label added to Labels
 	f := parchment.Filter{Kind: "task"}
 	n := f.Normalize()
-	if n.Kind != "task" {
-		t.Errorf("Kind should be preserved (deferred normalization), got %q", n.Kind)
+	if n.Kind != "" {
+		t.Errorf("Kind should be cleared after normalization, got %q", n.Kind)
+	}
+	found := false
+	for _, l := range n.Labels {
+		if l == "kind:task" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Labels should contain %q after normalization, got %v", "kind:task", n.Labels)
 	}
 }
 
-func TestFilter_Normalize_StatusPreserved(t *testing.T) {
-	// Status normalization deferred — same reason as Kind.
+func TestFilter_Normalize_StatusToLabel(t *testing.T) {
+	// Given: Status field set on filter
+	// When:  Normalize() runs (migration complete, v1.0.0+)
+	// Then:  Status cleared; status:active label added to Labels
 	f := parchment.Filter{Status: "active"}
 	n := f.Normalize()
-	if n.Status != "active" {
-		t.Errorf("Status should be preserved (deferred normalization), got %q", n.Status)
+	if n.Status != "" {
+		t.Errorf("Status should be cleared after normalization, got %q", n.Status)
+	}
+	found := false
+	for _, l := range n.Labels {
+		if l == "status:active" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Labels should contain %q after normalization, got %v", "status:active", n.Labels)
 	}
 }
 

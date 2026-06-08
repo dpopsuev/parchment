@@ -258,14 +258,25 @@ func (a *Artifact) ResolvedScope() string {
 // multiple times — idempotent. Called at List/ListPage boundaries.
 func (f Filter) Normalize() Filter { //nolint:gocritic // hugeParam: value semantics intentional; Filter is read-only in all callers
 	out := f
-	// Kind/Kinds/Status/Scope normalization deferred until MigrateSystemLabels is
-	// part of standard startup. Direct-Put artifacts (tests, seeds) have Kind/Status
-	// in the column but no system labels — normalizing now would exclude them.
-	// Sprint is safe to normalize — it is a pure label with no column backing.
+	if out.Kind != "" {
+		out.Labels = mirrorLabel(out.Labels, LabelPrefixKind, out.Kind)
+		out.Kind = ""
+	}
+	for _, k := range out.Kinds {
+		out.LabelsOr = append(out.LabelsOr, LabelPrefixKind+k)
+	}
+	if len(out.Kinds) > 0 {
+		out.Kinds = nil
+	}
+	if out.Status != "" {
+		out.Labels = mirrorLabel(out.Labels, LabelPrefixStatus, out.Status)
+		out.Status = ""
+	}
 	if out.Sprint != "" {
 		out.Labels = mirrorLabel(out.Labels, LabelPrefixSprint, out.Sprint)
 		out.Sprint = ""
 	}
+	// Scope stays column-backed: normalizing it would surface _schema artifacts in user queries.
 	return out
 }
 

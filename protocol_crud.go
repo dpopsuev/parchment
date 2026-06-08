@@ -231,7 +231,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		seedLabels = append(seedLabels, LabelPrefixPriority+in.Priority)
 	}
 	art := &Artifact{
-		ID: id, Alias: in.Alias, Kind: in.Kind, Scope: scope,
+		ID: id, Alias: in.Alias, Scope: scope,
 		Status: status, Parent: in.Parent,
 		Title: in.Title, Goal: in.Goal,
 		Priority:  in.Priority,
@@ -239,6 +239,8 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		Links: in.Links, Extra: in.Extra,
 		Sections: in.Sections,
 	}
+	// Kind is label-canonical: derive from the seeded label rather than setting the field directly.
+	art.Kind = art.ResolvedKind()
 	if in.CreatedAt != "" {
 		if t, err := time.Parse(time.RFC3339, in.CreatedAt); err == nil {
 			art.CreatedAt = t

@@ -2000,6 +2000,14 @@ func (s *SQLiteStore) GetEmbeddingHash(ctx context.Context, artifactID, model st
 	return hash
 }
 
+func (s *SQLiteStore) ListByLabel(ctx context.Context, label string) ([]*Artifact, error) {
+	return s.List(ctx, Filter{Labels: []string{label}})
+}
+
+func (s *SQLiteStore) NeighborArtifacts(ctx context.Context, id, rel string, dir Direction) ([]*Artifact, error) {
+	return neighborArtifacts(ctx, s, id, rel, dir)
+}
+
 func (s *SQLiteStore) SearchSemantic(ctx context.Context, model string, query []float32, n int) ([]SearchResult, error) {
 	rows, err := s.reader.QueryContext(ctx,
 		`SELECT artifact_id, vector FROM artifact_embeddings WHERE model=?`, model)

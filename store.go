@@ -55,6 +55,14 @@ type ArtifactStore interface {
 	GetEmbedding(ctx context.Context, artifactID, model string) ([]float32, error)
 	GetEmbeddingHash(ctx context.Context, artifactID, model string) string
 	SearchSemantic(ctx context.Context, model string, query []float32, n int) ([]SearchResult, error)
+
+	// ListByLabel returns all artifacts carrying the given label.
+	// Equivalent to List(ctx, Filter{Labels: []string{label}}) with a direct index path.
+	ListByLabel(ctx context.Context, label string) ([]*Artifact, error)
+
+	// NeighborArtifacts returns the full Artifact records for all neighbors of id
+	// via the given relation and direction. Convenience over Neighbors + batch Get.
+	NeighborArtifacts(ctx context.Context, id, rel string, dir Direction) ([]*Artifact, error)
 }
 
 // SearchResult is one entry returned by SearchSemantic.
@@ -121,3 +129,24 @@ type DBSizer interface {
 
 // Compile-time interface verification.
 var _ Store = (*SQLiteStore)(nil)
+
+// neighborArtifacts is the shared implementation for Store.NeighborArtifacts.
+func neighborArtifacts(ctx context.Context, s Store, id, rel string, dir Direction) ([]*Artifact, error) {
+	edges, err := s.Neighbors(ctx, id, rel, dir)
+	if err != nil {
+		return nil, err
+	}
+	arts := make([]*Artifact, 0, len(edges))
+	for _, e := range edges {
+		target := e.To
+		if dir == Incoming {
+			target = e.From
+		}
+		art, err := s.Get(ctx, target)
+		if err != nil {
+			continue
+		}
+		arts = append(arts, art)
+	}
+	return arts, nil
+}

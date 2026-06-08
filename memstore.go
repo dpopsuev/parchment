@@ -584,6 +584,14 @@ func (m *MemoryStore) GetEmbedding(_ context.Context, artifactID, model string) 
 	return cp, nil
 }
 
+func (m *MemoryStore) ListByLabel(ctx context.Context, label string) ([]*Artifact, error) {
+	return m.List(ctx, Filter{Labels: []string{label}})
+}
+
+func (m *MemoryStore) NeighborArtifacts(ctx context.Context, id, rel string, dir Direction) ([]*Artifact, error) {
+	return neighborArtifacts(ctx, m, id, rel, dir)
+}
+
 func (m *MemoryStore) SearchSemantic(_ context.Context, model string, query []float32, n int) ([]SearchResult, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

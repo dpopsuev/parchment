@@ -218,15 +218,17 @@ func labelValue(labels []string, prefix string) string {
 	return ""
 }
 
-// ResolvedKind returns the artifact's kind derived from labels.
-func (a *Artifact) ResolvedKind() string {
-	return labelValue(a.Labels, LabelPrefixKind)
-}
+// Kind returns the artifact's kind derived from its labels.
+func (a *Artifact) Kind() string { return labelValue(a.Labels, LabelPrefixKind) }
 
-// ResolvedStatus returns the artifact's status derived from labels.
-func (a *Artifact) ResolvedStatus() string {
-	return labelValue(a.Labels, LabelPrefixStatus)
-}
+// Status returns the artifact's status derived from its labels.
+func (a *Artifact) Status() string { return labelValue(a.Labels, LabelPrefixStatus) }
+
+// ResolvedKind is an alias for Kind, kept for call sites not yet updated.
+func (a *Artifact) ResolvedKind() string { return a.Kind() }
+
+// ResolvedStatus is an alias for Status, kept for call sites not yet updated.
+func (a *Artifact) ResolvedStatus() string { return a.Status() }
 
 // ResolvedScope returns the artifact's scope. The Scope field is authoritative;
 // if empty, the first "scope:<value>" label is used.

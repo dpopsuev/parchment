@@ -79,9 +79,10 @@ type ProtocolConfig struct {
 type Protocol struct {
 	store            Store
 	schema           *Schema
-	traits           *TraitStore             // unified trait store (Step 2)
-	labelTraits      map[string]LabelTrait   // deprecated: use traits.LabelMap()
-	edgeTypeTraits   map[string]EdgeTypeTrait // deprecated: use traits.EdgeMap()
+	registry         *ComponentRegistry      // reloadable trait + rule store (Step 9)
+	traits           *TraitStore             // deprecated: use registry.Traits()
+	labelTraits      map[string]LabelTrait   // deprecated: use registry.Traits().LabelMap()
+	edgeTypeTraits   map[string]EdgeTypeTrait // deprecated: use registry.Traits().EdgeMap()
 	scopes           []string
 	vocab            []string
 	idFormat         string
@@ -130,6 +131,8 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 		}
 		rules, _ := p.LoadRules(context.Background())
 		p.rules = rules
+		// ComponentRegistry wraps the trait store and rules for hot-reload (Step 9).
+		p.registry = newComponentRegistry(s, p.traits, p.rules)
 	}
 	p.idFormat = idc.IDFormat
 	p.idTemplate = idc.IDTemplate

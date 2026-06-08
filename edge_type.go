@@ -238,6 +238,9 @@ func SeedEdgeTypeTraits(ctx context.Context, s Store) {
 
 // RefreshEdgeTraits reloads edge type traits from the store.
 // Use in tests that seed edge_type_definition artifacts after Protocol construction.
+// Registry returns the ComponentRegistry for hot-reload of traits and rules.
+func (p *Protocol) Registry() *ComponentRegistry { return p.registry }
+
 func (p *Protocol) RefreshEdgeTraits(ctx context.Context) {
 	p.edgeTypeTraits = loadEdgeTypeTraits(ctx, p.store)
 }

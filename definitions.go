@@ -92,12 +92,9 @@ func SeedDefinitions(ctx context.Context, s Store) {
 func loadSchema(ctx context.Context, s Store) (*Schema, error) { //nolint:unparam // error always nil by design; kept for interface consistency
 	base := KnowledgeSchema()
 
-	// Dual-read seam: accept both KindDefinition (legacy) and KindLabelDefinition
-	// (post-collapse) until all rows are migrated. Remove KindDefinition path when
-	// the compat migration confirms no legacy rows remain (PRC-TSK-136 cleanup).
 	arts, err := s.List(ctx, Filter{
-		LabelsOr: []string{LabelPrefixKind + KindDefinition, LabelPrefixKind + KindLabelDefinition},
-		Scope:    SchemaScope,
+		Labels: []string{LabelPrefixKind + KindLabelDefinition},
+		Scope:  SchemaScope,
 	})
 	if err != nil {
 		slog.WarnContext(ctx, "load schema: list definitions failed, using compiled-in schema",

@@ -64,10 +64,6 @@ const (
 const (
 )
 
-// KindDefinition is the meta-kind. Every other kind is stored as a
-// KindDefinition artifact in SchemaScope. It is the only kind that is
-// compiled in — all others are loaded from the store at startup.
-const KindDefinition = "definition"
 
 // Artifact kinds — knowledge layer.
 // These extend the work kinds via KnowledgeSchema().

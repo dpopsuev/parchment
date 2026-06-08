@@ -196,6 +196,27 @@ func (a *Artifact) ResolvedSprint() string {
 // mirrorLabel replaces any existing label with the given prefix with a new
 // one built from prefix+value. If value is empty the label is simply removed.
 // Used by SetField to keep system label mirrors consistent with field writes.
+// syncSystemFields ensures Kind, Status, Scope, Priority, and Sprint are
+// mirrored as labels on the artifact. Called by Store.Put so every write —
+// whether from Protocol or directly — keeps the label junction consistent.
+func syncSystemFields(art *Artifact) {
+	if art.Kind != "" {
+		art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, art.Kind)
+	}
+	if art.Status != "" {
+		art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, art.Status)
+	}
+	if art.Scope != "" && art.Scope != SchemaScope {
+		art.Labels = mirrorLabel(art.Labels, LabelPrefixScope, art.Scope)
+	}
+	if art.Priority != "" {
+		art.Labels = mirrorLabel(art.Labels, LabelPrefixPriority, art.Priority)
+	}
+	if art.Sprint != "" {
+		art.Labels = mirrorLabel(art.Labels, LabelPrefixSprint, art.Sprint)
+	}
+}
+
 func mirrorLabel(labels []string, prefix, value string) []string {
 	out := make([]string, 0, len(labels)+1)
 	for _, l := range labels {

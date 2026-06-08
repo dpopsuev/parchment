@@ -485,6 +485,7 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	if art.InsertedAt.IsZero() {
 		art.InsertedAt = now
 	}
+	syncSystemFields(art)
 
 	tx, err := s.writer.BeginTx(ctx, nil)
 	if err != nil {
@@ -607,6 +608,7 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 		if art.InsertedAt.IsZero() {
 			art.InsertedAt = now
 		}
+		syncSystemFields(art)
 
 		dependsOn, _ := json.Marshal(art.DependsOn)
 		labels, _ := json.Marshal(art.Labels)
@@ -688,6 +690,7 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 	}
 	now := time.Now().UTC()
 	art.UpdatedAt = now
+	syncSystemFields(art)
 
 	dependsOn, _ := json.Marshal(art.DependsOn)
 	labels, _ := json.Marshal(art.Labels)
@@ -1124,6 +1127,7 @@ func (s *SQLiteStore) cleanDanglingRefs(ctx context.Context, tx *sql.Tx, deleted
 // Returns (clauses, args, sqlLabels) where sqlLabels=true means label filtering
 // was pushed to SQL; false means post-scan filtering is required.
 func buildWhereClause(f Filter) ([]string, []any, bool) { //nolint:cyclop,gocyclo,gocritic // hugeParam: value semantics match List/ListPage callers; complexity linear not nested
+	f = f.Normalize()
 	var clauses []string
 	var args []any
 	if f.IDPrefix != "" {
@@ -1228,7 +1232,7 @@ func buildWhereClause(f Filter) ([]string, []any, bool) { //nolint:cyclop,gocycl
 				args = append(args, label)
 			}
 			clauses = append(clauses,
-				"EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label IN ("+strings.Join(ph, ",")+")")
+				"EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label IN ("+strings.Join(ph, ",")+"))")
 		}
 		for _, label := range f.ExcludeLabels {
 			clauses = append(clauses,

@@ -85,7 +85,7 @@ func ParseMDFile(path string) (*Artifact, error) { //nolint:gosec,gocyclo,cyclop
 		return nil, err
 	}
 	content := strings.ReplaceAll(string(data), "\r\n", "\n")
-	art := &Artifact{Kind: KindNote, Status: StatusActive}
+	art := &Artifact{Labels: []string{LabelPrefixKind + KindNote, LabelPrefixStatus + StatusActive}}
 
 	if strings.HasPrefix(content, "---\n") { //nolint:nestif // YAML frontmatter parsing; branching is inherent to the format
 		end := strings.Index(content[4:], "\n---")
@@ -103,13 +103,13 @@ func ParseMDFile(path string) (*Artifact, error) { //nolint:gosec,gocyclo,cyclop
 				case "id":
 					art.ID = val
 				case FieldKind:
-					art.Kind = val
+					art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, val)
 				case "title":
 					art.Title = val
 				case FieldScope:
 					art.Scope = val
 				case "status":
-					art.Status = val
+					art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, val)
 				case "priority":
 					art.Priority = val
 				case "parent":
@@ -172,8 +172,8 @@ func parseTemplateFile(path string) (*Artifact, error) {
 	if err != nil {
 		return nil, err
 	}
-	art.Kind = KindTemplate
-	art.Status = StatusActive
+	art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, KindTemplate)
+	art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, StatusActive)
 	if art.ID == "" {
 		base := strings.TrimSuffix(filepath.Base(path), ".md")
 		art.ID = "TPL-SEED-" + strings.ToUpper(strings.ReplaceAll(base, "-", "_"))
@@ -201,9 +201,8 @@ func parseConfigFile(path string) (*Artifact, error) {
 
 	art := &Artifact{
 		ID:     "CFG-SEED-" + strings.ToUpper(strings.ReplaceAll(base, "-", "_")),
-		Kind:   KindConfig,
+		Labels: []string{LabelPrefixKind + KindConfig, LabelPrefixStatus + StatusActive},
 		Scope:  scope,
-		Status: StatusActive,
 		Title:  base + " config",
 	}
 

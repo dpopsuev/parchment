@@ -14,7 +14,7 @@ func setupTemplateProto(t *testing.T) *parchment.Protocol {
 	ctx := context.Background()
 
 	store.Put(ctx, &parchment.Artifact{
-		ID: "TPL-1", Kind: "template", Status: "active", Title: "Bug Template", Scope: "test",
+		ID: "TPL-1", Labels: []string{"kind:template", "status:active"}, Title: "Bug Template", Scope: "test",
 		Sections: []parchment.Section{
 			{Name: "content", Text: "raw markdown"},
 			{Name: "observed", Text: "Observed vs expected behavior"},
@@ -30,16 +30,14 @@ func TestCreateArtifact_PatchFillsSections(t *testing.T) {
 	ctx := context.Background()
 	proto := setupTemplateProto(t)
 
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind:  "bug",
-		Title: "crash on nil input",
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "crash on nil input",
 		Scope: "test",
 		Patch: map[string]string{
 			"observed":     "nil pointer dereference on Foo(nil)",
 			"reproduction": "1. call Foo(nil)\n2. observe panic",
 			"root_cause":   "missing nil guard",
 		},
-	})
+		Labels: []string{"kind:bug"},})
 	if err != nil {
 		t.Fatalf("create with patch should succeed: %v", err)
 	}
@@ -64,9 +62,7 @@ func TestCreateArtifact_PatchMergesWithExplicitSections(t *testing.T) {
 	ctx := context.Background()
 	proto := setupTemplateProto(t)
 
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind:  "bug",
-		Title: "race condition",
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "race condition",
 		Scope: "test",
 		Sections: []parchment.Section{
 			{Name: "observed", Text: "data race on map"},
@@ -75,7 +71,7 @@ func TestCreateArtifact_PatchMergesWithExplicitSections(t *testing.T) {
 			"reproduction": "1. run with -race",
 			"root_cause":   "unsynchronized map access",
 		},
-	})
+		Labels: []string{"kind:bug"},})
 	if err != nil {
 		t.Fatalf("create with sections+patch should succeed: %v", err)
 	}
@@ -97,9 +93,7 @@ func TestCreateArtifact_PatchOverridesExplicitSection(t *testing.T) {
 	ctx := context.Background()
 	proto := setupTemplateProto(t)
 
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind:  "bug",
-		Title: "dup section",
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "dup section",
 		Scope: "test",
 		Sections: []parchment.Section{
 			{Name: "observed", Text: "old observed"},
@@ -109,7 +103,7 @@ func TestCreateArtifact_PatchOverridesExplicitSection(t *testing.T) {
 		Patch: map[string]string{
 			"observed": "new observed from patch",
 		},
-	})
+		Labels: []string{"kind:bug"},})
 	if err != nil {
 		t.Fatalf("create should succeed: %v", err)
 	}
@@ -135,11 +129,9 @@ func TestPromoteStash_PatchFillsMissingSections(t *testing.T) {
 	// The stash/promote_stash recovery path is still supported for callers that
 	// pre-built a stash from an older workflow, but the happy path no longer
 	// requires it.
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind:  "bug",
-		Title: "stash test bug",
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "stash test bug",
 		Scope: "test",
-	})
+		Labels: []string{"kind:bug"},})
 	if err != nil {
 		t.Fatalf("create without sections should succeed as draft: %v", err)
 	}
@@ -170,13 +162,11 @@ func TestPromoteStash_PatchFillsMissingSections(t *testing.T) {
 func TestMergeInput_PatchFieldMerged(t *testing.T) {
 	t.Parallel()
 
-	base := parchment.CreateInput{
-		Kind:  "bug",
-		Title: "base title",
+	base := parchment.CreateInput{Title: "base title",
 		Sections: []parchment.Section{
 			{Name: "observed", Text: "existing observed"},
 		},
-	}
+		Labels: []string{"kind:bug"},}
 	patch := parchment.CreateInput{
 		Patch: map[string]string{
 			"reproduction": "new reproduction",

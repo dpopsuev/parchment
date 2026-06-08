@@ -15,7 +15,7 @@ func (p *Protocol) RegisterGate(g QualityGate) { p.gates = append(p.gates, g) }
 // Components: checklist items, child completion, section coverage.
 func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 { //nolint:gocyclo // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
 	// Terminal artifacts are 100% complete by definition
-	if p.schema.IsTerminal(art.Status) {
+	if p.schema.IsTerminal(art.ResolvedStatus()) {
 		return 1.0
 	}
 
@@ -47,7 +47,7 @@ func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 {
 	if err == nil && len(children) > 0 {
 		done := 0
 		for _, ch := range children {
-			if p.schema.IsTerminal(ch.Status) {
+			if p.schema.IsTerminal(ch.ResolvedStatus()) {
 				done++
 			}
 		}
@@ -144,7 +144,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		return Result{ID: id, Error: err.Error()}
 	}
 
-	if !opt.BypassGuards && p.schema.Guards.ArchivedReadonly && p.schema.IsReadonly(art.Status) {
+	if !opt.BypassGuards && p.schema.Guards.ArchivedReadonly && p.schema.IsReadonly(art.ResolvedStatus()) {
 		return Result{ID: id, Error: fmt.Sprintf("%s: %s", ErrArchived, id)}
 	}
 
@@ -198,7 +198,6 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		if err := ValidateKind(value, p.vocab); err != nil {
 			return Result{ID: id, Error: err.Error()}
 		}
-		art.Kind = value
 		art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, value)
 	case FieldDependsOn:
 		if value == "" {
@@ -270,7 +269,7 @@ func (p *Protocol) setStatus(ctx context.Context, art *Artifact, status string) 
 
 
 func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status string, force bool) Result { //nolint:gocyclo,funlen // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol.go
-	reason, valid := p.schema.ValidTransition(art.ResolvedKind(), art.Status, status)
+	reason, valid := p.schema.ValidTransition(art.ResolvedKind(), art.ResolvedStatus(), status)
 	if !valid {
 		if !force {
 			return Result{ID: art.ID, Error: reason}
@@ -278,7 +277,7 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 		slog.WarnContext(ctx, "forced status transition bypasses lifecycle model",
 			slog.String(LogKeyID, art.ID),
 			slog.String(LogKeyKind, art.ResolvedKind()),
-			slog.String(LogKeyFrom, art.Status),
+			slog.String(LogKeyFrom, art.ResolvedStatus()),
 			slog.String(LogKeyTo, status),
 			slog.String(LogKeyReason, reason))
 	}
@@ -328,14 +327,13 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 			if err != nil {
 				continue
 			}
-			if !p.schema.IsTerminal(preceded.Status) {
-				followsWarnings = append(followsWarnings, fmt.Sprintf("%s is %s", preceded.ID, preceded.Status))
+			if !p.schema.IsTerminal(preceded.ResolvedStatus()) {
+				followsWarnings = append(followsWarnings, fmt.Sprintf("%s is %s", preceded.ID, preceded.ResolvedStatus()))
 			}
 		}
 	}
 
-	oldStatus := art.Status
-	art.Status = status
+	oldStatus := art.ResolvedStatus()
 	art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, status)
 	if err := p.store.Put(ctx, art); err != nil {
 		return Result{ID: art.ID, Error: err.Error()}
@@ -415,8 +413,8 @@ func (p *Protocol) guardDependsOnComplete(ctx context.Context, art *Artifact) er
 		if err != nil {
 			continue // dangling edge, not a blocker
 		}
-		if !p.schema.IsTerminal(dep.Status) {
-			incomplete = append(incomplete, fmt.Sprintf("%s [%s]", dep.ID, dep.Status))
+		if !p.schema.IsTerminal(dep.ResolvedStatus()) {
+			incomplete = append(incomplete, fmt.Sprintf("%s [%s]", dep.ID, dep.ResolvedStatus()))
 		}
 	}
 	if len(incomplete) > 0 {
@@ -433,8 +431,8 @@ func (p *Protocol) guardChildrenComplete(ctx context.Context, art *Artifact) err
 	}
 	var incomplete []string
 	for _, ch := range children {
-		if !p.schema.IsTerminal(ch.Status) {
-			incomplete = append(incomplete, fmt.Sprintf("%s [%s]", ch.ID, ch.Status))
+		if !p.schema.IsTerminal(ch.ResolvedStatus()) {
+			incomplete = append(incomplete, fmt.Sprintf("%s [%s]", ch.ID, ch.ResolvedStatus()))
 		}
 	}
 	if len(incomplete) > 0 {
@@ -459,10 +457,10 @@ func (p *Protocol) autoArchiveGoal(ctx context.Context, art *Artifact) string {
 		if err != nil {
 			continue
 		}
-		if !p.schema.Kinds[goal.ResolvedKind()].IsGoalKind || goal.Status != goalDef.ActiveStatus {
+		if !p.schema.Kinds[goal.ResolvedKind()].IsGoalKind || goal.ResolvedStatus() != goalDef.ActiveStatus {
 			continue
 		}
-		goal.Status = p.schema.ReadonlyStatuses[0]
+		goal.Labels = mirrorLabel(goal.Labels, LabelPrefixStatus, p.schema.ReadonlyStatuses[0])
 		if err := p.store.Put(ctx, goal); err != nil {
 			continue
 		}
@@ -483,14 +481,14 @@ func (p *Protocol) completionRollup(ctx context.Context, art *Artifact) string {
 		sources, _ := p.store.Neighbors(ctx, art.ID, relation, Incoming)
 		for _, e := range sources {
 			source, err := p.store.Get(ctx, e.From)
-			if err != nil || p.schema.IsTerminal(source.Status) {
+			if err != nil || p.schema.IsTerminal(source.ResolvedStatus()) {
 				continue
 			}
 			targets, _ := p.store.Neighbors(ctx, source.ID, relation, Outgoing)
 			allDone := true
 			for _, t := range targets {
 				child, err := p.store.Get(ctx, t.To)
-				if err != nil || !p.schema.IsTerminal(child.Status) {
+				if err != nil || !p.schema.IsTerminal(child.ResolvedStatus()) {
 					allDone = false
 					break
 				}
@@ -511,7 +509,7 @@ func (p *Protocol) autoCompleteParent(ctx context.Context, art *Artifact) string
 		return ""
 	}
 	parent, err := p.store.Get(ctx, art.Parent)
-	if err != nil || p.schema.IsTerminal(parent.Status) {
+	if err != nil || p.schema.IsTerminal(parent.ResolvedStatus()) {
 		return ""
 	}
 	children, err := p.store.Children(ctx, parent.ID)
@@ -519,7 +517,7 @@ func (p *Protocol) autoCompleteParent(ctx context.Context, art *Artifact) string
 		return ""
 	}
 	for _, ch := range children {
-		if !p.schema.IsTerminal(ch.Status) {
+		if !p.schema.IsTerminal(ch.ResolvedStatus()) {
 			return ""
 		}
 	}

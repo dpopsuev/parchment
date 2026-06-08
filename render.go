@@ -15,7 +15,7 @@ func RenderMarkdown(art *Artifact) string { //nolint:gocyclo // display logic is
 	fmt.Fprintf(&b, "# %s: %s\n\n", art.ID, art.Title)
 
 	renderWriteField(&b, "Kind", art.ResolvedKind())
-	renderWriteField(&b, "Status", art.Status)
+	renderWriteField(&b, "Status", art.ResolvedStatus())
 	if art.Scope != "" {
 		renderWriteField(&b, "Scope", art.Scope)
 	}
@@ -98,7 +98,7 @@ func RenderTable(arts []*Artifact) string {
 	writeRow("----", "----", "-----", "------", "------", "------", "----------", "-----")
 	for _, a := range arts {
 		deps := strings.Join(a.DependsOn, ",")
-		writeRow(a.ID, a.Kind, a.Scope, a.Status, a.Sprint, a.Parent, deps, a.Title)
+		writeRow(a.ID, a.ResolvedKind(), a.Scope, a.ResolvedStatus(), a.Sprint, a.Parent, deps, a.Title)
 	}
 
 	fmt.Fprintf(&b, "\n(%d artifacts)\n", len(arts))
@@ -167,7 +167,7 @@ func RenderGroupedTable(arts []*Artifact, field string, statusOrder ...[]string)
 			if a.Sprint != "" {
 				sprint = " (sprint: " + a.Sprint + ")"
 			}
-			fmt.Fprintf(&b, "  %-20s %-15s %s%s%s%s\n", a.ID, a.Kind, scope, a.Title, parent, sprint)
+			fmt.Fprintf(&b, "  %-20s %-15s %s%s%s%s\n", a.ID, a.ResolvedKind(), scope, a.Title, parent, sprint)
 		}
 	}
 	fmt.Fprintf(&b, "\n(%d artifacts)\n", total)
@@ -231,7 +231,7 @@ func RenderVaultMarkdown(art *Artifact) string {
 		fmt.Fprintf(&b, "alias: %s\n", art.Alias)
 	}
 	fmt.Fprintf(&b, "kind: %s\n", art.ResolvedKind())
-	fmt.Fprintf(&b, "status: %s\n", art.Status)
+	fmt.Fprintf(&b, "status: %s\n", art.ResolvedStatus())
 	if art.Scope != "" {
 		fmt.Fprintf(&b, "scope: %s\n", art.Scope)
 	}
@@ -244,8 +244,15 @@ func RenderVaultMarkdown(art *Artifact) string {
 	if art.Sprint != "" {
 		fmt.Fprintf(&b, "sprint: %s\n", art.Sprint)
 	}
-	if len(art.Labels) > 0 {
-		fmt.Fprintf(&b, "labels: [%s]\n", strings.Join(art.Labels, ", "))
+	// kind: and status: are emitted as separate top-level fields; exclude from labels.
+	var userLabels []string
+	for _, l := range art.Labels {
+		if !strings.HasPrefix(l, LabelPrefixKind) && !strings.HasPrefix(l, LabelPrefixStatus) {
+			userLabels = append(userLabels, l)
+		}
+	}
+	if len(userLabels) > 0 {
+		fmt.Fprintf(&b, "labels: [%s]\n", strings.Join(userLabels, ", "))
 	}
 	if len(art.DependsOn) > 0 {
 		fmt.Fprintf(&b, "depends_on: [%s]\n", strings.Join(art.DependsOn, ", "))
@@ -326,9 +333,9 @@ func vaultApplyFrontmatterField(art *Artifact, key, val string) { //nolint:cyclo
 	case "alias":
 		art.Alias = val
 	case FieldKind:
-		art.Kind = val
+		art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, val)
 	case FieldStatus:
-		art.Status = val
+		art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, val)
 	case FieldScope:
 		art.Scope = val
 	case FieldParent:
@@ -428,15 +435,15 @@ func vaultParseSections(body string, art *Artifact) {
 func renderGroupKey(a *Artifact, field string) string {
 	switch field {
 	case FieldStatus:
-		return a.Status
+		return a.ResolvedStatus()
 	case FieldScope:
 		return a.Scope
 	case FieldKind:
-		return a.Kind
+		return a.ResolvedKind()
 	case "sprint":
 		return a.Sprint
 	default:
-		return a.Status
+		return a.ResolvedStatus()
 	}
 }
 

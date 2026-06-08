@@ -18,10 +18,9 @@ func TestProtocol_ListPage_PaginatesCorrectly(t *testing.T) {
 	ctx := context.Background()
 
 	for i := range 5 {
-		_, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-			Kind: parchment.KindTask, Title: "artifact", Scope: "test",
-			Goal: string(rune('a' + i)), // distinct enough to create
-		})
+		_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "artifact", Scope: "test",
+			Goal: string(rune('a' + i)), // distinct enough to create,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 		if err != nil {
 			t.Fatalf("create %d: %v", i, err)
 		}
@@ -74,7 +73,9 @@ func TestProtocol_ListPage_ZeroLimitReturnsAll(t *testing.T) {
 
 	for range 3 {
 		proto.CreateArtifact(ctx, parchment.CreateInput{ //nolint:errcheck // test setup
-			Kind: parchment.KindTask, Title: "item", Scope: "test",
+			Title:  "item",
+			Scope:  "test",
+			Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},
 		})
 	}
 
@@ -99,9 +100,12 @@ func TestProtocol_ListPage_TitleContains_Filters(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	proto.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindTask, Title: "fix authentication bug", Scope: "test"})     //nolint:errcheck // test setup
-	proto.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindTask, Title: "implement caching layer", Scope: "test"}) //nolint:errcheck // test setup
-	proto.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindTask, Title: "auth token refresh", Scope: "test"})      //nolint:errcheck // test setup
+	proto.CreateArtifact(ctx, parchment.CreateInput{Title: "fix authentication bug", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})     //nolint:errcheck // test setup
+	proto.CreateArtifact(ctx, parchment.CreateInput{Title: "implement caching layer", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},}) //nolint:errcheck // test setup
+	proto.CreateArtifact(ctx, parchment.CreateInput{Title: "auth token refresh", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})      //nolint:errcheck // test setup
 
 	page, err := proto.ListPage(ctx, parchment.ListInput{Scope: "test", TitleContains: "auth"})
 	if err != nil {
@@ -134,7 +138,9 @@ func TestProtocol_ListPage_SQLite_Paginates(t *testing.T) {
 
 	for range 4 {
 		proto.CreateArtifact(ctx, parchment.CreateInput{ //nolint:errcheck // test setup
-			Kind: parchment.KindTask, Title: "item", Scope: "test",
+			Title:  "item",
+			Scope:  "test",
+			Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},
 		})
 	}
 

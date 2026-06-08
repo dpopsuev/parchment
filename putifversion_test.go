@@ -18,9 +18,8 @@ func TestPutIfVersion_SucceedsOnMatchingVersion(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: parchment.KindTask, Title: "original", Scope: "test",
-	})
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "original", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,9 +44,8 @@ func TestPutIfVersion_FailsOnStaleVersion(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: parchment.KindTask, Title: "original", Scope: "test",
-	})
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "original", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 	staleVersion := art.UpdatedAt
 
 	// Simulate another agent updating the artifact: bump UpdatedAt in the store directly
@@ -78,9 +76,8 @@ func TestPutIfVersion_SQLite_SucceedsOnMatch(t *testing.T) {
 	proto := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: parchment.KindTask, Title: "original", Scope: "test",
-	})
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "original", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
 	art.Title = "updated"
 	if err := proto.UpdateArtifact(ctx, art, art.UpdatedAt); err != nil {
@@ -107,9 +104,8 @@ func TestPutIfVersion_SQLite_FailsOnStale(t *testing.T) {
 	proto := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: parchment.KindTask, Title: "original", Scope: "test",
-	})
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "original", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 	staleVersion := art.UpdatedAt
 	time.Sleep(time.Millisecond) // ensure T2 > T1 on fast hardware
 

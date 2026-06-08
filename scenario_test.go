@@ -62,7 +62,7 @@ func sgetStatus(t *testing.T, proto *parchment.Protocol, id string) string {
 	if err != nil {
 		t.Fatalf("get %s: %v", id, err)
 	}
-	return art.Status
+	return art.ResolvedStatus()
 }
 
 // seedEdgeType stores an edge_type_definition artifact directly in the store
@@ -73,8 +73,10 @@ func seedEdgeType(t *testing.T, store parchment.Store, name string, trait parchm
 	now := time.Now().UTC()
 	extra := parchment.EdgeTypeTraitToExtra(trait)
 	if err := store.Put(ctx, &parchment.Artifact{
-		ID: "EDT-" + name, Kind: "edge_type_definition", Scope: "_schema",
-		Title: name, Status: "active", Extra: extra,
+		ID:     "EDT-" + name,
+		Labels: []string{"kind:edge_type_definition", "status:active"},
+		Scope:  "_schema",
+		Title:  name, Extra: extra,
 		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	}); err != nil {
 		t.Fatalf("seedEdgeType %s: %v", name, err)
@@ -104,21 +106,17 @@ func TestScenario_A_Hierarchy(t *testing.T) {
 	proto, _ := scenarioProto(t)
 	ctx := context.Background()
 
-	campaign := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "campaign", Title: "Q3 campaign", Scope: "test",
+	campaign := mustCreate(t, proto, parchment.CreateInput{Title: "Q3 campaign", Scope: "test",
 		Sections: []parchment.Section{{Name: "mission", Text: "ship it"}},
-	})
-	goal := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "goal", Title: "core goal", Scope: "test",
-	})
-	task1 := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "task", Title: "task one", Scope: "test",
+		Labels: []string{"kind:campaign"},})
+	goal := mustCreate(t, proto, parchment.CreateInput{Title: "core goal", Scope: "test",
+		Labels: []string{"kind:goal"},})
+	task1 := mustCreate(t, proto, parchment.CreateInput{Title: "task one", Scope: "test",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-	})
-	task2 := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "task", Title: "task two", Scope: "test",
+		Labels: []string{"kind:task"},})
+	task2 := mustCreate(t, proto, parchment.CreateInput{Title: "task two", Scope: "test",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-	})
+		Labels: []string{"kind:task"},})
 
 	slink(t, proto, campaign.ID, parchment.RelParentOf, goal.ID)
 	slink(t, proto, goal.ID, parchment.RelParentOf, task1.ID)
@@ -151,13 +149,11 @@ func TestScenario_A_Hierarchy(t *testing.T) {
 	}
 
 	// CascadeArchive: archiving campaign cascades to non-terminal children.
-	campaign2 := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "campaign", Title: "Q4 campaign", Scope: "test",
+	campaign2 := mustCreate(t, proto, parchment.CreateInput{Title: "Q4 campaign", Scope: "test",
 		Sections: []parchment.Section{{Name: "mission", Text: "plan"}},
-	})
-	goal2 := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "goal", Title: "new goal", Scope: "test",
-	})
+		Labels: []string{"kind:campaign"},})
+	goal2 := mustCreate(t, proto, parchment.CreateInput{Title: "new goal", Scope: "test",
+		Labels: []string{"kind:goal"},})
 	slink(t, proto, campaign2.ID, parchment.RelParentOf, goal2.ID)
 
 	archiveResults, err := proto.ArchiveArtifact(ctx, []string{campaign2.ID}, false)
@@ -201,17 +197,14 @@ func TestScenario_B_CodeGraph(t *testing.T) {
 	seedEdgeType(t, store, "belongs_to", parchment.EdgeTypeTrait{MaxIncoming: 1})
 	proto.RefreshEdgeTraits(ctx)
 
-	comp := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "note", Title: "code:component:graphEngine", Scope: "locus",
-		Labels: []string{"source:locus", "kind:component"},
+	comp := mustCreate(t, proto, parchment.CreateInput{Title: "code:component:graphEngine", Scope: "locus",
+		Labels: []string{"kind:note", "source:locus", "kind:component"},
 	})
-	sym1 := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "note", Title: "code:symbol:initGraph", Scope: "locus",
-		Labels: []string{"source:locus", "kind:symbol"},
+	sym1 := mustCreate(t, proto, parchment.CreateInput{Title: "code:symbol:initGraph", Scope: "locus",
+		Labels: []string{"kind:note", "source:locus", "kind:symbol"},
 	})
-	sym2 := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "note", Title: "code:symbol:applyData", Scope: "locus",
-		Labels: []string{"source:locus", "kind:symbol"},
+	sym2 := mustCreate(t, proto, parchment.CreateInput{Title: "code:symbol:applyData", Scope: "locus",
+		Labels: []string{"kind:note", "source:locus", "kind:symbol"},
 	})
 
 	// First belongs_to → comp succeeds.
@@ -253,17 +246,14 @@ func TestScenario_C_AgentContext(t *testing.T) {
 	ctx := context.Background()
 
 	sessionID := "abc123"
-	ctxArt := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "context", Title: "agent session context", Scope: "agent",
-		Labels: []string{"session:" + sessionID, "source:agent"},
+	ctxArt := mustCreate(t, proto, parchment.CreateInput{Title: "agent session context", Scope: "agent",
+		Labels: []string{"kind:context", "session:" + sessionID, "source:agent"},
 	})
-	note1 := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "note", Title: "physics note", Scope: "agent",
-		Labels: []string{"session:" + sessionID, "source:agent"},
+	note1 := mustCreate(t, proto, parchment.CreateInput{Title: "physics note", Scope: "agent",
+		Labels: []string{"kind:note", "session:" + sessionID, "source:agent"},
 	})
-	concept := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "concept", Title: "force graph concept", Scope: "agent",
-		Labels: []string{"source:agent"},
+	concept := mustCreate(t, proto, parchment.CreateInput{Title: "force graph concept", Scope: "agent",
+		Labels: []string{"kind:concept", "source:agent"},
 	})
 
 	slink(t, proto, ctxArt.ID, parchment.RelRemembers, note1.ID)
@@ -317,15 +307,12 @@ func TestScenario_D_Wiki(t *testing.T) {
 	})
 	proto.RefreshEdgeTraits(ctx)
 
-	concept := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "concept", Title: "N-body gravity simulation", Scope: "wiki",
-	})
-	src := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "source", Title: "Barnes-Hut paper", Scope: "wiki",
-	})
-	note := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "note", Title: "notes on N-body", Scope: "wiki",
-	})
+	concept := mustCreate(t, proto, parchment.CreateInput{Title: "N-body gravity simulation", Scope: "wiki",
+		Labels: []string{"kind:concept"},})
+	src := mustCreate(t, proto, parchment.CreateInput{Title: "Barnes-Hut paper", Scope: "wiki",
+		Labels: []string{"kind:source"},})
+	note := mustCreate(t, proto, parchment.CreateInput{Title: "notes on N-body", Scope: "wiki",
+		Labels: []string{"kind:note"},})
 
 	// note→source is valid per AllowedPairs.
 	slink(t, proto, note.ID, "cites", src.ID)
@@ -362,17 +349,14 @@ func TestScenario_E_CrossSource(t *testing.T) {
 	proto, _ := scenarioProto(t, "locus", "jira", "human")
 	ctx := context.Background()
 
-	spec := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "spec", Title: "ingest protocol spec", Scope: "human",
-		Labels: []string{"source:human"},
+	spec := mustCreate(t, proto, parchment.CreateInput{Title: "ingest protocol spec", Scope: "human",
+		Labels: []string{"kind:spec", "source:human"},
 	})
-	component := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "note", Title: "code:component:ingest", Scope: "locus",
-		Labels: []string{"source:locus"},
+	component := mustCreate(t, proto, parchment.CreateInput{Title: "code:component:ingest", Scope: "locus",
+		Labels: []string{"kind:note", "source:locus"},
 	})
-	issue := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "bug", Title: "JIRA-101: ingest timeout", Scope: "jira",
-		Labels: []string{"source:jira"},
+	issue := mustCreate(t, proto, parchment.CreateInput{Title: "JIRA-101: ingest timeout", Scope: "jira",
+		Labels: []string{"kind:bug", "source:jira"},
 		Sections: []parchment.Section{{Name: "context", Text: "timeout"}},
 	})
 
@@ -427,57 +411,50 @@ func TestScenario_F_UnifiedGraph(t *testing.T) { //nolint:gocyclo // inherent co
 	proto.RefreshEdgeTraits(ctx)
 
 	// Task tracker (Scenario A nodes).
-	campaign := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "campaign", Title: "unified campaign", Scope: "test",
+	campaign := mustCreate(t, proto, parchment.CreateInput{Title: "unified campaign", Scope: "test",
 		Sections: []parchment.Section{{Name: "mission", Text: "unified"}},
-	})
-	goal := mustCreate(t, proto, parchment.CreateInput{Kind: "goal", Title: "unified goal", Scope: "test"})
-	task := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "task", Title: "unified task", Scope: "test",
+		Labels: []string{"kind:campaign"},})
+	goal := mustCreate(t, proto, parchment.CreateInput{Title: "unified goal", Scope: "test",
+		Labels: []string{"kind:goal"},})
+	task := mustCreate(t, proto, parchment.CreateInput{Title: "unified task", Scope: "test",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-	})
+		Labels: []string{"kind:task"},})
 	slink(t, proto, campaign.ID, parchment.RelParentOf, goal.ID)
 	slink(t, proto, goal.ID, parchment.RelParentOf, task.ID)
 
 	// Docs (Scenario E).
-	spec := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "spec", Title: "unified spec", Scope: "human",
-		Labels: []string{"source:human"},
+	spec := mustCreate(t, proto, parchment.CreateInput{Title: "unified spec", Scope: "human",
+		Labels: []string{"kind:spec", "source:human"},
 	})
 	slink(t, proto, task.ID, parchment.RelImplements, spec.ID)
 
 	// Code (Scenario B).
-	component := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "note", Title: "code:component:unified", Scope: "locus",
-		Labels: []string{"source:locus", "kind:component"},
+	component := mustCreate(t, proto, parchment.CreateInput{Title: "code:component:unified", Scope: "locus",
+		Labels: []string{"kind:note", "source:locus", "kind:component"},
 	})
-	symbol := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "note", Title: "code:symbol:unified", Scope: "locus",
-		Labels: []string{"source:locus", "kind:symbol"},
+	symbol := mustCreate(t, proto, parchment.CreateInput{Title: "code:symbol:unified", Scope: "locus",
+		Labels: []string{"kind:note", "source:locus", "kind:symbol"},
 	})
 	slink(t, proto, spec.ID, parchment.RelDocuments, component.ID)
 	slink(t, proto, symbol.ID, "belongs_to", component.ID)
 
 	// Jira issue.
-	issue := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "bug", Title: "JIRA-999: unified bug", Scope: "jira",
-		Labels: []string{"source:jira"},
+	issue := mustCreate(t, proto, parchment.CreateInput{Title: "JIRA-999: unified bug", Scope: "jira",
+		Labels: []string{"kind:bug", "source:jira"},
 		Sections: []parchment.Section{{Name: "context", Text: "bug"}},
 	})
 	slink(t, proto, issue.ID, parchment.RelImplements, symbol.ID)
 
 	// Agent context (Scenario C).
-	ctxArt := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "context", Title: "agent ctx", Scope: "agent",
-		Labels: []string{"session:sess1", "source:agent"},
+	ctxArt := mustCreate(t, proto, parchment.CreateInput{Title: "agent ctx", Scope: "agent",
+		Labels: []string{"kind:context", "session:sess1", "source:agent"},
 	})
 	slink(t, proto, ctxArt.ID, parchment.RelRemembers, task.ID)
 	slink(t, proto, ctxArt.ID, parchment.RelRemembers, symbol.ID)
 
 	// Wiki concept (Scenario D).
-	concept := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "concept", Title: "unified concept", Scope: "wiki",
-	})
+	concept := mustCreate(t, proto, parchment.CreateInput{Title: "unified concept", Scope: "wiki",
+		Labels: []string{"kind:concept"},})
 	slink(t, proto, concept.ID, parchment.RelElaborates, spec.ID)
 	slink(t, proto, ctxArt.ID, parchment.RelElaborates, concept.ID)
 

@@ -485,7 +485,6 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	if art.InsertedAt.IsZero() {
 		art.InsertedAt = now
 	}
-	syncSystemFields(art)
 
 	tx, err := s.writer.BeginTx(ctx, nil)
 	if err != nil {
@@ -504,6 +503,8 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 		old = nil // treat as new insert after rename
 	}
 
+	kind := labelValue(art.Labels, LabelPrefixKind)
+	status := labelValue(art.Labels, LabelPrefixStatus)
 	dependsOn, _ := json.Marshal(art.DependsOn)
 	labels, _ := json.Marshal(art.Labels)
 	sections, _ := json.Marshal(art.Sections)
@@ -525,7 +526,7 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 			criteria=excluded.criteria, links=excluded.links,
 			extra=excluded.extra,
 			annotations=excluded.annotations, updated_at=excluded.updated_at`,
-		art.UID, art.ID, art.Alias, art.Kind, art.Scope, art.Status, art.Parent, art.Title, art.Goal,
+		art.UID, art.ID, art.Alias, kind, art.Scope, status, art.Parent, art.Title, art.Goal,
 		string(dependsOn), string(labels), art.Priority, art.Sprint,
 		string(sections), string(features), string(criteria), string(links), string(extra),
 		string(annotations),
@@ -608,8 +609,9 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 		if art.InsertedAt.IsZero() {
 			art.InsertedAt = now
 		}
-		syncSystemFields(art)
 
+		kind := labelValue(art.Labels, LabelPrefixKind)
+		status := labelValue(art.Labels, LabelPrefixStatus)
 		dependsOn, _ := json.Marshal(art.DependsOn)
 		labels, _ := json.Marshal(art.Labels)
 		sections, _ := json.Marshal(art.Sections)
@@ -620,7 +622,7 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 		annotations, _ := json.Marshal(art.Annotations)
 
 		_, execErr := stmt.ExecContext(ctx,
-			art.UID, art.ID, art.Alias, art.Kind, art.Scope, art.Status, art.Parent,
+			art.UID, art.ID, art.Alias, kind, art.Scope, status, art.Parent,
 			art.Title, art.Goal, string(dependsOn), string(labels), art.Priority, art.Sprint,
 			string(sections), string(features), string(criteria), string(links), string(extra),
 			string(annotations),
@@ -690,8 +692,9 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 	}
 	now := time.Now().UTC()
 	art.UpdatedAt = now
-	syncSystemFields(art)
 
+	kind := labelValue(art.Labels, LabelPrefixKind)
+	status := labelValue(art.Labels, LabelPrefixStatus)
 	dependsOn, _ := json.Marshal(art.DependsOn)
 	labels, _ := json.Marshal(art.Labels)
 	sections, _ := json.Marshal(art.Sections)
@@ -710,7 +713,7 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 			sections=?, features=?, criteria=?, links=?,
 			extra=?, annotations=?, updated_at=?
 		WHERE id=?`,
-		art.Alias, art.Kind, art.Scope, art.Status, art.Parent, art.Title, art.Goal,
+		art.Alias, kind, art.Scope, status, art.Parent, art.Title, art.Goal,
 		string(dependsOn), string(labels), art.Priority, art.Sprint,
 		string(sections), string(features), string(criteria), string(links),
 		string(extra), string(annotations),
@@ -1127,37 +1130,18 @@ func (s *SQLiteStore) cleanDanglingRefs(ctx context.Context, tx *sql.Tx, deleted
 // Returns (clauses, args, sqlLabels) where sqlLabels=true means label filtering
 // was pushed to SQL; false means post-scan filtering is required.
 func buildWhereClause(f Filter) ([]string, []any, bool) { //nolint:cyclop,gocyclo,gocritic // hugeParam: value semantics match List/ListPage callers; complexity linear not nested
-	f = f.Normalize()
 	var clauses []string
 	var args []any
 	if f.IDPrefix != "" {
 		clauses = append(clauses, "id LIKE ?")
 		args = append(args, f.IDPrefix+"%")
 	}
-	switch {
-	case len(f.Kinds) > 0:
-		ph := strings.Repeat("?,", len(f.Kinds))
-		clauses = append(clauses, "kind IN ("+ph[:len(ph)-1]+")")
-		for _, k := range f.Kinds {
-			args = append(args, k)
-		}
-	case f.Kind != "":
-		clauses = append(clauses, "kind = ?")
-		args = append(args, f.Kind)
-	case len(f.FamilyKinds) > 0:
+	if len(f.FamilyKinds) > 0 {
 		ph := strings.Repeat("?,", len(f.FamilyKinds))
 		clauses = append(clauses, "kind IN ("+ph[:len(ph)-1]+")")
 		for k := range f.FamilyKinds {
 			args = append(args, k)
 		}
-	}
-	if f.ExcludeKind != "" {
-		clauses = append(clauses, "kind != ?")
-		args = append(args, f.ExcludeKind)
-	}
-	if f.ExcludeStatus != "" {
-		clauses = append(clauses, "status != ?")
-		args = append(args, f.ExcludeStatus)
 	}
 	if f.ExcludeScope != "" {
 		clauses = append(clauses, "scope != ?")
@@ -1178,10 +1162,6 @@ func buildWhereClause(f Filter) ([]string, []any, bool) { //nolint:cyclop,gocycl
 			clauses = append(clauses, "scope = ?")
 			args = append(args, f.Scope)
 		}
-	}
-	if f.Status != "" {
-		clauses = append(clauses, "status = ?")
-		args = append(args, f.Status)
 	}
 	if f.Parent != "" {
 		clauses = append(clauses, "parent = ?")
@@ -1218,12 +1198,22 @@ func buildWhereClause(f Filter) ([]string, []any, bool) { //nolint:cyclop,gocycl
 
 	// SQL-side label filtering. Not applied when scope label expansion is active —
 	// scope expansion requires post-scan to match artifacts whose scope carries the label.
+	// kind: and status: labels map to indexed columns for performance and backward compat.
 	sqlLabels := len(f.ScopeLabelIndex) == 0
 	if sqlLabels {
 		for _, label := range f.Labels {
-			clauses = append(clauses,
-				"EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
-			args = append(args, label)
+			switch {
+			case strings.HasPrefix(label, LabelPrefixKind):
+				clauses = append(clauses, "kind = ?")
+				args = append(args, strings.TrimPrefix(label, LabelPrefixKind))
+			case strings.HasPrefix(label, LabelPrefixStatus):
+				clauses = append(clauses, "status = ?")
+				args = append(args, strings.TrimPrefix(label, LabelPrefixStatus))
+			default:
+				clauses = append(clauses,
+					"EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
+				args = append(args, label)
+			}
 		}
 		if len(f.LabelsOr) > 0 {
 			ph := make([]string, len(f.LabelsOr))
@@ -1769,11 +1759,12 @@ const artifactColumns = `uid, id, alias, kind, scope, status, parent, title, goa
 
 func scanRow(s rowScanner) (*Artifact, error) {
 	var art Artifact
+	var kindCol, statusCol string
 	var dependsOn, labels, sections, features, criteria, links, extra, annotations string
 	var createdAt, updatedAt, insertedAt string
 
 	err := s.Scan(
-		&art.UID, &art.ID, &art.Alias, &art.Kind, &art.Scope, &art.Status, &art.Parent, &art.Title, &art.Goal,
+		&art.UID, &art.ID, &art.Alias, &kindCol, &art.Scope, &statusCol, &art.Parent, &art.Title, &art.Goal,
 		&dependsOn, &labels, &art.Priority, &art.Sprint,
 		&sections, &features, &criteria, &links, &extra,
 		&annotations,
@@ -1815,17 +1806,17 @@ func scanRow(s rowScanner) (*Artifact, error) {
 		}
 	}
 
-	// Hydrate view fields from labels when the stored column is empty.
-	// Labels are the canonical source; the Kind/Scope/Status/Priority/Sprint
-	// columns become a write-through cache eliminated in a later migration.
-	if art.Kind == "" {
-		art.Kind = art.ResolvedKind()
+	// Backfill labels from columns for pre-migration rows that pre-date label storage.
+	if kindCol != "" && !hasLabelPrefix(art.Labels, LabelPrefixKind) {
+		art.Labels = append(art.Labels, LabelPrefixKind+kindCol)
 	}
+	if statusCol != "" && !hasLabelPrefix(art.Labels, LabelPrefixStatus) {
+		art.Labels = append(art.Labels, LabelPrefixStatus+statusCol)
+	}
+
+	// Hydrate Scope/Priority/Sprint from labels when the stored column is empty.
 	if art.Scope == "" {
 		art.Scope = art.ResolvedScope()
-	}
-	if art.Status == "" {
-		art.Status = art.ResolvedStatus()
 	}
 	if art.Priority == "" {
 		art.Priority = art.ResolvedPriority()
@@ -1835,6 +1826,16 @@ func scanRow(s rowScanner) (*Artifact, error) {
 	}
 
 	return &art, nil
+}
+
+// hasLabelPrefix reports whether any label starts with prefix.
+func hasLabelPrefix(labels []string, prefix string) bool {
+	for _, l := range labels {
+		if strings.HasPrefix(l, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // syncLabelsInTx replaces the artifact_labels rows for art.ID inside the

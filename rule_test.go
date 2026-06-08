@@ -22,10 +22,10 @@ func TestRule_ParsedFromArtifact(t *testing.T) {
 	// must be parseable into a RuleDef struct.
 	t.Parallel()
 	art := &parchment.Artifact{
-		ID:    "RULE-001",
-		Kind:  parchment.KindRule,
-		Scope: parchment.SchemaScope,
-		Title: "priority_required",
+		ID:     "RULE-001",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindRule},
+		Scope:  parchment.SchemaScope,
+		Title:  "priority_required",
 		Sections: []parchment.Section{
 			{Name: "trigger", Text: "status_changed"},
 			{Name: "when", Text: "to=active AND kind=task AND priority==\"\""},
@@ -64,8 +64,8 @@ func TestRule_SeededInSchema(t *testing.T) {
 	parchment.SeedRules(ctx, s)
 
 	arts, err := s.List(ctx, parchment.Filter{
-		Kind:  parchment.KindRule,
-		Scope: parchment.SchemaScope,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindRule},
+		Scope:  parchment.SchemaScope,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -90,8 +90,10 @@ func TestRule_LoadedByProtocol(t *testing.T) {
 	// Manually seed one rule
 	now := time.Now().UTC()
 	_ = s.Put(ctx, &parchment.Artifact{
-		ID: "RULE-test", Kind: parchment.KindRule, Scope: parchment.SchemaScope,
-		Title: "test_rule", Status: parchment.StatusActive,
+		ID:     "RULE-test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindRule, parchment.LabelPrefixStatus + parchment.StatusActive},
+		Scope:  parchment.SchemaScope,
+		Title:  "test_rule",
 		Sections: []parchment.Section{
 			{Name: "trigger", Text: "status_changed"},
 			{Name: "when", Text: "to=active"},

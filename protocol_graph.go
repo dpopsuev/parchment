@@ -13,8 +13,7 @@ import (
 // TreeNode is a recursive tree representation.
 type TreeNode struct {
 	ID        string      `json:"id"`
-	Kind      string      `json:"kind"`
-	Status    string      `json:"status"`
+	Labels    []string    `json:"labels,omitempty"`
 	Title     string      `json:"title"`
 	Scope     string      `json:"scope,omitempty"`
 	Edge      string      `json:"edge,omitempty"`
@@ -178,7 +177,7 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 			}
 			artWithLink := &Artifact{
 				ID:       art.ID,
-				Kind:     art.ResolvedKind(),
+				Labels:   []string{LabelPrefixKind + art.ResolvedKind()},
 				Sections: art.Sections,
 				Links:    map[string][]string{relation: {tid}},
 			}
@@ -315,7 +314,7 @@ func (p *Protocol) ArtifactTree(ctx context.Context, in TreeInput) (*TreeNode, e
 		return p.buildTree(ctx, root), nil
 	}
 
-	node := &TreeNode{ID: root.ID, Kind: root.ResolvedKind(), Status: root.Status, Title: root.Title, Scope: root.Scope}
+	node := &TreeNode{ID: root.ID, Labels: root.Labels, Title: root.Title, Scope: root.Scope}
 	visited := map[string]bool{root.ID: true}
 	p.buildGraphTree(ctx, node, rel, storeDir, depth, 1, visited)
 	return node, nil
@@ -382,7 +381,7 @@ func (p *Protocol) TopoSort(ctx context.Context, rootID string) ([]TopoEntry, er
 		partial := make([]TopoEntry, 0, len(arts))
 		for id, art := range arts {
 			partial = append(partial, TopoEntry{
-				ID: id, Kind: art.ResolvedKind(), Status: art.Status,
+				ID: id, Labels: art.Labels,
 				Title: art.Title, Priority: art.Priority,
 			})
 		}
@@ -393,7 +392,7 @@ func (p *Protocol) TopoSort(ctx context.Context, rootID string) ([]TopoEntry, er
 	for _, id := range order {
 		art := arts[id]
 		result = append(result, TopoEntry{
-			ID: id, Kind: art.ResolvedKind(), Status: art.Status,
+			ID: id, Labels: art.Labels,
 			Title: art.Title, Priority: art.Priority,
 		})
 	}
@@ -402,15 +401,14 @@ func (p *Protocol) TopoSort(ctx context.Context, rootID string) ([]TopoEntry, er
 
 // TopoEntry is a single entry in a topological sort result.
 type TopoEntry struct {
-	ID       string `json:"id"`
-	Kind     string `json:"kind"`
-	Status   string `json:"status"`
-	Title    string `json:"title"`
-	Priority string `json:"priority,omitempty"`
+	ID       string   `json:"id"`
+	Labels   []string `json:"labels,omitempty"`
+	Title    string   `json:"title"`
+	Priority string   `json:"priority,omitempty"`
 }
 
 func (p *Protocol) buildTree(ctx context.Context, art *Artifact) *TreeNode {
-	node := &TreeNode{ID: art.ID, Kind: art.ResolvedKind(), Status: art.Status, Title: art.Title, Scope: art.Scope}
+	node := &TreeNode{ID: art.ID, Labels: art.Labels, Title: art.Title, Scope: art.Scope}
 	children, _ := p.store.Children(ctx, art.ID)
 	for _, ch := range children {
 		node.Children = append(node.Children, p.buildTree(ctx, ch))
@@ -449,8 +447,7 @@ func (p *Protocol) buildGraphTree(ctx context.Context, node *TreeNode, rel strin
 
 		child := &TreeNode{
 			ID:        target.ID,
-			Kind:      target.Kind,
-			Status:    target.Status,
+			Labels:    target.Labels,
 			Title:     target.Title,
 			Scope:     target.Scope,
 			Edge:      e.Relation,
@@ -466,10 +463,9 @@ type EdgeSummary struct {
 	Relation  string `json:"relation"`
 	Direction string `json:"direction"`
 	Target    struct {
-		ID     string `json:"id"`
-		Kind   string `json:"kind"`
-		Title  string `json:"title"`
-		Status string `json:"status"`
+		ID     string   `json:"id"`
+		Labels []string `json:"labels,omitempty"`
+		Title  string   `json:"title"`
 	} `json:"target"`
 }
 
@@ -506,17 +502,15 @@ func (p *Protocol) GetArtifactEdges(ctx context.Context, id string) ([]EdgeSumma
 			s.Direction = DirOutgoing
 			if target, err := p.store.Get(ctx, e.To); err == nil {
 				s.Target.ID = target.ID
-				s.Target.Kind = target.Kind
+				s.Target.Labels = target.Labels
 				s.Target.Title = target.Title
-				s.Target.Status = target.Status
 			}
 		} else {
 			s.Direction = DirIncoming
 			if target, err := p.store.Get(ctx, e.From); err == nil {
 				s.Target.ID = target.ID
-				s.Target.Kind = target.Kind
+				s.Target.Labels = target.Labels
 				s.Target.Title = target.Title
-				s.Target.Status = target.Status
 			}
 		}
 		summaries = append(summaries, s)

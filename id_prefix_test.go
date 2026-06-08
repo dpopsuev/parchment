@@ -27,7 +27,7 @@ func TestCheck_IDPrefixMismatch_FlagsViolation(t *testing.T) {
 	// Seed a mismatched artifact directly so we control the ID.
 	now := time.Now().UTC()
 	_ = s.Put(ctx, &parchment.Artifact{
-		ID: "ALE-TSK-001", Kind: "task", Scope: "scribe", Status: "active",
+		ID: "ALE-TSK-001", Labels: []string{"kind:task", "status:active"}, Scope: "scribe",
 		Title: "wrong prefix", CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	})
 
@@ -65,7 +65,7 @@ func TestCheck_IDPrefix_CorrectPrefix_NoViolation(t *testing.T) {
 	// Put an artifact with the correct prefix directly.
 	now := time.Now().UTC()
 	_ = s.Put(ctx, &parchment.Artifact{
-		ID: "SCR-TSK-001", Kind: "task", Scope: "scribe", Status: "active",
+		ID: "SCR-TSK-001", Labels: []string{"kind:task", "status:active"}, Scope: "scribe",
 		Title: "good prefix", CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	})
 	art := &parchment.Artifact{ID: "SCR-TSK-001"}

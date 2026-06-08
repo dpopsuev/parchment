@@ -38,18 +38,18 @@ func buildV044DB(t *testing.T, path string) {
 	}
 	ctx := context.Background()
 	artifacts := []*Artifact{
-		{UID: "u1", ID: "SCR-GOL-1", Kind: "goal", Scope: "scribe", Status: "active", Title: "Ship v2"},
-		{UID: "u2", ID: "SCR-CAM-1", Kind: "campaign", Scope: "scribe", Status: "active",
+		{UID: "u1", ID: "SCR-GOL-1", Labels: []string{"kind:goal", "status:active"}, Scope: "scribe", Title: "Ship v2"},
+		{UID: "u2", ID: "SCR-CAM-1", Labels: []string{"kind:campaign", "status:active"}, Scope: "scribe",
 			Title:    "Migration campaign",
 			Sections: []Section{{Name: "mission", Text: "stay safe"}},
 			Links:    map[string][]string{RelJustifies: {"SCR-GOL-1"}},
 		},
-		{UID: "u3", ID: "SCR-TSK-1", Kind: "task", Scope: "scribe", Status: "draft",
+		{UID: "u3", ID: "SCR-TSK-1", Labels: []string{"kind:task", "status:draft"}, Scope: "scribe",
 			Title:    "Task alpha",
 			Parent:   "SCR-CAM-1",
 			Sections: []Section{{Name: "context", Text: "do it"}},
 		},
-		{UID: "u4", ID: "SCR-TSK-2", Kind: "task", Scope: "scribe", Status: "active",
+		{UID: "u4", ID: "SCR-TSK-2", Labels: []string{"kind:task", "status:active"}, Scope: "scribe",
 			Title:     "Task beta",
 			Parent:    "SCR-CAM-1",
 			DependsOn: []string{"SCR-TSK-1"},
@@ -151,8 +151,8 @@ func TestV045_PartialIndexDoesNotConflict(t *testing.T) {
 	// Put a new artifact with alias='' — must not fail.
 	ctx := context.Background()
 	err = s.Put(ctx, &Artifact{
-		UID: "new-u", ID: "SCR-TSK-99", Kind: "task",
-		Scope: "scribe", Status: "draft", Title: "No alias",
+		UID: "new-u", ID: "SCR-TSK-99", Labels: []string{"kind:task", "status:draft"},
+		Scope: "scribe", Title: "No alias",
 	})
 	if err != nil {
 		t.Errorf("Put with empty alias failed: %v", err)
@@ -176,12 +176,10 @@ func TestV045_ScopedModeUnchanged(t *testing.T) {
 	proto := New(s, nil, []string{"scribe"}, nil, ProtocolConfig{IDTemplate: &tpl})
 	ctx := context.Background()
 
-	art, err := proto.CreateArtifact(ctx, CreateInput{
-		Kind:     "task",
-		Title:    "Post-upgrade scoped task",
+	art, err := proto.CreateArtifact(ctx, CreateInput{Title:    "Post-upgrade scoped task",
 		Scope:    "scribe",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
-	})
+		Labels: []string{"kind:task"},})
 	if err != nil {
 		t.Fatalf("CreateArtifact: %v", err)
 	}
@@ -216,12 +214,10 @@ func TestV045_UUIDModeOnUpgradedDB(t *testing.T) {
 	})
 	ctx := context.Background()
 
-	art, err := proto.CreateArtifact(ctx, CreateInput{
-		Kind:     "task",
-		Title:    "First UUID task on upgraded DB",
+	art, err := proto.CreateArtifact(ctx, CreateInput{Title:    "First UUID task on upgraded DB",
 		Scope:    "scribe",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
-	})
+		Labels: []string{"kind:task"},})
 	if err != nil {
 		t.Fatalf("CreateArtifact in UUID mode: %v", err)
 	}

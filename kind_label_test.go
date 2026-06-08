@@ -1,17 +1,11 @@
 package parchment_test
 
 import (
+	"slices"
 	"testing"
 
 	parchment "github.com/dpopsuev/parchment"
 )
-
-func TestResolvedKind_FromField(t *testing.T) {
-	art := &parchment.Artifact{Kind: "task"}
-	if got := art.ResolvedKind(); got != "task" {
-		t.Errorf("expected task, got %q", got)
-	}
-}
 
 func TestResolvedKind_FromLabel(t *testing.T) {
 	art := &parchment.Artifact{Labels: []string{"kind:bug", "priority:high"}}
@@ -20,40 +14,33 @@ func TestResolvedKind_FromLabel(t *testing.T) {
 	}
 }
 
-func TestResolvedKind_FieldWinsOverLabel(t *testing.T) {
-	art := &parchment.Artifact{Kind: "task", Labels: []string{"kind:bug"}}
-	if got := art.ResolvedKind(); got != "task" {
-		t.Errorf("expected task (field wins), got %q", got)
-	}
-}
-
-func TestResolvedKind_EmptyWhenNeither(t *testing.T) {
+func TestResolvedKind_EmptyWhenNoLabel(t *testing.T) {
 	art := &parchment.Artifact{}
 	if got := art.ResolvedKind(); got != "" {
 		t.Errorf("expected empty, got %q", got)
 	}
 }
 
-// --- Filter.Kind with label-based kind ---
+// --- Filter label-based kind matching ---
 
-func TestFilter_KindMatchesLabelKind(t *testing.T) {
-	// Given an artifact with no Kind field but kind:bug label
+func TestFilter_LabelsKindMatchesLabelKind(t *testing.T) {
+	// Given an artifact with kind:bug label
 	art := &parchment.Artifact{ID: "X-1", Labels: []string{"kind:bug"}}
-	f := parchment.Filter{Kind: "bug"}
+	f := parchment.Filter{Labels: []string{"kind:bug"}}
 	if !f.Matches(art) {
-		t.Error("Filter.Kind=bug should match artifact with labels[kind:bug]")
+		t.Error("Filter.Labels=[kind:bug] should match artifact with labels[kind:bug]")
 	}
 }
 
 func TestFilter_ExcludeKindMatchesLabelKind(t *testing.T) {
 	art := &parchment.Artifact{ID: "X-1", Labels: []string{"kind:bug"}}
-	f := parchment.Filter{ExcludeKind: "bug"}
+	f := parchment.Filter{ExcludeLabels: []string{"kind:bug"}}
 	if f.Matches(art) {
 		t.Error("Filter.ExcludeKind=bug should exclude artifact with labels[kind:bug]")
 	}
 }
 
-// --- ResolvedKindFromLabels for CreateInput ---
+// --- ResolvedKind for CreateInput ---
 
 func TestCreateArtifact_KindFromLabel(t *testing.T) {
 	// Given a protocol and a CreateInput with no Kind field but a kind label
@@ -66,17 +53,18 @@ func TestCreateArtifact_KindFromLabel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if art.Kind != "bug" {
-		t.Errorf("expected Kind=bug, got %q", art.Kind)
+	if art.ResolvedKind() != "bug" {
+		t.Errorf("expected ResolvedKind()=bug, got %q", art.ResolvedKind())
 	}
 }
 
-// --- SetField(kind=X) writes label + mirrors field ---
+// --- SetField(kind=X) writes label ---
 
 func TestSetField_KindWritesLabel(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{IDFormat: "sequential"})
-	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{Kind: "task", Title: "original"})
+	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{Title: "original",
+		Labels: []string{"kind:task"},})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -91,16 +79,10 @@ func TestSetField_KindWritesLabel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if updated.Kind != "bug" {
-		t.Errorf("Kind field: expected bug, got %q", updated.Kind)
+	if updated.ResolvedKind() != "bug" {
+		t.Errorf("ResolvedKind(): expected bug, got %q", updated.ResolvedKind())
 	}
-	var hasKindLabel bool
-	for _, l := range updated.Labels {
-		if l == "kind:bug" {
-			hasKindLabel = true
-		}
-	}
-	if !hasKindLabel {
+	if !slices.Contains(updated.Labels, "kind:bug") {
 		t.Errorf("expected kind:bug in labels, got %v", updated.Labels)
 	}
 }

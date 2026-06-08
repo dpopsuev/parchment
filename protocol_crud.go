@@ -86,12 +86,10 @@ func (p *Protocol) PromoteStash(ctx context.Context, stashID string, patch Creat
 // --- CRUD ---
 
 type CreateInput struct {
-	Kind       string              `json:"kind"`
 	Title      string              `json:"title"`
 	Scope      string              `json:"scope,omitempty"`
 	Goal       string              `json:"goal,omitempty"`
 	Parent     string              `json:"parent,omitempty"`
-	Status     string              `json:"status,omitempty"`
 	Priority   string              `json:"priority,omitempty"`
 	DependsOn  []string            `json:"depends_on,omitempty"`
 	Labels     []string            `json:"labels,omitempty"`
@@ -110,16 +108,8 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	if in.Title == "" {
 		return nil, fmt.Errorf("title is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
-	// Resolve kind from labels when the Kind field is absent.
-	if in.Kind == "" {
-		for _, l := range in.Labels {
-			if strings.HasPrefix(l, LabelPrefixKind) {
-				in.Kind = strings.TrimPrefix(l, LabelPrefixKind)
-				break
-			}
-		}
-	}
-	if err := ValidateKind(in.Kind, p.vocab); err != nil {
+	kind := labelValue(in.Labels, LabelPrefixKind)
+	if err := ValidateKind(kind, p.vocab); err != nil {
 		return nil, err
 	}
 	if in.Priority != "" && !p.schema.ValidPriority(in.Priority) {
@@ -127,7 +117,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	}
 	if in.Parent != "" {
 		if parent, err := p.store.Get(ctx, in.Parent); err == nil {
-			if reason, ok := p.schema.ValidChild(parent.ResolvedKind(), in.Kind); !ok {
+			if reason, ok := p.schema.ValidChild(parent.ResolvedKind(), kind); !ok {
 				return nil, fmt.Errorf("%s", reason) //nolint:err113 // runtime values required in message; no static sentinel possible
 			}
 		}
@@ -135,14 +125,14 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 			return nil, fmt.Errorf("parent_of cycle detected: %s", strings.Join(path, " → ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 		}
 	}
-	scope, err := p.inferScope(ctx, in.Scope, in.Parent, in.Kind)
+	scope, err := p.inferScope(ctx, in.Scope, in.Parent, kind)
 	if err != nil {
 		return nil, err
 	}
 	// Enforce scope policy
 	if policy, ok := p.scopePolicies[scope]; ok {
-		if len(policy.AllowedKinds) > 0 && !slices.Contains(policy.AllowedKinds, in.Kind) {
-			return nil, fmt.Errorf("kind %q not allowed in scope %q (allowed: %s)", in.Kind, scope, strings.Join(policy.AllowedKinds, ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
+		if len(policy.AllowedKinds) > 0 && !slices.Contains(policy.AllowedKinds, kind) {
+			return nil, fmt.Errorf("kind %q not allowed in scope %q (allowed: %s)", kind, scope, strings.Join(policy.AllowedKinds, ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 		}
 		if in.Priority == "" && policy.DefaultPriority != "" {
 			in.Priority = policy.DefaultPriority
@@ -165,18 +155,18 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		if in.Alias == "" && scope != "" {
 			scopeKey, skErr := p.resolveScopeKey(ctx, scope)
 			if skErr == nil {
-				kindCode := p.resolveKindCode(in.Kind)
+				kindCode := p.resolveKindCode(kind)
 				in.Alias, _ = p.store.NextScopedAlias(ctx, scopeKey, kindCode)
 			}
 		}
 	} else if p.idTemplate != nil && in.Prefix == "" {
-		id, err = p.generateTemplatedID(ctx, scope, in.Kind)
+		id, err = p.generateTemplatedID(ctx, scope, kind)
 		if err != nil {
 			return nil, err
 		}
 	} else if p.idFormat == "scoped" && in.Prefix == "" {
 		if scope == "" {
-			prefix := p.schema.Prefix(in.Kind)
+			prefix := p.schema.Prefix(kind)
 			id, err = p.store.NextID(ctx, prefix)
 			if err != nil {
 				return nil, fmt.Errorf("generate ID: %w", err)
@@ -186,7 +176,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 			if err != nil {
 				return nil, err
 			}
-			kindCode := p.resolveKindCode(in.Kind)
+			kindCode := p.resolveKindCode(kind)
 			id, err = p.store.NextScopedID(ctx, scopeKey, kindCode)
 			if err != nil {
 				return nil, fmt.Errorf("generate scoped ID: %w", err)
@@ -195,16 +185,16 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	} else {
 		prefix := in.Prefix
 		if prefix == "" {
-			prefix = p.schema.Prefix(in.Kind)
+			prefix = p.schema.Prefix(kind)
 		}
 		id, err = p.store.NextID(ctx, prefix)
 		if err != nil {
 			return nil, fmt.Errorf("generate ID: %w", err)
 		}
 	}
-	status := in.Status
+	status := labelValue(in.Labels, LabelPrefixStatus)
 	if status == "" {
-		status = p.schema.DefaultStatus(in.Kind)
+		status = p.schema.DefaultStatus(kind)
 	}
 	// Seed labels with system mirrors (scope, kind, status, priority, sprint)
 	// so label-based queries work without reading individual fields.
@@ -221,8 +211,8 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	if scope != "" {
 		seedLabels = append(seedLabels, LabelPrefixScope+scope)
 	}
-	if in.Kind != "" {
-		seedLabels = append(seedLabels, LabelPrefixKind+in.Kind)
+	if kind != "" {
+		seedLabels = append(seedLabels, LabelPrefixKind+kind)
 	}
 	if status != "" {
 		seedLabels = append(seedLabels, LabelPrefixStatus+status)
@@ -238,11 +228,8 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		Links: in.Links, Extra: in.Extra,
 		Sections: in.Sections,
 	}
-	// Kind, Scope, Status are label-canonical: derive from seeded labels rather than
-	// setting fields directly. Scan hydration protects all downstream readers.
-	art.Kind = art.ResolvedKind()
+	// Scope, Priority are still field-backed; derive from labels when not set directly.
 	art.Scope = art.ResolvedScope()
-	art.Status = art.ResolvedStatus()
 	art.Priority = art.ResolvedPriority()
 	if in.CreatedAt != "" {
 		if t, err := time.Parse(time.RFC3339, in.CreatedAt); err == nil {
@@ -303,7 +290,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		// When the caller explicitly requests draft, skip conformance —
 		// draft is intentional "work in progress"; sections come later.
 		// When status defaults to draft, still warn so agents know what's missing.
-		explicitDraft := in.Status == StatusDraft
+		explicitDraft := labelValue(in.Labels, LabelPrefixStatus) == StatusDraft
 		if !explicitDraft {
 			if err := p.checkTemplateConformance(ctx, art, true); err != nil {
 				slog.WarnContext(ctx, "partial create: template sections missing",
@@ -313,9 +300,9 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 			}
 		}
 		// Duplicate awareness: warn if similar non-terminal artifact exists
-		if existing, _ := p.store.List(ctx, Filter{Kind: art.ResolvedKind(), Scope: art.Scope}); len(existing) > 0 {
+		if existing, _ := p.store.List(ctx, Filter{Labels: []string{LabelPrefixKind + art.ResolvedKind()}, Scope: art.Scope}); len(existing) > 0 {
 			for _, e := range existing {
-				if !p.schema.IsTerminal(e.Status) && e.Title == art.Title {
+				if !p.schema.IsTerminal(e.ResolvedStatus()) && e.Title == art.Title {
 					slog.WarnContext(ctx, "duplicate title detected on create",
 						slog.String("new_id", art.ID), slog.String("existing_id", e.ID), slog.String("title", art.Title)) //nolint:sloglint // new_id/existing_id have no LogKey constants
 				}
@@ -382,8 +369,8 @@ func (p *Protocol) DeleteArtifact(ctx context.Context, id string, force bool) er
 		if err != nil {
 			return err
 		}
-		if !p.schema.IsReadonly(art.Status) {
-			return fmt.Errorf("%w: %s (status: %s)", ErrNotArchived, id, art.Status)
+		if !p.schema.IsReadonly(art.ResolvedStatus()) {
+			return fmt.Errorf("%w: %s (status: %s)", ErrNotArchived, id, art.ResolvedStatus())
 		}
 	}
 	if err := p.store.Delete(ctx, id); err != nil {
@@ -397,15 +384,10 @@ func (p *Protocol) DeleteArtifact(ctx context.Context, id string, force bool) er
 
 type ListInput struct {
 	Family         string   `json:"family,omitempty"` // filter by kind family: intent, effort, knowledge, support
-	Kind           string   `json:"kind,omitempty"`
-	Kinds          []string `json:"kinds,omitempty"` // OR within kind dimension; takes precedence over Kind
 	Scope          string   `json:"scope,omitempty"`
-	Status         string   `json:"status,omitempty"`
 	Parent         string   `json:"parent,omitempty"`
 	Sprint         string   `json:"sprint,omitempty"`
 	IDPrefix       string   `json:"id_prefix,omitempty"`
-	ExcludeKind    string   `json:"exclude_kind,omitempty"`
-	ExcludeStatus  string   `json:"exclude_status,omitempty"`
 	Labels         []string `json:"labels,omitempty"`
 	LabelsOr       []string `json:"labels_or,omitempty"`
 	ExcludeLabels  []string `json:"exclude_labels,omitempty"`
@@ -430,10 +412,8 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 			in.Scope = v
 		}
 	}
-	if in.ExcludeStatus == "" {
-		if v := p.GetConfig(ctx, configKeyDefaultExcludeStatus, ""); v != "" {
-			in.ExcludeStatus = v
-		}
+	if v := p.GetConfig(ctx, configKeyDefaultExcludeStatus, ""); v != "" {
+		in.ExcludeLabels = append(in.ExcludeLabels, LabelPrefixStatus+v)
 	}
 	if in.Sort == "" {
 		if v := p.GetConfig(ctx, configKeyDefaultSort, ""); v != "" {
@@ -442,12 +422,10 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 	}
 
 	f := Filter{
-		Family: in.Family,
-		Kind: in.Kind, Kinds: in.Kinds, Status: in.Status,
-		Parent: in.Parent, Sprint: in.Sprint,
+		Family:         in.Family,
+		Parent:         in.Parent,
+		Sprint:         in.Sprint,
 		IDPrefix:       in.IDPrefix,
-		ExcludeKind:    in.ExcludeKind,
-		ExcludeStatus:  in.ExcludeStatus,
 		ExcludeScope:   SchemaScope, // definition artifacts are never in user-facing results
 		Labels:         in.Labels,
 		LabelsOr:       in.LabelsOr,
@@ -466,7 +444,6 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 	}
 	p.populateScopeLabelIndex(ctx, &f)
 	p.populateFamilyKinds(&f)
-	f = f.Normalize()
 	arts, err := p.store.List(ctx, f)
 	if err != nil {
 		return arts, err
@@ -487,13 +464,9 @@ func (p *Protocol) ListPage(ctx context.Context, in ListInput) (Page, error) { /
 
 	f := Filter{
 		Family:         in.Family,
-		Kind:           in.Kind,
-		Status:         in.Status,
 		Parent:         in.Parent,
 		Sprint:         in.Sprint,
 		IDPrefix:       in.IDPrefix,
-		ExcludeKind:    in.ExcludeKind,
-		ExcludeStatus:  in.ExcludeStatus,
 		ExcludeScope:   SchemaScope,
 		Labels:         in.Labels,
 		LabelsOr:       in.LabelsOr,
@@ -588,23 +561,19 @@ func (p *Protocol) SearchArtifacts(ctx context.Context, query string, in ListInp
 	// Try FTS5 first, fall back to substring scan
 	ftsIDs, ftsErr := p.store.Search(ctx, query)
 	if ftsErr == nil && len(ftsIDs) > 0 { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity
+		scopeFilter := Filter{Labels: in.Labels}
+		if in.Scope != "" {
+			scopeFilter.Scope = in.Scope
+		} else if len(p.scopes) > 0 {
+			scopeFilter.Scopes = p.scopes
+		}
 		var matched []*Artifact
 		for _, id := range ftsIDs {
 			art, err := p.store.Get(ctx, id)
 			if err != nil {
 				continue
 			}
-			// Apply filters
-			if in.Kind != "" && art.ResolvedKind() != in.Kind {
-				continue
-			}
-			if in.Status != "" && art.Status != in.Status {
-				continue
-			}
-			if in.Scope != "" && art.Scope != in.Scope {
-				continue
-			}
-			if len(p.scopes) > 0 && in.Scope == "" && !slices.Contains(p.scopes, art.Scope) {
+			if !scopeFilter.Matches(art) {
 				continue
 			}
 			matched = append(matched, art)
@@ -613,7 +582,7 @@ func (p *Protocol) SearchArtifacts(ctx context.Context, query string, in ListInp
 	}
 
 	// Fallback: in-memory substring scan
-	f := Filter{Kind: in.Kind, Status: in.Status}
+	f := Filter{Labels: in.Labels}
 	if in.Scope != "" {
 		f.Scope = in.Scope
 	} else if len(p.scopes) > 0 {
@@ -666,7 +635,7 @@ func (p *Protocol) AttachSection(ctx context.Context, id, name, text string) (bo
 	if err != nil {
 		return false, err
 	}
-	if p.schema.Guards.ArchivedReadonly && p.schema.IsReadonly(art.Status) {
+	if p.schema.Guards.ArchivedReadonly && p.schema.IsReadonly(art.ResolvedStatus()) {
 		return false, fmt.Errorf("%w: %s", ErrArchived, art.ID)
 	}
 	replaced := false
@@ -715,7 +684,7 @@ func (p *Protocol) DetachSection(ctx context.Context, id, name string) (bool, er
 	if err != nil {
 		return false, err
 	}
-	if p.schema.Guards.ArchivedReadonly && p.schema.IsReadonly(art.Status) {
+	if p.schema.Guards.ArchivedReadonly && p.schema.IsReadonly(art.ResolvedStatus()) {
 		return false, fmt.Errorf("%w: %s", ErrArchived, art.ID)
 	}
 	if tpl := p.resolveTemplate(ctx, art); tpl != nil {
@@ -888,11 +857,11 @@ func (p *Protocol) retireSingle(ctx context.Context, id string, cascade bool) er
 	if err != nil {
 		return err
 	}
-	if art.Status == StatusRetired {
+	if art.ResolvedStatus() == StatusRetired {
 		return nil // idempotent
 	}
-	if p.schema.IsReadonly(art.Status) {
-		return fmt.Errorf("%s is %s (readonly) — de-archive before retiring", id, art.Status) //nolint:err113 // domain error
+	if p.schema.IsReadonly(art.ResolvedStatus()) {
+		return fmt.Errorf("%s is %s (readonly) — de-archive before retiring", id, art.ResolvedStatus()) //nolint:err113 // domain error
 	}
 	children, err := p.store.Children(ctx, id)
 	if err != nil {
@@ -903,11 +872,11 @@ func (p *Protocol) retireSingle(ctx context.Context, id string, cascade bool) er
 			if err := p.retireSingle(ctx, ch.ID, true); err != nil {
 				return fmt.Errorf("cascade retire %s: %w", ch.ID, err)
 			}
-		} else if !p.schema.IsTerminal(ch.Status) {
-			return fmt.Errorf("cannot retire %s: child %s is %s (use cascade to retire the whole tree)", id, ch.ID, ch.Status) //nolint:err113 // domain error
+		} else if !p.schema.IsTerminal(ch.ResolvedStatus()) {
+			return fmt.Errorf("cannot retire %s: child %s is %s (use cascade to retire the whole tree)", id, ch.ID, ch.ResolvedStatus()) //nolint:err113 // domain error
 		}
 	}
-	art.Status = StatusRetired
+	art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, StatusRetired)
 	slog.InfoContext(ctx, "retired",
 		slog.String(LogKeyID, id),
 		slog.String(LogKeyKind, art.ResolvedKind()))
@@ -929,11 +898,11 @@ func (p *Protocol) DeArchive(ctx context.Context, ids []string, cascade bool) ([
 			results = append(results, Result{ID: id, Error: err.Error()})
 			continue
 		}
-		if !p.schema.IsReadonly(art.Status) {
-			results = append(results, Result{ID: id, Error: fmt.Sprintf("%s is not archived (status: %s)", id, art.Status)})
+		if !p.schema.IsReadonly(art.ResolvedStatus()) {
+			results = append(results, Result{ID: id, Error: fmt.Sprintf("%s is not archived (status: %s)", id, art.ResolvedStatus())})
 			continue
 		}
-		art.Status = StatusDraft
+		art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, StatusDraft)
 		if err := p.store.Put(ctx, art); err != nil {
 			results = append(results, Result{ID: id, Error: err.Error()})
 			continue
@@ -942,8 +911,8 @@ func (p *Protocol) DeArchive(ctx context.Context, ids []string, cascade bool) ([
 		if cascade {
 			children, _ := p.store.Children(ctx, id)
 			for _, ch := range children {
-				if p.schema.IsReadonly(ch.Status) {
-					ch.Status = StatusDraft
+				if p.schema.IsReadonly(ch.ResolvedStatus()) {
+					ch.Labels = mirrorLabel(ch.Labels, LabelPrefixStatus, StatusDraft)
 					_ = p.store.Put(ctx, ch)
 				}
 			}
@@ -957,7 +926,7 @@ func (p *Protocol) archiveSingle(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	if p.schema.IsReadonly(art.Status) {
+	if p.schema.IsReadonly(art.ResolvedStatus()) {
 		return nil
 	}
 	// No cascade — archive is single-artifact only. Children must already be
@@ -967,11 +936,11 @@ func (p *Protocol) archiveSingle(ctx context.Context, id string) error {
 		return err
 	}
 	for _, ch := range children {
-		if !p.schema.IsTerminal(ch.Status) {
-			return fmt.Errorf("cannot archive %s: child %s is %s — retire or complete children first", id, ch.ID, ch.Status) //nolint:err113 // domain error
+		if !p.schema.IsTerminal(ch.ResolvedStatus()) {
+			return fmt.Errorf("cannot archive %s: child %s is %s — retire or complete children first", id, ch.ID, ch.ResolvedStatus()) //nolint:err113 // domain error
 		}
 	}
-	art.Status = p.schema.ReadonlyStatuses[0]
+	art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, p.schema.ReadonlyStatuses[0])
 	return p.store.Put(ctx, art)
 }
 
@@ -1008,9 +977,6 @@ func (p *Protocol) SearchSemantic(ctx context.Context, query string, in ListInpu
 			continue
 		}
 		if in.Scope != "" && art.Scope != in.Scope {
-			continue
-		}
-		if in.Kind != "" && art.ResolvedKind() != in.Kind {
 			continue
 		}
 		results = append(results, ScoredArtifact{Artifact: art, Score: hit.Score})

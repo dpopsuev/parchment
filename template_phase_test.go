@@ -20,7 +20,7 @@ func TestCreateBug_ShouldSucceedWithOnlyFilingTimeSections(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
 	store.Put(ctx, &parchment.Artifact{
-		ID: "TPL-BUG-1", Kind: "template", Status: "active", Title: "Bug Template", Scope: "test",
+		ID: "TPL-BUG-1", Labels: []string{"kind:template", "status:active"}, Title: "Bug Template", Scope: "test",
 		Sections: []parchment.Section{
 			{Name: "content", Text: "raw markdown"},
 			{Name: "observed", Text: "Observed vs Expected behavior"},
@@ -33,20 +33,18 @@ func TestCreateBug_ShouldSucceedWithOnlyFilingTimeSections(t *testing.T) {
 
 	// Filing a bug: we know what we observed and how to reproduce it.
 	// We do NOT know the root cause, fix, or security assessment yet.
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind:  "bug",
-		Title: "template conformance blocks bug filing",
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "template conformance blocks bug filing",
 		Scope: "test",
 		Sections: []parchment.Section{
 			{Name: "observed", Text: "Template conformance rejects creation when investigation-time sections are missing"},
 			{Name: "reproduction", Text: "1. Create a bug template with fix/root_cause/security_assessment sections\n2. Try to create a bug with only observed/reproduction\n3. Creation fails"},
 		},
-	})
+		Labels: []string{"kind:bug"},})
 	if err != nil {
 		t.Fatalf("creating a bug with only filing-time sections should succeed, but got: %v", err)
 	}
-	if art.Status != "draft" {
-		t.Errorf("new bug should be in draft status, got: %s", art.Status)
+	if art.ResolvedStatus() != "draft" {
+		t.Errorf("new bug should be in draft status, got: %s", art.ResolvedStatus())
 	}
 
 	// Completing the bug WITHOUT investigation sections should fail

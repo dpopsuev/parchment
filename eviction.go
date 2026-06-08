@@ -193,7 +193,7 @@ func ComputeTensor(art *Artifact, metrics ArtifactMetrics, incomingEdges, recenc
 	return ValueTensor{
 		AccessHeat:     ComputeAccessHeat(metrics.AccessCount, metrics.LastAccessed),
 		StructuralHeat: structuralHeatFromCount(incomingEdges),
-		QualityScore:   StatusToQuality(art.Status),
+		QualityScore:   StatusToQuality(art.ResolvedStatus()),
 		Recency:        ComputeRecency(art.UpdatedAt, recencyWindowDays),
 		ComputedAt:     time.Now().UTC(),
 	}
@@ -246,7 +246,7 @@ func (p *Protocol) DetectEvictionCandidates(ctx context.Context, policy Eviction
 	if len(policy.Kinds) > 0 {
 		// For simplicity with multiple kinds, iterate per kind.
 		// For now treat first kind as filter; caller can aggregate.
-		f.Kind = policy.Kinds[0]
+		f.Labels = append(f.Labels, LabelPrefixKind+policy.Kinds[0])
 	}
 
 	arts, err := p.store.List(ctx, f)

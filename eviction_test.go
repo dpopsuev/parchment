@@ -131,7 +131,7 @@ func TestComputeRecency_UpdatedLongAgo_IsNearZero(t *testing.T) {
 
 func TestComputeTensor_FleetingOrphan_LowScores(t *testing.T) {
 	art := &parchment.Artifact{
-		Status:    parchment.StatusFleeting,
+		Labels:    []string{"status:" + parchment.StatusFleeting},
 		CreatedAt: time.Now().Add(-60 * 24 * time.Hour),
 		UpdatedAt: time.Now().Add(-60 * 24 * time.Hour),
 	}
@@ -154,7 +154,7 @@ func TestComputeTensor_FleetingOrphan_LowScores(t *testing.T) {
 
 func TestComputeTensor_EvergreenWellLinked_HighScores(t *testing.T) {
 	art := &parchment.Artifact{
-		Status:    parchment.StatusEvergreen,
+		Labels:    []string{"status:" + parchment.StatusEvergreen},
 		CreatedAt: time.Now().Add(-10 * 24 * time.Hour),
 		UpdatedAt: time.Now().Add(-1 * time.Hour),
 	}
@@ -185,7 +185,7 @@ func TestMetricsStore_RecordAccess_Increments(t *testing.T) {
 	ctx := context.Background()
 	store := parchment.NewMemoryStore()
 
-	_ = store.Put(ctx, &parchment.Artifact{ID: "X-1", Kind: "task", Status: "active", Title: "t"})
+	_ = store.Put(ctx, &parchment.Artifact{ID: "X-1", Labels: []string{"kind:task", "status:active"}, Title: "t"})
 
 	if err := store.RecordAccess(ctx, "X-1"); err != nil {
 		t.Fatalf("RecordAccess: %v", err)
@@ -226,10 +226,9 @@ func TestGetArtifact_RecordsAccess(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "task", Title: "access test",
+	art := mustCreate(t, proto, parchment.CreateInput{Title: "access test",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-	})
+		Labels: []string{"kind:task"},})
 
 	_, _ = proto.GetArtifact(ctx, art.ID)
 	_, _ = proto.GetArtifact(ctx, art.ID)
@@ -252,8 +251,10 @@ func TestDetectEvictionCandidates_FleetingOrphan_IsCandidate(t *testing.T) {
 
 	old := time.Now().Add(-60 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
-		ID: "NOT-OLD-1", Kind: "note", Scope: "test",
-		Status: parchment.StatusFleeting, Title: "old fleeting orphan",
+		ID:    "NOT-OLD-1",
+		Labels: []string{"kind:note", "status:" + parchment.StatusFleeting},
+		Scope: "test",
+		Title: "old fleeting orphan",
 		CreatedAt: old, UpdatedAt: old,
 	})
 
@@ -285,8 +286,10 @@ func TestDetectEvictionCandidates_Evergreen_NotCandidate(t *testing.T) {
 
 	old := time.Now().Add(-60 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
-		ID: "NOT-EVER-1", Kind: "note", Scope: "test",
-		Status: parchment.StatusEvergreen, Title: "old evergreen",
+		ID:    "NOT-EVER-1",
+		Labels: []string{"kind:note", "status:" + parchment.StatusEvergreen},
+		Scope: "test",
+		Title: "old evergreen",
 		CreatedAt: old, UpdatedAt: old,
 	})
 	// Simulate many accesses
@@ -315,8 +318,10 @@ func TestDetectEvictionCandidates_PinnedAnnotation_Excluded(t *testing.T) {
 
 	old := time.Now().Add(-90 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
-		ID: "NOT-PIN-1", Kind: "note", Scope: "test",
-		Status: parchment.StatusFleeting, Title: "pinned note",
+		ID:    "NOT-PIN-1",
+		Labels: []string{"kind:note", "status:" + parchment.StatusFleeting},
+		Scope: "test",
+		Title: "pinned note",
 		CreatedAt: old, UpdatedAt: old,
 		Annotations: []parchment.Annotation{{Kind: parchment.AnnotationPin, Comment: "keep forever"}},
 	})

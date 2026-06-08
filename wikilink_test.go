@@ -74,12 +74,10 @@ func TestUniqueWikilinks(t *testing.T) {
 func TestRenderVaultMarkdown_RoundTrip(t *testing.T) {
 	art := &Artifact{
 		ID:     "REL-r-1",
-		Kind:   "relic",
-		Status: "active",
+		Labels: []string{"kind:relic", "status:active", "philosophy", "stoicism"},
 		Scope:  "reliquary",
 		Title:  "The Dichotomy of Control",
 		Goal:   "Understand what is and is not in our power.",
-		Labels: []string{"philosophy", "stoicism"},
 		Sections: []Section{
 			{Name: "body", Text: "Focus only on what you control.\n\nSee also [[Virtue Ethics]]."},
 			{Name: "sources", Text: "Epictetus, Enchiridion."},
@@ -102,11 +100,11 @@ func TestRenderVaultMarkdown_RoundTrip(t *testing.T) {
 	if got.ID != art.ID {
 		t.Errorf("ID: got %q, want %q", got.ID, art.ID)
 	}
-	if got.Kind != art.Kind {
-		t.Errorf("Kind: got %q, want %q", got.Kind, art.Kind)
+	if got.ResolvedKind() != art.ResolvedKind() {
+		t.Errorf("Kind: got %q, want %q", got.ResolvedKind(), art.ResolvedKind())
 	}
-	if got.Status != art.Status {
-		t.Errorf("Status: got %q, want %q", got.Status, art.Status)
+	if got.ResolvedStatus() != art.ResolvedStatus() {
+		t.Errorf("Status: got %q, want %q", got.ResolvedStatus(), art.ResolvedStatus())
 	}
 	if got.Title != art.Title {
 		t.Errorf("Title: got %q, want %q", got.Title, art.Title)
@@ -170,7 +168,8 @@ func TestBacklinks(t *testing.T) {
 
 	// Use decision kind — no required edges or fields.
 	mkArt := func(title string) *Artifact {
-		art, err := p.CreateArtifact(ctx, CreateInput{Kind: "decision", Title: title, Scope: "test"})
+		art, err := p.CreateArtifact(ctx, CreateInput{Title: title, Scope: "test",
+		Labels: []string{"kind:decision"},})
 		if err != nil {
 			t.Fatalf("create %q: %v", title, err)
 		}
@@ -203,18 +202,17 @@ func TestSyncWikilinks(t *testing.T) {
 	store := NewMemoryStore()
 	p := New(store, nil, []string{"test"}, nil, ProtocolConfig{})
 
-	stoicism, err := p.CreateArtifact(ctx, CreateInput{Kind: "decision", Title: "Stoicism", Scope: "test"})
+	stoicism, err := p.CreateArtifact(ctx, CreateInput{Title: "Stoicism", Scope: "test",
+		Labels: []string{"kind:decision"},})
 	if err != nil {
 		t.Fatalf("create stoicism: %v", err)
 	}
-	note, err := p.CreateArtifact(ctx, CreateInput{
-		Kind:  "decision",
-		Title: "My Note",
+	note, err := p.CreateArtifact(ctx, CreateInput{Title: "My Note",
 		Scope: "test",
 		Sections: []Section{
 			{Name: "body", Text: "This note references [[Stoicism]] as a key philosophy."},
 		},
-	})
+		Labels: []string{"kind:decision"},})
 
 	if err != nil {
 		t.Fatalf("create note: %v", err)

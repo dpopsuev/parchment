@@ -22,16 +22,16 @@ func MigrateSystemLabels(ctx context.Context, s Store) error {
 		labels := art.Labels
 		changed := false
 
-		if art.Kind != "" && !hasPrefix(labels, LabelPrefixKind) {
-			labels = mirrorLabel(labels, LabelPrefixKind, art.Kind)
+		if art.ResolvedKind() != "" && !hasPrefix(labels, LabelPrefixKind) {
+			labels = mirrorLabel(labels, LabelPrefixKind, art.ResolvedKind())
 			changed = true
 		}
 		if art.Scope != "" && !hasPrefix(labels, LabelPrefixScope) {
 			labels = mirrorLabel(labels, LabelPrefixScope, art.Scope)
 			changed = true
 		}
-		if art.Status != "" && !hasPrefix(labels, LabelPrefixStatus) {
-			labels = mirrorLabel(labels, LabelPrefixStatus, art.Status)
+		if art.ResolvedStatus() != "" && !hasPrefix(labels, LabelPrefixStatus) {
+			labels = mirrorLabel(labels, LabelPrefixStatus, art.ResolvedStatus())
 			changed = true
 		}
 		if art.Priority != "" && !hasPrefix(labels, LabelPrefixPriority) {

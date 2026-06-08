@@ -11,9 +11,7 @@ type Artifact struct {
 	UID         string              `json:"uid,omitempty"`
 	ID          string              `json:"id"`
 	Alias       string              `json:"alias,omitempty"`
-	Kind        string              `json:"kind"`
 	Scope       string              `json:"scope,omitempty"`
-	Status      string              `json:"status"`
 	Parent      string              `json:"parent,omitempty"`
 	Title       string              `json:"title"`
 	Goal        string              `json:"goal,omitempty"`
@@ -113,10 +111,6 @@ type IDConfig struct {
 type Filter struct {
 	Family          string            // restrict to a kind family (intent, effort, knowledge, support)
 	FamilyKinds     map[string]bool   // populated at query time: kind → true for the requested family
-	Kind            string
-	Kinds           []string // OR within the kind dimension: kind IN (kinds...). Takes precedence over Kind when non-empty.
-	ExcludeKind     string
-	ExcludeStatus   string // exclude artifacts with this status
 	ExcludeScope    string // exclude artifacts with this scope (used to hide _schema)
 	IDPrefix        string // match artifacts whose ID starts with this prefix
 	Scope           string
@@ -125,7 +119,6 @@ type Filter struct {
 	// exact-match behavior.
 	ScopePrefix     bool
 	Scopes          []string // multi-scope IN filter (takes precedence over Scope when non-empty)
-	Status          string
 	Parent          string
 	Sprint          string
 	Labels          []string
@@ -193,29 +186,14 @@ func (a *Artifact) ResolvedSprint() string {
 	return ""
 }
 
-// mirrorLabel replaces any existing label with the given prefix with a new
+// MirrorLabel replaces any existing label with the given prefix with a new
 // one built from prefix+value. If value is empty the label is simply removed.
 // Used by SetField to keep system label mirrors consistent with field writes.
-// syncSystemFields ensures Kind, Status, Scope, Priority, and Sprint are
-// mirrored as labels on the artifact. Called by Store.Put so every write —
-// whether from Protocol or directly — keeps the label junction consistent.
-func syncSystemFields(art *Artifact) {
-	if art.Kind != "" {
-		art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, art.Kind)
-	}
-	if art.Status != "" {
-		art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, art.Status)
-	}
-	if art.Scope != "" && art.Scope != SchemaScope {
-		art.Labels = mirrorLabel(art.Labels, LabelPrefixScope, art.Scope)
-	}
-	if art.Priority != "" {
-		art.Labels = mirrorLabel(art.Labels, LabelPrefixPriority, art.Priority)
-	}
-	if art.Sprint != "" {
-		art.Labels = mirrorLabel(art.Labels, LabelPrefixSprint, art.Sprint)
-	}
+func MirrorLabel(labels []string, prefix, value string) []string {
+	return mirrorLabel(labels, prefix, value)
 }
+
+// mirrorLabel is the unexported implementation shared by SetField and MirrorLabel.
 
 func mirrorLabel(labels []string, prefix, value string) []string {
 	out := make([]string, 0, len(labels)+1)
@@ -230,33 +208,24 @@ func mirrorLabel(labels []string, prefix, value string) []string {
 	return out
 }
 
-// ResolvedKind returns the artifact's kind. The Kind field is authoritative;
-// if empty, the first "kind:<name>" label is used. Both paths will be
-// equivalent once the Kind field is fully deprecated in favor of labels.
-func (a *Artifact) ResolvedKind() string {
-	if a.Kind != "" {
-		return a.Kind
-	}
-	for _, l := range a.Labels {
-		if strings.HasPrefix(l, LabelPrefixKind) {
-			return strings.TrimPrefix(l, LabelPrefixKind)
+// labelValue returns the value of the first label with the given prefix, or "".
+func labelValue(labels []string, prefix string) string {
+	for _, l := range labels {
+		if strings.HasPrefix(l, prefix) {
+			return strings.TrimPrefix(l, prefix)
 		}
 	}
 	return ""
 }
 
-// ResolvedStatus returns the artifact's status. The Status field is authoritative;
-// if empty, the first "status:<value>" label is used.
+// ResolvedKind returns the artifact's kind derived from labels.
+func (a *Artifact) ResolvedKind() string {
+	return labelValue(a.Labels, LabelPrefixKind)
+}
+
+// ResolvedStatus returns the artifact's status derived from labels.
 func (a *Artifact) ResolvedStatus() string {
-	if a.Status != "" {
-		return a.Status
-	}
-	for _, l := range a.Labels {
-		if strings.HasPrefix(l, LabelPrefixStatus) {
-			return strings.TrimPrefix(l, LabelPrefixStatus)
-		}
-	}
-	return ""
+	return labelValue(a.Labels, LabelPrefixStatus)
 }
 
 // ResolvedScope returns the artifact's scope. The Scope field is authoritative;
@@ -273,34 +242,6 @@ func (a *Artifact) ResolvedScope() string {
 	return ""
 }
 
-// Matches reports whether art satisfies all non-zero filter fields.
-// Normalize translates entity-field predicates (Kind, Status, Scope, etc.)
-// into label predicates and clears the originating fields. Safe to call
-// multiple times — idempotent. Called at List/ListPage boundaries.
-func (f Filter) Normalize() Filter { //nolint:gocritic // hugeParam: value semantics intentional; Filter is read-only in all callers
-	out := f
-	if out.Kind != "" {
-		out.Labels = mirrorLabel(out.Labels, LabelPrefixKind, out.Kind)
-		out.Kind = ""
-	}
-	for _, k := range out.Kinds {
-		out.LabelsOr = append(out.LabelsOr, LabelPrefixKind+k)
-	}
-	if len(out.Kinds) > 0 {
-		out.Kinds = nil
-	}
-	if out.Status != "" {
-		out.Labels = mirrorLabel(out.Labels, LabelPrefixStatus, out.Status)
-		out.Status = ""
-	}
-	if out.Sprint != "" {
-		out.Labels = mirrorLabel(out.Labels, LabelPrefixSprint, out.Sprint)
-		out.Sprint = ""
-	}
-	// Scope stays column-backed: normalizing it would surface _schema artifacts in user queries.
-	return out
-}
-
 func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic // hugeParam: Filter is read-only in all callers; pointer would complicate call sites
 	if f.Family != "" && len(f.FamilyKinds) > 0 {
 		if !f.FamilyKinds[art.ResolvedKind()] {
@@ -310,27 +251,7 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic /
 	if f.IDPrefix != "" && !strings.HasPrefix(art.ID, f.IDPrefix) {
 		return false
 	}
-	if f.ExcludeKind != "" && art.ResolvedKind() == f.ExcludeKind {
-		return false
-	}
-	if f.ExcludeStatus != "" && art.ResolvedStatus() == f.ExcludeStatus {
-		return false
-	}
 	if f.ExcludeScope != "" && art.ResolvedScope() == f.ExcludeScope {
-		return false
-	}
-	if len(f.Kinds) > 0 {
-		matched := false
-		for _, k := range f.Kinds {
-			if art.ResolvedKind() == k {
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			return false
-		}
-	} else if f.Kind != "" && art.ResolvedKind() != f.Kind {
 		return false
 	}
 	if len(f.Scopes) > 0 { //nolint:nestif // scope filter has legitimate branching; splitting would reduce clarity
@@ -352,9 +273,6 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic /
 		} else if art.ResolvedScope() != f.Scope {
 			return false
 		}
-	}
-	if f.Status != "" && art.ResolvedStatus() != f.Status {
-		return false
 	}
 	if f.Parent != "" && art.Parent != f.Parent {
 		return false

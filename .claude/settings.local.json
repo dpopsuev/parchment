@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat)",
+      "Bash(bash /tmp/extract_clusters.sh)",
+      "Read(//tmp/**)",
+      "Bash(golangci-lint run *)",
+      "Bash(goimports *)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(awk -F: '{print $1}')",
+      "Bash(awk -F: '{s+=$2} END {print s}')",
+      "Bash(python3 -c ' *)",
+      "Bash(grep '--- FAIL')",
+      "Bash(grep -F '--- FAIL')",
+      "Bash(awk '/^--- FAIL/')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(k,v\\) for k,v in d.get\\('mcpServers',{}\\).items\\(\\) if 'scribe' in k.lower\\(\\)]\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(make deploy *)",
+      "Bash(sudo ausearch *)",
+      "Bash(journalctl -t setroubleshoot --since \"5 min ago\")",
+      "Bash(journalctl --user -u \"podman*\" --since \"5 min ago\")",
+      "Bash(dmesg)",
+      "Bash(sudo cat *)",
+      "Bash(ausearch -m AVC -ts recent)",
+      "Bash(journalctl -t setroubleshoot --since \"10 min ago\")",
+      "Bash(sed -i 's|return nil, nil, fmt.Errorf\\(\"query is required for search action\"\\)|return nil, nil, fmt.Errorf\\(\"query is required for search action\"\\) //nolint:err113 // agent-facing hint|' mcp/server.go)",
+      "Bash(sed -i 's|return nil, nil, fmt.Errorf\\(\"id is required \\(artifact ID\\) or ids \\(array of artifact IDs\\) for set action\"\\)|return nil, nil, fmt.Errorf\\(\"id is required \\(artifact ID\\) or ids \\(array of artifact IDs\\) for set action\"\\) //nolint:err113 // agent-facing hint|' mcp/server.go)",
+      "Bash(sed -i 's|return nil, nil, fmt.Errorf\\(\"id is required \\(artifact ID\\) or ids \\(array of artifact IDs\\) for update action\"\\)|return nil, nil, fmt.Errorf\\(\"id is required \\(artifact ID\\) or ids \\(array of artifact IDs\\) for update action\"\\) //nolint:err113 // agent-facing hint|' mcp/server.go)",
+      "Bash(sed -i 's|return nil, nil, fmt.Errorf\\(\"id is required \\(source artifact ID\\) for link action\"\\)|return nil, nil, fmt.Errorf\\(\"id is required \\(source artifact ID\\) for link action\"\\) //nolint:err113 // agent-facing hint|' mcp/server.go)",
+      "Bash(sed -i 's|return nil, nil, fmt.Errorf\\(\"targets is required \\(array of target artifact IDs\\) for link action\"\\)|return nil, nil, fmt.Errorf\\(\"targets is required \\(array of target artifact IDs\\) for link action\"\\) //nolint:err113 // agent-facing hint|' mcp/server.go)"
+    ]
+  }
+}

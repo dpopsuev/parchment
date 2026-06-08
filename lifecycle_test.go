@@ -14,15 +14,13 @@ func TestTransition_ActiveToMature(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind:  "task",
-		Scope: "test",
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Scope: "test",
 		Title: "implement feature X",
 		Goal:  "add the feature",
 		Sections: []parchment.Section{
 			{Name: "context", Text: "context here"},
 		},
-	})
+		Labels: []string{"kind:task"},})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -37,8 +35,8 @@ func TestTransition_ActiveToMature(t *testing.T) {
 	}
 
 	got, _ := store.Get(ctx, art.ID)
-	if got.Status != "mature" {
-		t.Errorf("status = %q, want mature", got.Status)
+	if got.ResolvedStatus() != "mature" {
+		t.Errorf("status = %q, want mature", got.ResolvedStatus())
 	}
 }
 
@@ -49,15 +47,13 @@ func TestTransition_MatureToAllocated(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind:  "task",
-		Scope: "test",
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Scope: "test",
 		Title: "implement feature Y",
 		Goal:  "add the feature",
 		Sections: []parchment.Section{
 			{Name: "context", Text: "context here"},
 		},
-	})
+		Labels: []string{"kind:task"},})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -71,8 +67,8 @@ func TestTransition_MatureToAllocated(t *testing.T) {
 	}
 
 	got, _ := store.Get(ctx, art.ID)
-	if got.Status != "allocated" {
-		t.Errorf("status = %q, want allocated", got.Status)
+	if got.ResolvedStatus() != "allocated" {
+		t.Errorf("status = %q, want allocated", got.ResolvedStatus())
 	}
 }
 
@@ -83,15 +79,13 @@ func TestTransition_FullLifecycle(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind:  "task",
-		Scope: "test",
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Scope: "test",
 		Title: "full lifecycle task",
 		Goal:  "test all transitions",
 		Sections: []parchment.Section{
 			{Name: "context", Text: "context"},
 		},
-	})
+		Labels: []string{"kind:task"},})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -102,8 +96,8 @@ func TestTransition_FullLifecycle(t *testing.T) {
 			t.Fatalf("transition to %s: %v", status, err)
 		}
 		got, _ := store.Get(ctx, art.ID)
-		if got.Status != status {
-			t.Errorf("after transition: status = %q, want %q", got.Status, status)
+		if got.ResolvedStatus() != status {
+			t.Errorf("after transition: status = %q, want %q", got.ResolvedStatus(), status)
 		}
 	}
 }
@@ -115,10 +109,9 @@ func TestTransition_InvalidTransitionBlocked(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: "task", Scope: "test", Title: "blocked", Priority: "medium",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Scope: "test", Title: "blocked", Priority: "medium",
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
-	})
+		Labels: []string{"kind:task"},})
 	proto.SetField(ctx, []string{art.ID}, "status", "active", parchment.SetFieldOptions{Force: true})
 
 	// active → complete should be blocked (must go through lifecycle).
@@ -131,8 +124,8 @@ func TestTransition_InvalidTransitionBlocked(t *testing.T) {
 	}
 
 	got, _ := store.Get(ctx, art.ID)
-	if got.Status != "active" {
-		t.Errorf("status = %q, want active (unchanged)", got.Status)
+	if got.ResolvedStatus() != "active" {
+		t.Errorf("status = %q, want active (unchanged)", got.ResolvedStatus())
 	}
 }
 
@@ -143,10 +136,9 @@ func TestTransition_WorkerIDRequiredForAllocation(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: "task", Scope: "test", Title: "needs worker", Priority: "medium",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Scope: "test", Title: "needs worker", Priority: "medium",
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
-	})
+		Labels: []string{"kind:task"},})
 	proto.SetField(ctx, []string{art.ID}, "status", "active", parchment.SetFieldOptions{Force: true})
 	proto.SetField(ctx, []string{art.ID}, "status", "mature", parchment.SetFieldOptions{Force: true})
 
@@ -181,10 +173,9 @@ func TestTransition_StampsRequiredForReview(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: "task", Scope: "test", Title: "needs stamps", Priority: "medium",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Scope: "test", Title: "needs stamps", Priority: "medium",
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
-	})
+		Labels: []string{"kind:task"},})
 	// Walk to in_progress.
 	proto.SetField(ctx, []string{art.ID}, "status", "active", parchment.SetFieldOptions{Force: true})
 	proto.SetField(ctx, []string{art.ID}, "status", "mature", parchment.SetFieldOptions{Force: true})

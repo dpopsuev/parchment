@@ -120,11 +120,11 @@ func protocolWithTrait(t *testing.T, label string, requiredSections ...string) (
 	// so loadLabelTraits picks it up.
 	import_ctx := t.Context()
 	store.Put(import_ctx, &parchment.Artifact{
-		ID:    "LDEF-" + label,
-		Kind:  parchment.KindLabelDefinition,
-		Scope: parchment.SchemaScope,
-		Title: label,
-		Extra: map[string]any{"required_sections": requiredSections},
+		ID:     "LDEF-" + label,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
+		Scope:  parchment.SchemaScope,
+		Title:  label,
+		Extra:  map[string]any{"required_sections": requiredSections},
 	})
 	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{IDFormat: "sequential"})
 	return proto, store
@@ -132,10 +132,8 @@ func protocolWithTrait(t *testing.T, label string, requiredSections ...string) (
 
 func TestProtocol_CreateWithTrait_Violation(t *testing.T) {
 	proto, _ := protocolWithTrait(t, "security", "threat_model")
-	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{
-		Kind:   "note",
-		Title:  "sec note",
-		Labels: []string{"security"},
+	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{Title:  "sec note",
+		Labels: []string{"kind:note", "security"},
 	})
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -147,10 +145,8 @@ func TestProtocol_CreateWithTrait_Violation(t *testing.T) {
 
 func TestProtocol_CreateWithTrait_OK(t *testing.T) {
 	proto, _ := protocolWithTrait(t, "security", "threat_model")
-	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{
-		Kind:     "note",
-		Title:    "sec note",
-		Labels:   []string{"security"},
+	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{Title:    "sec note",
+		Labels: []string{"kind:note", "security"},
 		Sections: []parchment.Section{{Name: "threat_model", Text: "documented"}},
 	})
 	if err != nil {
@@ -163,10 +159,8 @@ func TestProtocol_CreateWithTrait_OK(t *testing.T) {
 
 func TestProtocol_AttachSection_FixesViolation(t *testing.T) {
 	proto, store := protocolWithTrait(t, "security", "threat_model")
-	art, _ := proto.CreateArtifact(t.Context(), parchment.CreateInput{
-		Kind:   "note",
-		Title:  "sec note",
-		Labels: []string{"security"},
+	art, _ := proto.CreateArtifact(t.Context(), parchment.CreateInput{Title:  "sec note",
+		Labels: []string{"kind:note", "security"},
 	})
 	if !hasLabel(art.Labels, "compliance:violation") {
 		t.Fatal("expected violation before fix")
@@ -182,10 +176,8 @@ func TestProtocol_AttachSection_FixesViolation(t *testing.T) {
 
 func TestProtocol_SetField_Labels_RemovingLabel_FixesViolation(t *testing.T) {
 	proto, store := protocolWithTrait(t, "security", "threat_model")
-	art, _ := proto.CreateArtifact(t.Context(), parchment.CreateInput{
-		Kind:   "note",
-		Title:  "sec note",
-		Labels: []string{"security"},
+	art, _ := proto.CreateArtifact(t.Context(), parchment.CreateInput{Title:  "sec note",
+		Labels: []string{"kind:note", "security"},
 	})
 	if !hasLabel(art.Labels, "compliance:violation") {
 		t.Fatal("expected violation before fix")
@@ -204,12 +196,14 @@ func TestProtocol_ListByComplianceLabel(t *testing.T) {
 	proto, _ := protocolWithTrait(t, "security", "threat_model")
 	// compliant
 	proto.CreateArtifact(t.Context(), parchment.CreateInput{ //nolint:errcheck // test setup; error surfaces in assertion
-		Kind: "note", Title: "ok", Labels: []string{"security"},
+		Title:    "ok",
+		Labels:   []string{"kind:note", "security"},
 		Sections: []parchment.Section{{Name: "threat_model", Text: "x"}},
 	})
 	// non-compliant
 	proto.CreateArtifact(t.Context(), parchment.CreateInput{ //nolint:errcheck // test setup; error surfaces in assertion
-		Kind: "note", Title: "bad", Labels: []string{"security"},
+		Title:  "bad",
+		Labels: []string{"kind:note", "security"},
 	})
 
 	violations, _ := proto.ListArtifacts(t.Context(), parchment.ListInput{

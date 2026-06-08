@@ -16,8 +16,9 @@ func TestFilter_MatchLabels_ExcludeLabels_UsesLabelCheck(t *testing.T) {
 	// Then: Matches returns false
 	t.Parallel()
 	art := &parchment.Artifact{
-		ID: "TSK-1", Kind: "task", Status: "active",
-		Scope: "test", Labels: []string{"security", "go"},
+		ID:     "TSK-1",
+		Labels: []string{"kind:task", "status:active", "security", "go"},
+		Scope:  "test",
 	}
 	f := parchment.Filter{ExcludeLabels: []string{"security"}}
 	if f.Matches(art) {
@@ -32,7 +33,9 @@ func TestFilter_MatchLabels_ScopeLabelIndex_Expansion(t *testing.T) {
 	// Then: Matches returns true
 	t.Parallel()
 	art := &parchment.Artifact{
-		ID: "TSK-2", Kind: "task", Status: "active", Scope: "infra",
+		ID:     "TSK-2",
+		Labels: []string{"kind:task", "status:active"},
+		Scope:  "infra",
 	}
 	f := parchment.Filter{
 		Labels:          []string{"backend"},
@@ -68,12 +71,13 @@ func TestBulkSetField_UpdatesAllMatching(t *testing.T) {
 	proto := parchment.New(store, parchment.KnowledgeSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindTask, Title: "a", Scope: "test"})
-	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindTask, Title: "b", Scope: "test"})
+	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "a", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "b", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
-	result, err := proto.BulkSetField(ctx, parchment.BulkMutationInput{
-		Kind: parchment.KindTask, Scope: "test",
-	}, "priority", "high")
+	result, err := proto.BulkSetField(ctx, parchment.BulkMutationInput{Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},}, "priority", "high")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,11 +101,11 @@ func TestBulkSetField_DryRun_NoMutation(t *testing.T) {
 	proto := parchment.New(store, parchment.KnowledgeSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindTask, Title: "c", Scope: "test"})
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "c", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
-	result, err := proto.BulkSetField(ctx, parchment.BulkMutationInput{
-		Kind: parchment.KindTask, Scope: "test", DryRun: true,
-	}, "priority", "critical")
+	result, err := proto.BulkSetField(ctx, parchment.BulkMutationInput{Scope: "test", DryRun: true,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},}, "priority", "critical")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,27 +143,33 @@ func TestVocab_ContainsKindNames(t *testing.T) {
 	}
 }
 
-// TestFilter_Kinds verifies that Kinds []string works as an OR filter on kind.
-func TestFilter_Kinds(t *testing.T) {
+// TestFilter_LabelsOr verifies that LabelsOr works as an OR filter on kind labels.
+func TestFilter_LabelsOr(t *testing.T) {
 	// Given: artifacts of three kinds
-	// When: Filter.Kinds lists two of them
+	// When: Filter.LabelsOr lists kind labels for two of them
 	// Then: both match; the third does not
 	t.Parallel()
 	ctx := context.Background()
 	s := parchment.NewMemoryStore()
 	p := parchment.New(s, parchment.DefaultSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindTask, Title: "task", Scope: "test", Priority: "none", Sections: []parchment.Section{{Name: "context", Text: "x"}}}); err != nil {
+	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "task", Scope: "test", Priority: "none", Sections: []parchment.Section{{Name: "context", Text: "x"}},
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindBug, Title: "bug", Scope: "test", Sections: []parchment.Section{{Name: "context", Text: "x"}}}); err != nil {
+	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "bug", Scope: "test", Sections: []parchment.Section{{Name: "context", Text: "x"}},
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindBug},}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindSpec, Title: "spec", Scope: "test"}); err != nil {
+	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "spec", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindSpec},}); err != nil {
 		t.Fatal(err)
 	}
 
-	arts, err := p.ListArtifacts(ctx, parchment.ListInput{Kinds: []string{parchment.KindTask, parchment.KindBug}, Scope: "test"})
+	arts, err := p.ListArtifacts(ctx, parchment.ListInput{
+		LabelsOr: []string{"kind:" + parchment.KindTask, "kind:" + parchment.KindBug},
+		Scope:    "test",
+	})
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -167,8 +177,8 @@ func TestFilter_Kinds(t *testing.T) {
 		t.Errorf("got %d artifacts, want 2 (task+bug)", len(arts))
 	}
 	for _, a := range arts {
-		if a.Kind != parchment.KindTask && a.Kind != parchment.KindBug {
-			t.Errorf("unexpected kind %q in result", a.Kind)
+		if a.ResolvedKind() != parchment.KindTask && a.ResolvedKind() != parchment.KindBug {
+			t.Errorf("unexpected kind %q in result", a.ResolvedKind())
 		}
 	}
 }

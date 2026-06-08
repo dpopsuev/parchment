@@ -93,9 +93,9 @@ func putArtifact(t *testing.T, store parchment.Store, kind, title string) *parch
 	t.Helper()
 	nodeTestSeq++
 	art := &parchment.Artifact{
-		ID:    kind[:1] + "-" + fmt.Sprintf("%03d", nodeTestSeq),
-		Kind:  kind,
-		Title: title,
+		ID:     kind[:1] + "-" + fmt.Sprintf("%03d", nodeTestSeq),
+		Labels: []string{"kind:" + kind},
+		Title:  title,
 	}
 	if err := store.Put(t.Context(), art); err != nil {
 		t.Fatalf("putArtifact %s: %v", title, err)

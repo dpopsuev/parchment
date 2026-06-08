@@ -128,8 +128,9 @@ func TestMigrateRegistrySections_AddsMissingSectionsToExistingArtifacts(t *testi
 	// Simulate pre-registry state: DEF-task exists with NO guidance sections
 	now := time.Now().UTC()
 	_ = s.Put(ctx, &parchment.Artifact{
-		ID: "DEF-task", Kind: parchment.KindDefinition,
-		Scope: parchment.SchemaScope, Title: "task", Status: parchment.StatusActive,
+		ID:     "DEF-task",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
+		Scope:  parchment.SchemaScope, Title: "task",
 		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	})
 
@@ -167,8 +168,9 @@ func TestMigrateRegistrySections_PreservesExistingCustomSections(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC()
 	_ = s.Put(ctx, &parchment.Artifact{
-		ID: "DEF-task", Kind: parchment.KindDefinition,
-		Scope: parchment.SchemaScope, Title: "task", Status: parchment.StatusActive,
+		ID:     "DEF-task",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
+		Scope:  parchment.SchemaScope, Title: "task",
 		Sections: []parchment.Section{
 			{Name: "when_to_create", Text: "custom operator guidance"},
 		},

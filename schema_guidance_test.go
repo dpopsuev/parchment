@@ -37,8 +37,8 @@ func TestSeedDefinitions_KindArtifact_HasGuidanceSections(t *testing.T) {
 	// Find the task kind_definition artifact.
 	// Dual-read: accepts both legacy KindDefinition and collapsed KindLabelDefinition.
 	arts, err := s.List(ctx, parchment.Filter{
-		Kinds: []string{parchment.KindDefinition, parchment.KindLabelDefinition},
-		Scope: parchment.SchemaScope,
+		LabelsOr: []string{parchment.LabelPrefixKind + parchment.KindDefinition, parchment.LabelPrefixKind + parchment.KindLabelDefinition},
+		Scope:    parchment.SchemaScope,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -85,8 +85,8 @@ func TestSeedEdgeTypeTraits_HasGuidanceSections(t *testing.T) {
 	parchment.SeedEdgeTypeTraits(ctx, s)
 
 	arts, err := s.List(ctx, parchment.Filter{
-		Kind:  parchment.KindEdgeTypeDefinition,
-		Scope: parchment.SchemaScope,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition},
+		Scope:  parchment.SchemaScope,
 	})
 	if err != nil {
 		t.Fatal(err)

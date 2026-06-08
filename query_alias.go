@@ -21,10 +21,9 @@ func (p *Protocol) RegisterQueryAlias(ctx context.Context, name string, f Filter
 	}
 	art := &Artifact{
 		ID:     "QALIAS-" + name,
-		Kind:   KindQueryAlias,
+		Labels: []string{LabelPrefixKind + KindQueryAlias, LabelPrefixStatus + StatusActive},
 		Scope:  SchemaScope,
 		Title:  name,
-		Status: StatusActive,
 		Extra:  extra,
 	}
 	return p.store.Put(ctx, art)
@@ -49,7 +48,7 @@ func (p *Protocol) ResolveQueryAlias(ctx context.Context, name string) (Filter, 
 
 // ListQueryAliases returns all registered query alias names in SchemaScope.
 func (p *Protocol) ListQueryAliases(ctx context.Context) ([]string, error) {
-	arts, err := p.store.List(ctx, Filter{Kind: KindQueryAlias, Scope: SchemaScope})
+	arts, err := p.store.List(ctx, Filter{Labels: []string{LabelPrefixKind + KindQueryAlias}, Scope: SchemaScope})
 	if err != nil {
 		return nil, err
 	}

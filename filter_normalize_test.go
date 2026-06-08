@@ -6,80 +6,54 @@ import (
 	"github.com/dpopsuev/parchment"
 )
 
-func TestFilter_Normalize_KindToLabel(t *testing.T) {
-	// Given: Kind field set on filter
-	// When:  Normalize() runs (migration complete, v1.0.0+)
-	// Then:  Kind cleared; kind:task label added to Labels
-	f := parchment.Filter{Kind: "task"}
-	n := f.Normalize()
-	if n.Kind != "" {
-		t.Errorf("Kind should be cleared after normalization, got %q", n.Kind)
+func TestFilter_Labels_KindFilter(t *testing.T) {
+	// Given: Labels contains kind:task
+	// When:  Matches() is called on an artifact with kind:task
+	// Then:  the filter matches
+	f := parchment.Filter{Labels: []string{"kind:task"}}
+	art := &parchment.Artifact{Labels: []string{"kind:task", "status:active"}}
+	if !f.Matches(art) {
+		t.Error("filter with kind:task label should match artifact with kind:task label")
 	}
-	found := false
-	for _, l := range n.Labels {
-		if l == "kind:task" {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("Labels should contain %q after normalization, got %v", "kind:task", n.Labels)
+	art2 := &parchment.Artifact{Labels: []string{"kind:spec", "status:active"}}
+	if f.Matches(art2) {
+		t.Error("filter with kind:task label should not match artifact with kind:spec label")
 	}
 }
 
-func TestFilter_Normalize_StatusToLabel(t *testing.T) {
-	// Given: Status field set on filter
-	// When:  Normalize() runs (migration complete, v1.0.0+)
-	// Then:  Status cleared; status:active label added to Labels
-	f := parchment.Filter{Status: "active"}
-	n := f.Normalize()
-	if n.Status != "" {
-		t.Errorf("Status should be cleared after normalization, got %q", n.Status)
+func TestFilter_Labels_StatusFilter(t *testing.T) {
+	// Given: Labels contains status:active
+	// When:  Matches() is called
+	// Then:  only active artifacts match
+	f := parchment.Filter{Labels: []string{"status:active"}}
+	art := &parchment.Artifact{Labels: []string{"kind:task", "status:active"}}
+	if !f.Matches(art) {
+		t.Error("filter with status:active should match active artifact")
 	}
-	found := false
-	for _, l := range n.Labels {
-		if l == "status:active" {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("Labels should contain %q after normalization, got %v", "status:active", n.Labels)
+	art2 := &parchment.Artifact{Labels: []string{"kind:task", "status:draft"}}
+	if f.Matches(art2) {
+		t.Error("filter with status:active should not match draft artifact")
 	}
 }
 
-func TestFilter_Normalize_ScopePreserved(t *testing.T) {
-	// Scope normalization is deferred — Scope stays as a column predicate
-	// until all artifacts carry scope: labels (requires MigrateSystemLabels).
+func TestFilter_Labels_ScopePreserved(t *testing.T) {
+	// Scope stays as a column predicate, not a label.
 	f := parchment.Filter{Scope: "scribe"}
-	n := f.Normalize()
-	if n.Scope != "scribe" {
-		t.Errorf("Scope should be preserved (not yet normalized to label), got %q", n.Scope)
+	art := &parchment.Artifact{Scope: "scribe", Labels: []string{"kind:task", "status:active"}}
+	if !f.Matches(art) {
+		t.Error("filter with Scope should match artifact with same Scope")
 	}
 }
 
-func TestFilter_Normalize_Idempotent(t *testing.T) {
-	// Sprint IS normalized. Kind/Status/Scope are NOT (deferred).
-	f := parchment.Filter{Sprint: "2026-W24"}
-	once := f.Normalize()
-	twice := once.Normalize()
-	if once.Sprint != twice.Sprint {
-		t.Error("Normalize must be idempotent")
+func TestFilter_ExcludeKind_Preserved(t *testing.T) {
+	// ExcludeKind remains a column-backed predicate.
+	f := parchment.Filter{ExcludeLabels: []string{"kind:template"}}
+	art := &parchment.Artifact{Labels: []string{"kind:template", "status:active"}}
+	if f.Matches(art) {
+		t.Error("ExcludeKind should exclude matching artifacts")
 	}
-	sprintCount := 0
-	for _, l := range twice.Labels {
-		if l == "sprint:2026-W24" {
-			sprintCount++
-		}
-	}
-	if sprintCount != 1 {
-		t.Errorf("sprint:2026-W24 must appear exactly once after double Normalize, got %d", sprintCount)
-	}
-}
-
-func TestFilter_Normalize_ExcludeKindPreserved(t *testing.T) {
-	// ExcludeKind normalization deferred — same reason as Scope.
-	f := parchment.Filter{ExcludeKind: "template"}
-	n := f.Normalize()
-	if n.ExcludeKind != "template" {
-		t.Errorf("ExcludeKind should be preserved (deferred normalization), got %q", n.ExcludeKind)
+	art2 := &parchment.Artifact{Labels: []string{"kind:task", "status:active"}}
+	if !f.Matches(art2) {
+		t.Error("ExcludeKind should not exclude non-matching artifacts")
 	}
 }

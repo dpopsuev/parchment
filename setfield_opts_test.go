@@ -16,9 +16,8 @@ func TestSetFieldOptions_BypassGuards_ArchivesWithoutGuards(t *testing.T) {
 	ctx := context.Background()
 	proto, _ := newProto(t)
 
-	task := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "task", Title: "T",
-	})
+	task := mustCreate(t, proto, parchment.CreateInput{Title: "T",
+		Labels: []string{"kind:task"},})
 
 	results, err := proto.SetField(ctx, []string{task.ID}, "status", parchment.StatusArchived,
 		parchment.SetFieldOptions{BypassGuards: true})
@@ -29,8 +28,8 @@ func TestSetFieldOptions_BypassGuards_ArchivesWithoutGuards(t *testing.T) {
 		t.Fatalf("expected OK with BypassGuards, got: %s", results[0].Error)
 	}
 	art, _ := proto.GetArtifact(ctx, task.ID)
-	if art.Status != parchment.StatusArchived {
-		t.Errorf("status = %q, want archived", art.Status)
+	if art.ResolvedStatus() != parchment.StatusArchived {
+		t.Errorf("status = %q, want archived", art.ResolvedStatus())
 	}
 }
 
@@ -41,9 +40,12 @@ func TestSetFieldOptions_Cascade_TransitionsChildren(t *testing.T) {
 	ctx := context.Background()
 	proto, _ := newProto(t)
 
-	goal := mustCreate(t, proto, parchment.CreateInput{Kind: "goal", Title: "G"})
-	a := mustCreate(t, proto, parchment.CreateInput{Kind: "task", Title: "A", Parent: goal.ID})
-	b := mustCreate(t, proto, parchment.CreateInput{Kind: "task", Title: "B", Parent: goal.ID})
+	goal := mustCreate(t, proto, parchment.CreateInput{Title: "G",
+		Labels: []string{"kind:goal"},})
+	a := mustCreate(t, proto, parchment.CreateInput{Title: "A", Parent: goal.ID,
+		Labels: []string{"kind:task"},})
+	b := mustCreate(t, proto, parchment.CreateInput{Title: "B", Parent: goal.ID,
+		Labels: []string{"kind:task"},})
 
 	results, err := proto.SetField(ctx, []string{goal.ID}, "status", parchment.StatusArchived,
 		parchment.SetFieldOptions{BypassGuards: true, Cascade: true})
@@ -56,8 +58,8 @@ func TestSetFieldOptions_Cascade_TransitionsChildren(t *testing.T) {
 
 	for _, id := range []string{a.ID, b.ID} {
 		art, _ := proto.GetArtifact(ctx, id)
-		if art.Status != parchment.StatusArchived {
-			t.Errorf("child %s status = %q, want archived", id, art.Status)
+		if art.ResolvedStatus() != parchment.StatusArchived {
+			t.Errorf("child %s status = %q, want archived", id, art.ResolvedStatus())
 		}
 	}
 }
@@ -69,8 +71,9 @@ func TestSetFieldOptions_DryRun_NoMutation(t *testing.T) {
 	ctx := context.Background()
 	proto, _ := newProto(t)
 
-	task := mustCreate(t, proto, parchment.CreateInput{Kind: "task", Title: "T"})
-	original := task.Status
+	task := mustCreate(t, proto, parchment.CreateInput{Title: "T",
+		Labels: []string{"kind:task"},})
+	original := task.ResolvedStatus()
 
 	results, err := proto.SetField(ctx, []string{task.ID}, "status", parchment.StatusArchived,
 		parchment.SetFieldOptions{BypassGuards: true, DryRun: true})
@@ -82,7 +85,7 @@ func TestSetFieldOptions_DryRun_NoMutation(t *testing.T) {
 	}
 
 	art, _ := proto.GetArtifact(ctx, task.ID)
-	if art.Status != original {
-		t.Errorf("dry run mutated status: got %q, want %q", art.Status, original)
+	if art.ResolvedStatus() != original {
+		t.Errorf("dry run mutated status: got %q, want %q", art.ResolvedStatus(), original)
 	}
 }

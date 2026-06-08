@@ -11,10 +11,9 @@ func TestArchiveArtifact_DryRun_NoMutation(t *testing.T) {
 	ctx := context.Background()
 	proto, _ := newProto(t)
 
-	task := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "task", Title: "dry run target",
+	task := mustCreate(t, proto, parchment.CreateInput{Title: "dry run target",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-	})
+		Labels: []string{"kind:task"},})
 
 	results, err := proto.ArchiveArtifact(ctx, []string{task.ID}, true) // dry_run=true
 	if err != nil {
@@ -26,7 +25,7 @@ func TestArchiveArtifact_DryRun_NoMutation(t *testing.T) {
 
 	// Status must be unchanged.
 	art, _ := proto.GetArtifact(ctx, task.ID)
-	if art.Status == parchment.StatusArchived {
+	if art.ResolvedStatus() == parchment.StatusArchived {
 		t.Error("dry_run=true must not mutate status")
 	}
 }
@@ -35,10 +34,9 @@ func TestArchiveArtifact_DryRun_False_DoesArchive(t *testing.T) {
 	ctx := context.Background()
 	proto, _ := newProto(t)
 
-	task := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "task", Title: "real archive",
+	task := mustCreate(t, proto, parchment.CreateInput{Title: "real archive",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-	})
+		Labels: []string{"kind:task"},})
 
 	_, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false) // dry_run=false
 	if err != nil {
@@ -46,7 +44,7 @@ func TestArchiveArtifact_DryRun_False_DoesArchive(t *testing.T) {
 	}
 
 	art, _ := proto.GetArtifact(ctx, task.ID)
-	if art.Status != parchment.StatusArchived {
-		t.Errorf("expected archived, got %s", art.Status)
+	if art.ResolvedStatus() != parchment.StatusArchived {
+		t.Errorf("expected archived, got %s", art.ResolvedStatus())
 	}
 }

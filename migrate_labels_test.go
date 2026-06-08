@@ -8,16 +8,18 @@ import (
 	"github.com/dpopsuev/parchment"
 )
 
-func TestMigrateSystemLabels_BackfillsKindScopeStatus(t *testing.T) {
-	// Given: artifact with Kind/Scope/Status fields set but no system labels.
+func TestMigrateSystemLabels_BackfillsScopeLabel(t *testing.T) {
+	// Given: artifact with Scope field set but no scope: label.
 	// When:  MigrateSystemLabels runs.
-	// Then:  kind:X, scope:X, status:X labels are added.
+	// Then:  scope:X label is added.
 	s := parchment.NewMemoryStore()
 	ctx := context.Background()
 
 	art := &parchment.Artifact{
-		ID: "TST-1", Kind: "task", Scope: "myproj", Status: "active",
-		Title: "old artifact", Labels: []string{"custom"},
+		ID:     "TST-1",
+		Labels: []string{"kind:task", "status:active", "custom"},
+		Scope:  "myproj",
+		Title:  "old artifact",
 	}
 	if err := s.Put(ctx, art); err != nil {
 		t.Fatal(err)
@@ -45,8 +47,10 @@ func TestMigrateSystemLabels_Idempotent(t *testing.T) {
 	ctx := context.Background()
 
 	art := &parchment.Artifact{
-		ID: "TST-2", Kind: "task", Scope: "myproj", Status: "active",
-		Title: "idempotent test",
+		ID:     "TST-2",
+		Labels: []string{"kind:task", "status:active"},
+		Scope:  "myproj",
+		Title:  "idempotent test",
 	}
 	_ = s.Put(ctx, art)
 	_ = parchment.MigrateSystemLabels(ctx, s)
@@ -55,25 +59,26 @@ func TestMigrateSystemLabels_Idempotent(t *testing.T) {
 	got, _ := s.Get(ctx, "TST-2")
 	count := 0
 	for _, l := range got.Labels {
-		if l == "kind:task" {
+		if l == "scope:myproj" {
 			count++
 		}
 	}
 	if count != 1 {
-		t.Errorf("kind:task duplicated: appears %d times in %v", count, got.Labels)
+		t.Errorf("scope:myproj duplicated: appears %d times in %v", count, got.Labels)
 	}
 }
 
 func TestMigrateSystemLabels_SkipsAlreadyLabelled(t *testing.T) {
-	// Given: artifact already has system labels.
-	// Then:  Put is not called (no mutation).
+	// Given: artifact already has all system labels.
+	// Then:  no extra labels are added.
 	s := parchment.NewMemoryStore()
 	ctx := context.Background()
 
 	art := &parchment.Artifact{
-		ID: "TST-3", Kind: "note", Scope: "wiki", Status: "active",
-		Title: "already labeled",
+		ID:     "TST-3",
 		Labels: []string{"kind:note", "scope:wiki", "status:active"},
+		Scope:  "wiki",
+		Title:  "already labeled",
 	}
 	_ = s.Put(ctx, art)
 
@@ -88,14 +93,17 @@ func TestMigrateSystemLabels_SkipsAlreadyLabelled(t *testing.T) {
 }
 
 func TestMigrateSystemLabels_Priority(t *testing.T) {
-	// Given: artifact with Priority set.
+	// Given: artifact with Priority field set but no priority: label.
 	// Then:  priority:X label added.
 	s := parchment.NewMemoryStore()
 	ctx := context.Background()
 
 	art := &parchment.Artifact{
-		ID: "TST-4", Kind: "task", Scope: "scribe", Status: "draft",
-		Priority: "high", Title: "priority test",
+		ID:       "TST-4",
+		Labels:   []string{"kind:task", "status:draft"},
+		Scope:    "scribe",
+		Priority: "high",
+		Title:    "priority test",
 	}
 	_ = s.Put(ctx, art)
 	_ = parchment.MigrateSystemLabels(ctx, s)
@@ -109,8 +117,7 @@ func TestMigrateSystemLabels_Priority(t *testing.T) {
 func TestMigrateSystemLabels_SQLite_Idempotent(t *testing.T) {
 	// Given: a real SQLite store with artifacts pre-populated via Put.
 	// When:  MigrateSystemLabels runs twice.
-	// Then:  labels are added correctly and no duplicates appear.
-	// This covers the SQL path (artifact_labels junction table) not just MemStore.
+	// Then:  labels are correct and no duplicates appear.
 	t.Parallel()
 	s, err := parchment.OpenSQLite(t.TempDir() + "/migrate.sqlite")
 	if err != nil {
@@ -120,10 +127,9 @@ func TestMigrateSystemLabels_SQLite_Idempotent(t *testing.T) {
 
 	ctx := context.Background()
 	arts := []*parchment.Artifact{
-		{ID: "SQL-1", Kind: "task", Scope: "myproj", Status: "active", Title: "a"},
-		{ID: "SQL-2", Kind: "spec", Scope: "myproj", Status: "draft", Title: "b"},
-		{ID: "SQL-3", Kind: "task", Scope: "myproj", Status: "draft",
-			Labels: []string{"kind:task", "scope:myproj", "status:draft"}, Title: "already"},
+		{ID: "SQL-1", Labels: []string{"kind:task", "status:active"}, Scope: "myproj", Title: "a"},
+		{ID: "SQL-2", Labels: []string{"kind:spec", "status:draft"}, Scope: "myproj", Title: "b"},
+		{ID: "SQL-3", Labels: []string{"kind:task", "scope:myproj", "status:draft"}, Scope: "myproj", Title: "already"},
 	}
 	for _, art := range arts {
 		if err := s.Put(ctx, art); err != nil {
@@ -152,8 +158,8 @@ func TestMigrateSystemLabels_SQLite_Idempotent(t *testing.T) {
 				t.Errorf("%s: label %q appears %d times (duplicate)", id, label, count)
 			}
 		}
-		if !slices.Contains(got.Labels, "kind:"+got.Kind) {
-			t.Errorf("%s: missing kind:%s in %v", id, got.Kind, got.Labels)
+		if !slices.Contains(got.Labels, "kind:"+got.ResolvedKind()) {
+			t.Errorf("%s: missing kind:%s in %v", id, got.ResolvedKind(), got.Labels)
 		}
 	}
 }

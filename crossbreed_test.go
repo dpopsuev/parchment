@@ -18,7 +18,7 @@ func TestArtifact_Annotations_RoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	art := &Artifact{
-		UID: "u1", ID: "ANN-1", Kind: "task", Status: "draft", Title: "with annotations",
+		UID: "u1", ID: "ANN-1", Labels: []string{"kind:task", "status:draft"}, Title: "with annotations",
 		Annotations: []Annotation{
 			{Kind: "+", Comment: "good approach"},
 			{Kind: "-", Comment: "missing error handling"},
@@ -57,9 +57,12 @@ func TestCascade_DependencyEdges(t *testing.T) {
 	ctx := context.Background()
 
 	// A → B → C (depends_on chain)
-	a, _ := p.CreateArtifact(ctx, CreateInput{Kind: "task", Title: "A", Scope: "test", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}}})
-	b, _ := p.CreateArtifact(ctx, CreateInput{Kind: "task", Title: "B", Scope: "test", Priority: "medium", DependsOn: []string{a.ID}, Sections: []Section{{Name: "context", Text: "b"}}})
-	c, _ := p.CreateArtifact(ctx, CreateInput{Kind: "task", Title: "C", Scope: "test", Priority: "medium", DependsOn: []string{b.ID}, Sections: []Section{{Name: "context", Text: "c"}}})
+	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Scope: "test", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}},
+		Labels: []string{"kind:task"},})
+	b, _ := p.CreateArtifact(ctx, CreateInput{Title: "B", Scope: "test", Priority: "medium", DependsOn: []string{a.ID}, Sections: []Section{{Name: "context", Text: "b"}},
+		Labels: []string{"kind:task"},})
+	c, _ := p.CreateArtifact(ctx, CreateInput{Title: "C", Scope: "test", Priority: "medium", DependsOn: []string{b.ID}, Sections: []Section{{Name: "context", Text: "c"}},
+		Labels: []string{"kind:task"},})
 
 	affected := p.Cascade(ctx, a.ID)
 	if len(affected) == 0 {
@@ -104,7 +107,8 @@ func TestQualityGate_BlockingPreventsCompletion(t *testing.T) {
 	p.RegisterGate(gate)
 
 	// Create and activate an artifact
-	a, _ := p.CreateArtifact(ctx, CreateInput{Kind: "task", Title: "A", Scope: "test", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}}})
+	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Scope: "test", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}},
+		Labels: []string{"kind:task"},})
 	// Walk through lifecycle to in_review so complete is a valid transition.
 	p.SetField(ctx, []string{a.ID}, "status", "active", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
 	p.SetField(ctx, []string{a.ID}, "status", "mature", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
@@ -134,8 +138,8 @@ func TestQualityGate_BlockingPreventsCompletion(t *testing.T) {
 
 	// Artifact should still be in_review
 	art, _ := s.Get(ctx, a.ID)
-	if art.Status != "in_review" {
-		t.Errorf("status = %q, want in_review (gate blocked)", art.Status)
+	if art.ResolvedStatus() != "in_review" {
+		t.Errorf("status = %q, want in_review (gate blocked)", art.ResolvedStatus())
 	}
 }
 
@@ -161,7 +165,8 @@ func TestQualityGate_WarningAllowsCompletion(t *testing.T) {
 	})
 	p.RegisterGate(gate)
 
-	a, _ := p.CreateArtifact(ctx, CreateInput{Kind: "task", Title: "A", Scope: "test", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}}})
+	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Scope: "test", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}},
+		Labels: []string{"kind:task"},})
 	// Walk through lifecycle to in_review so complete is a valid transition.
 	p.SetField(ctx, []string{a.ID}, "status", "active", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
 	p.SetField(ctx, []string{a.ID}, "status", "mature", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
@@ -184,8 +189,8 @@ func TestQualityGate_WarningAllowsCompletion(t *testing.T) {
 
 	// Artifact should be complete
 	art, _ := s.Get(ctx, a.ID)
-	if art.Status != "complete" {
-		t.Errorf("status = %q, want complete", art.Status)
+	if art.ResolvedStatus() != "complete" {
+		t.Errorf("status = %q, want complete", art.ResolvedStatus())
 	}
 }
 

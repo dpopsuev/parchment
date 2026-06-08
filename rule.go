@@ -78,8 +78,8 @@ func SeedRules(ctx context.Context, s Store) {
 // Invalid rule artifacts are logged and skipped — they never block startup.
 func (p *Protocol) LoadRules(ctx context.Context) ([]*RuleDef, error) {
 	arts, err := p.store.List(ctx, Filter{
-		Kind:  KindRule,
-		Scope: SchemaScope,
+		Labels: []string{LabelPrefixKind + KindRule},
+		Scope:  SchemaScope,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("load rules: %w", err)
@@ -107,10 +107,9 @@ func seedRulesFromRegistry(ctx context.Context, s Store) {
 		}
 		art := &Artifact{
 			ID:         id,
-			Kind:       KindRule,
+			Labels:     []string{LabelPrefixKind + KindRule, LabelPrefixStatus + StatusActive},
 			Scope:      SchemaScope,
 			Title:      r.Name,
-			Status:     StatusActive,
 			CreatedAt:  now,
 			UpdatedAt:  now,
 			InsertedAt: now,
@@ -271,10 +270,10 @@ func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResul
 		children, err := p.store.Children(context.Background(), art.ID)
 		if err == nil {
 			for _, ch := range children {
-				if !p.schema.IsReadonly(ch.Status) {
-					return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock,
-						Message: rule.Message + ": child " + ch.ID + " is " + ch.Status}
-				}
+			if !p.schema.IsReadonly(ch.ResolvedStatus()) {
+				return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock,
+					Message: rule.Message + ": child " + ch.ID + " is " + ch.ResolvedStatus()}
+			}
 			}
 		}
 	case CheckWorkerIDRequired:
@@ -303,7 +302,7 @@ func fieldValue(field string, art *Artifact, toStatus string) string {
 	case FieldKind:
 		return art.ResolvedKind()
 	case "status":
-		return art.Status
+		return art.ResolvedStatus()
 	case "priority":
 		return art.Priority
 	case FieldScope:

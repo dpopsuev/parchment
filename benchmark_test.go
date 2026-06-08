@@ -30,13 +30,11 @@ func seedArtifacts(b *testing.B, p *Protocol, n int) []string {
 	ctx := context.Background()
 	ids := make([]string, 0, n)
 	for i := range n {
-		art, err := p.CreateArtifact(ctx, CreateInput{
-			Kind:     "task",
-			Title:    fmt.Sprintf("bench-task-%d", i),
+		art, err := p.CreateArtifact(ctx, CreateInput{Title:    fmt.Sprintf("bench-task-%d", i),
 			Scope:    "bench",
 			Priority: "medium",
 			Sections: []Section{{Name: "context", Text: fmt.Sprintf("benchmark task %d context", i)}},
-		})
+		Labels: []string{"kind:task"},})
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -55,13 +53,11 @@ func BenchmarkCreateArtifact(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := range b.N {
-		_, err := p.CreateArtifact(ctx, CreateInput{
-			Kind:     "task",
-			Title:    fmt.Sprintf("bench-%d", i),
+		_, err := p.CreateArtifact(ctx, CreateInput{Title:    fmt.Sprintf("bench-%d", i),
 			Scope:    "bench",
 			Priority: "medium",
 			Sections: []Section{{Name: "context", Text: "benchmark"}},
-		})
+		Labels: []string{"kind:task"},})
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -97,9 +93,8 @@ func BenchmarkTopoSort(b *testing.B) {
 	ctx := context.Background()
 
 	// Create a parent goal.
-	goal, err := p.CreateArtifact(ctx, CreateInput{
-		Kind: "goal", Title: "bench-goal", Scope: "bench",
-	})
+	goal, err := p.CreateArtifact(ctx, CreateInput{Title: "bench-goal", Scope: "bench",
+		Labels: []string{"kind:goal"},})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -107,11 +102,10 @@ func BenchmarkTopoSort(b *testing.B) {
 	// Create 500 tasks under the goal with chain dependencies.
 	var prevID string
 	for i := range 500 {
-		in := CreateInput{
-			Kind: "task", Title: fmt.Sprintf("task-%d", i),
+		in := CreateInput{Title: fmt.Sprintf("task-%d", i),
 			Scope: "bench", Parent: goal.ID, Priority: "medium",
 			Sections: []Section{{Name: "context", Text: "bench"}},
-		}
+		Labels: []string{"kind:task"},}
 		if prevID != "" && i%5 == 0 { // every 5th task depends on the previous
 			in.DependsOn = []string{prevID}
 		}

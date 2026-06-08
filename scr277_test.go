@@ -16,11 +16,8 @@ func TestCreateDraft_SkipsTemplateConformance(t *testing.T) {
 
 	// Bug requires "observed" section (MustSection). Creating as draft
 	// should produce no warning and no conformance noise.
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind:   "bug",
-		Title:  "draft bug — sections to come",
-		Status: "draft",
-	})
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title:  "draft bug — sections to come",
+		Labels: []string{"kind:bug", "status:draft"},})
 	if err != nil {
 		t.Fatalf("CreateArtifact draft: %v", err)
 	}
@@ -35,11 +32,8 @@ func TestCreateActive_StillChecksConformance(t *testing.T) {
 	ctx := context.Background()
 	proto := setupTemplateProtoForConformance(t)
 
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind:   "bug",
-		Title:  "active bug without sections",
-		Status: "active",
-	})
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title:  "active bug without sections",
+		Labels: []string{"kind:bug", "status:active"},})
 	if err != nil {
 		t.Fatalf("CreateArtifact active: %v", err)
 	}

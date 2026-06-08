@@ -80,19 +80,17 @@ func TestIntentLifecycle_Protocol(t *testing.T) {
 	p := New(s, nil, []string{"test"}, nil, ProtocolConfig{})
 
 	// Create a need in draft.
-	art, err := p.CreateArtifact(ctx, CreateInput{
-		Kind:  "need",
-		Title: "We need better search",
+	art, err := p.CreateArtifact(ctx, CreateInput{Title: "We need better search",
 		Scope: "test",
 		Sections: []Section{
 			{Name: "problem", Text: "FTS5 misses semantic matches."},
 		},
-	})
+		Labels: []string{"kind:need"},})
 	if err != nil {
 		t.Fatalf("create need: %v", err)
 	}
-	if art.Status != StatusDraft {
-		t.Fatalf("expected draft, got %s", art.Status)
+	if art.ResolvedStatus() != StatusDraft {
+		t.Fatalf("expected draft, got %s", art.ResolvedStatus())
 	}
 
 	// Propose it.

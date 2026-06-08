@@ -25,20 +25,16 @@ func TestTopoSort_ShouldRespectParentGoalDependencies(t *testing.T) {
 	campaign := createCampaign(t, proto, "campaign with goal deps")
 
 	// 2. Create goal GOL-1 as child of CMP-1
-	goal1 := mustCreate(t, proto, parchment.CreateInput{
-		Kind:   "goal",
-		Title:  "goal 1 — prerequisite",
+	goal1 := mustCreate(t, proto, parchment.CreateInput{Title:  "goal 1 — prerequisite",
 		Scope:  "test",
 		Parent: campaign.ID,
-	})
+		Labels: []string{"kind:goal"},})
 
 	// 3. Create goal GOL-2 as child of CMP-1, with depends_on edge to GOL-1
-	goal2 := mustCreate(t, proto, parchment.CreateInput{
-		Kind:   "goal",
-		Title:  "goal 2 — depends on goal 1",
+	goal2 := mustCreate(t, proto, parchment.CreateInput{Title:  "goal 2 — depends on goal 1",
 		Scope:  "test",
 		Parent: campaign.ID,
-	})
+		Labels: []string{"kind:goal"},})
 	// Link GOL-2 depends_on GOL-1
 	_, err := proto.LinkArtifacts(ctx, goal2.ID, "depends_on", []string{goal1.ID}, 0)
 	if err != nil {
@@ -46,22 +42,18 @@ func TestTopoSort_ShouldRespectParentGoalDependencies(t *testing.T) {
 	}
 
 	// 4. Create task TSK-1 as child of GOL-1
-	task1 := mustCreate(t, proto, parchment.CreateInput{
-		Kind:     "task",
-		Title:    "task under goal 1",
+	task1 := mustCreate(t, proto, parchment.CreateInput{Title:    "task under goal 1",
 		Scope:    "test",
 		Parent:   goal1.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-	})
+		Labels: []string{"kind:task"},})
 
 	// 5. Create task TSK-2 as child of GOL-2
-	task2 := mustCreate(t, proto, parchment.CreateInput{
-		Kind:     "task",
-		Title:    "task under goal 2",
+	task2 := mustCreate(t, proto, parchment.CreateInput{Title:    "task under goal 2",
 		Scope:    "test",
 		Parent:   goal2.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-	})
+		Labels: []string{"kind:task"},})
 
 	// 6. Run TopoSort on CMP-1 repeatedly. The underlying graph library uses
 	//    Kahn's algorithm which iterates over a Go map, producing

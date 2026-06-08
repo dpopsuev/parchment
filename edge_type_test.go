@@ -19,8 +19,8 @@ func TestSeedEdgeTypeTraits_PopulatesRegistry(t *testing.T) {
 	parchment.SeedEdgeTypeTraits(ctx, s)
 
 	arts, err := s.List(ctx, parchment.Filter{
-		Kind:  parchment.KindEdgeTypeDefinition,
-		Scope: parchment.SchemaScope,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition},
+		Scope:  parchment.SchemaScope,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -60,19 +60,22 @@ func TestBond_RejectsWhenMaxOutgoingExceeded(t *testing.T) {
 
 	now := time.Now().UTC()
 	if err := s.Put(ctx, &parchment.Artifact{
-		ID: "EDT-owns", Kind: parchment.KindEdgeTypeDefinition,
-		Scope: parchment.SchemaScope, Title: "owns",
-		Status: parchment.StatusActive,
-		Extra:  map[string]any{"max_outgoing": float64(1)},
+		ID:     "EDT-owns",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
+		Scope:  parchment.SchemaScope, Title: "owns",
+		Extra: map[string]any{"max_outgoing": float64(1)},
 		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	proto2 := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
-	a := mustCreate(t, proto2, parchment.CreateInput{Kind: "task", Title: "A", Scope: "test"})
-	b := mustCreate(t, proto, parchment.CreateInput{Kind: "task", Title: "B", Scope: "test"})
-	c := mustCreate(t, proto, parchment.CreateInput{Kind: "task", Title: "C", Scope: "test"})
+	a := mustCreate(t, proto2, parchment.CreateInput{Title: "A", Scope: "test",
+		Labels: []string{"kind:task"},})
+	b := mustCreate(t, proto, parchment.CreateInput{Title: "B", Scope: "test",
+		Labels: []string{"kind:task"},})
+	c := mustCreate(t, proto, parchment.CreateInput{Title: "C", Scope: "test",
+		Labels: []string{"kind:task"},})
 
 	if _, err := proto2.LinkArtifacts(ctx, a.ID, "owns", []string{b.ID}, 0); err != nil {
 		t.Fatalf("first link should succeed: %v", err)
@@ -93,17 +96,20 @@ func TestValidRelation_AcceptsRegisteredEdgeType(t *testing.T) {
 	// Seed a custom edge type
 	now := time.Now().UTC()
 	if err := s.Put(ctx, &parchment.Artifact{
-		ID: "EDT-mentors", Kind: parchment.KindEdgeTypeDefinition,
-		Scope: parchment.SchemaScope, Title: "mentors",
-		Status: parchment.StatusActive, CreatedAt: now, UpdatedAt: now, InsertedAt: now,
+		ID:     "EDT-mentors",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
+		Scope:  parchment.SchemaScope, Title: "mentors",
+		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	// Reload so protocol picks up the new edge type
 	proto2 := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
-	a := mustCreate(t, proto2, parchment.CreateInput{Kind: "task", Title: "A", Scope: "test"})
-	b := mustCreate(t, proto, parchment.CreateInput{Kind: "task", Title: "B", Scope: "test"})
+	a := mustCreate(t, proto2, parchment.CreateInput{Title: "A", Scope: "test",
+		Labels: []string{"kind:task"},})
+	b := mustCreate(t, proto, parchment.CreateInput{Title: "B", Scope: "test",
+		Labels: []string{"kind:task"},})
 
 	_, err := proto2.LinkArtifacts(ctx, a.ID, "mentors", []string{b.ID}, 0)
 	if err != nil {
@@ -119,14 +125,16 @@ func TestLinkArtifacts_ErrorListsRegisteredRelations(t *testing.T) {
 	_, s := newProto(t)
 	now := time.Now().UTC()
 	if err := s.Put(ctx, &parchment.Artifact{
-		ID: "EDT-sponsors", Kind: parchment.KindEdgeTypeDefinition,
-		Scope: parchment.SchemaScope, Title: "sponsors",
-		Status: parchment.StatusActive, CreatedAt: now, UpdatedAt: now, InsertedAt: now,
+		ID:     "EDT-sponsors",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
+		Scope:  parchment.SchemaScope, Title: "sponsors",
+		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	proto2 := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
-	a := mustCreate(t, proto2, parchment.CreateInput{Kind: "task", Title: "A", Scope: "test"})
+	a := mustCreate(t, proto2, parchment.CreateInput{Title: "A", Scope: "test",
+		Labels: []string{"kind:task"},})
 
 	_, err := proto2.LinkArtifacts(ctx, a.ID, "imaginary_xyz", []string{"x"}, 0)
 	if err == nil {
@@ -145,9 +153,10 @@ func TestProtocol_RegisteredRelations_IncludesTraits(t *testing.T) {
 	_, s := newProto(t)
 	now := time.Now().UTC()
 	if err := s.Put(ctx, &parchment.Artifact{
-		ID: "EDT-coaches", Kind: parchment.KindEdgeTypeDefinition,
-		Scope: parchment.SchemaScope, Title: "coaches",
-		Status: parchment.StatusActive, CreatedAt: now, UpdatedAt: now, InsertedAt: now,
+		ID:     "EDT-coaches",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
+		Scope:  parchment.SchemaScope, Title: "coaches",
+		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	}); err != nil {
 		t.Fatal(err)
 	}

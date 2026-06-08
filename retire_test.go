@@ -40,11 +40,9 @@ func TestRetireArtifact_TaskFromComplete(t *testing.T) {
 	ctx := context.Background()
 	proto, _ := newProto(t)
 
-	task := mustCreate(t, proto, parchment.CreateInput{
-		Kind:     "task",
-		Title:    "implement pipes",
+	task := mustCreate(t, proto, parchment.CreateInput{Title:    "implement pipes",
 		Sections: []parchment.Section{{Name: "context", Text: "add pipe operator"}},
-	})
+		Labels: []string{"kind:task"},})
 
 	// Drive to complete via normal lifecycle.
 	for _, st := range []string{"active", "in_progress", "in_review", "complete"} {
@@ -65,8 +63,8 @@ func TestRetireArtifact_TaskFromComplete(t *testing.T) {
 	}
 
 	art, _ := proto.GetArtifact(ctx, task.ID)
-	if art.Status != parchment.StatusRetired {
-		t.Errorf("expected status=retired, got %s", art.Status)
+	if art.ResolvedStatus() != parchment.StatusRetired {
+		t.Errorf("expected status=retired, got %s", art.ResolvedStatus())
 	}
 }
 
@@ -74,11 +72,9 @@ func TestRetireArtifact_RetiredIsWritable(t *testing.T) {
 	ctx := context.Background()
 	proto, _ := newProto(t)
 
-	task := mustCreate(t, proto, parchment.CreateInput{
-		Kind:     "task",
-		Title:    "write pipes",
+	task := mustCreate(t, proto, parchment.CreateInput{Title:    "write pipes",
 		Sections: []parchment.Section{{Name: "context", Text: "original"}},
-	})
+		Labels: []string{"kind:task"},})
 	if _, err := proto.SetField(ctx, []string{task.ID}, "status", "complete",
 		parchment.SetFieldOptions{Force: true}); err != nil {
 		t.Fatalf("drive to complete: %v", err)
@@ -98,11 +94,9 @@ func TestRetireArtifact_ArchivedIsNotWritable(t *testing.T) {
 	ctx := context.Background()
 	proto, _ := newProto(t)
 
-	task := mustCreate(t, proto, parchment.CreateInput{
-		Kind:     "task",
-		Title:    "write pipes",
+	task := mustCreate(t, proto, parchment.CreateInput{Title:    "write pipes",
 		Sections: []parchment.Section{{Name: "context", Text: "original"}},
-	})
+		Labels: []string{"kind:task"},})
 	if _, err := proto.SetField(ctx, []string{task.ID}, "status", "complete",
 		parchment.SetFieldOptions{Force: true}); err != nil {
 		t.Fatalf("drive to complete: %v", err)
@@ -127,8 +121,9 @@ func TestVacuum_SkipsRetired(t *testing.T) {
 	// Insert an old retired artifact directly.
 	old := time.Now().Add(-100 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
-		ID: "TSK-RETIRED-1", Kind: "task", Scope: "test",
-		Status: parchment.StatusRetired, Title: "old retired",
+		ID:     "TSK-RETIRED-1",
+		Labels: []string{"kind:task", parchment.LabelPrefixStatus + parchment.StatusRetired},
+		Scope:  "test", Title: "old retired",
 		UpdatedAt: old,
 	})
 
@@ -149,8 +144,9 @@ func TestVacuum_DeletesOldArchived(t *testing.T) {
 
 	old := time.Now().Add(-100 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
-		ID: "TSK-ARCH-1", Kind: "task", Scope: "test",
-		Status: parchment.StatusArchived, Title: "old archived",
+		ID:     "TSK-ARCH-1",
+		Labels: []string{"kind:task", parchment.LabelPrefixStatus + parchment.StatusArchived},
+		Scope:  "test", Title: "old archived",
 		UpdatedAt: old,
 	})
 
@@ -178,8 +174,9 @@ func TestVacuum_SkipsNonVacuumableKind(t *testing.T) {
 
 	old := time.Now().Add(-100 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
-		ID: "NOT-1", Kind: "note", Scope: "test",
-		Status: parchment.StatusArchived, Title: "old note",
+		ID:     "NOT-1",
+		Labels: []string{"kind:note", parchment.LabelPrefixStatus + parchment.StatusArchived},
+		Scope:  "test", Title: "old note",
 		UpdatedAt: old,
 	})
 
@@ -202,12 +199,10 @@ func TestVacuum_SkipsProtectedLabelTrait(t *testing.T) {
 
 	old := time.Now().Add(-100 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
-		ID:        "RUL-OLD-1",
-		Kind:      "rule",
-		Scope:     "global",
-		Status:    parchment.StatusArchived,
-		Title:     "old rule",
-		Labels:    []string{"rule"},
+		ID:     "RUL-OLD-1",
+		Labels: []string{"kind:rule", parchment.LabelPrefixStatus + parchment.StatusArchived, "rule"},
+		Scope:  "global",
+		Title:  "old rule",
 		UpdatedAt: old,
 	})
 

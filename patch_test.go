@@ -16,9 +16,8 @@ func TestPatchArtifact_AppendAnnotations_MemStore(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: parchment.KindTask, Title: "patch test", Scope: "test",
-	})
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "patch test", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
 	if err := proto.PatchArtifact(ctx, art.ID, parchment.ArtifactPatch{
 		AppendAnnotations: []parchment.Annotation{{Kind: "+", Comment: "trace-1"}},
@@ -41,9 +40,8 @@ func TestPatchArtifact_AppendAnnotations_Concurrent(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: parchment.KindTask, Title: "concurrent patch", Scope: "test",
-	})
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "concurrent patch", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
 	if err := proto.PatchArtifact(ctx, art.ID, parchment.ArtifactPatch{
 		AppendAnnotations: []parchment.Annotation{{Kind: "+", Comment: "trace-a"}},
@@ -71,10 +69,9 @@ func TestPatchArtifact_AppendSections_MergeByName(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: parchment.KindTask, Title: "section patch", Scope: "test",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "section patch", Scope: "test",
 		Sections: []parchment.Section{{Name: "notes", Text: "original"}},
-	})
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
 	if err := proto.PatchArtifact(ctx, art.ID, parchment.ArtifactPatch{
 		AppendSections: []parchment.Section{{Name: "notes", Text: "updated"}},
@@ -114,9 +111,8 @@ func TestPatchArtifact_SQLite_AppendAnnotations(t *testing.T) {
 	proto := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: parchment.KindTask, Title: "sqlite patch", Scope: "test",
-	})
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "sqlite patch", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
 	_ = proto.PatchArtifact(ctx, art.ID, parchment.ArtifactPatch{
 		AppendAnnotations: []parchment.Annotation{{Kind: "+", Comment: "v1"}},

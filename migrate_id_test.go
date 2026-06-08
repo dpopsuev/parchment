@@ -23,9 +23,12 @@ func TestMigrateID_RenamesArtifactAndEdges(t *testing.T) {
 	ctx := context.Background()
 
 	// Use goal→spec hierarchy which allows parent-child relationships.
-	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindGoal, Title: "A", Scope: "test"})
-	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindTask, Title: "B", Scope: "test"})
-	c, err2 := proto.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindSpec, Title: "C", Scope: "test", Parent: a.ID})
+	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "A", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindGoal},})
+	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "B", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+	c, err2 := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "C", Scope: "test", Parent: a.ID,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindSpec},})
 	if err2 != nil {
 		t.Fatalf("create child: %v", err2)
 	}
@@ -79,7 +82,8 @@ func TestMigrateID_OldIDBecomesAlias(t *testing.T) {
 	proto := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindTask, Title: "alias test", Scope: "test"})
+	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "alias test", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 	if err := proto.MigrateID(ctx, a.ID, "TST-ALIAS"); err != nil {
 		t.Fatal(err)
 	}
@@ -107,11 +111,11 @@ func TestMigrateID_UpdatesDependsOn(t *testing.T) {
 	proto := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Kind: parchment.KindTask, Title: "A", Scope: "test"})
-	d, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: parchment.KindTask, Title: "D depends on A", Scope: "test",
+	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "A", Scope: "test",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+	d, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "D depends on A", Scope: "test",
 		DependsOn: []string{a.ID},
-	})
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
 	if err := proto.MigrateID(ctx, a.ID, "TST-NEW"); err != nil {
 		t.Fatal(err)
@@ -146,9 +150,8 @@ func TestSetField_ScopeWithRenameID_MigratesID(t *testing.T) {
 	_ = s.SetScopeKey(ctx, "beta", "BET", false)
 
 	proto := parchment.New(s, nil, []string{"alpha", "beta"}, nil, parchment.ProtocolConfig{})
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: parchment.KindTask, Title: "move me", Scope: "alpha",
-	})
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "move me", Scope: "alpha",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 	oldID := art.ID
 
 	results, err := proto.SetField(ctx, []string{oldID}, parchment.FieldScope, "beta",

@@ -67,11 +67,9 @@ func SeedDefinitions(ctx context.Context, s Store) {
 		}
 		art := &Artifact{
 			ID:         id,
-			Kind:       KindLabelDefinition, // collapsed: kind_definition → label_definition
 			Scope:      SchemaScope,
 			Title:      name,
-			Status:     StatusActive,
-			Labels:     []string{LabelPrefixKind + KindDefinition}, // marks it as a definition
+			Labels:     []string{LabelPrefixKind + KindLabelDefinition, LabelPrefixStatus + StatusActive}, // collapsed: kind_definition → label_definition
 			Extra:      extra,
 			CreatedAt:  now,
 			UpdatedAt:  now,
@@ -98,8 +96,8 @@ func loadSchema(ctx context.Context, s Store) (*Schema, error) { //nolint:unpara
 	// (post-collapse) until all rows are migrated. Remove KindDefinition path when
 	// the compat migration confirms no legacy rows remain (PRC-TSK-136 cleanup).
 	arts, err := s.List(ctx, Filter{
-		Kinds: []string{KindDefinition, KindLabelDefinition},
-		Scope: SchemaScope,
+		LabelsOr: []string{LabelPrefixKind + KindDefinition, LabelPrefixKind + KindLabelDefinition},
+		Scope:    SchemaScope,
 	})
 	if err != nil {
 		slog.WarnContext(ctx, "load schema: list definitions failed, using compiled-in schema",

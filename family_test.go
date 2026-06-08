@@ -126,13 +126,13 @@ func TestFilter_FamilyFilter_SQLite(t *testing.T) {
 	}
 	p := New(s, KnowledgeSchema(), []string{"test"}, nil, ProtocolConfig{})
 
-	if _, err := p.CreateArtifact(ctx, CreateInput{Kind: KindNote, Title: "a note", Scope: "test"}); err != nil {
+	if _, err := p.CreateArtifact(ctx, CreateInput{Title: "a note", Scope: "test",
+		Labels: []string{LabelPrefixKind + KindNote},}); err != nil {
 		t.Fatalf("create note: %v", err)
 	}
-	if _, err := p.CreateArtifact(ctx, CreateInput{
-		Kind: KindTask, Title: "a task", Scope: "test", Priority: "none",
+	if _, err := p.CreateArtifact(ctx, CreateInput{Title: "a task", Scope: "test", Priority: "none",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
-	}); err != nil {
+		Labels: []string{LabelPrefixKind + KindTask},}); err != nil {
 		t.Fatalf("create task: %v", err)
 	}
 
@@ -140,7 +140,7 @@ func TestFilter_FamilyFilter_SQLite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list knowledge: %v", err)
 	}
-	if len(knowledge) != 1 || knowledge[0].Kind != KindNote {
+	if len(knowledge) != 1 || knowledge[0].ResolvedKind() != KindNote {
 		t.Errorf("list knowledge: got %d artifacts, want 1 note", len(knowledge))
 	}
 
@@ -148,7 +148,7 @@ func TestFilter_FamilyFilter_SQLite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list effort: %v", err)
 	}
-	if len(effort) != 1 || effort[0].Kind != KindTask {
+	if len(effort) != 1 || effort[0].ResolvedKind() != KindTask {
 		t.Errorf("list effort: got %d artifacts, want 1 task", len(effort))
 	}
 }
@@ -161,15 +161,15 @@ func TestFilter_FamilyFilter(t *testing.T) {
 	p := New(s, KnowledgeSchema(), []string{"test"}, nil, ProtocolConfig{})
 
 	// Create one note (knowledge) and one task (effort).
-	_, err := p.CreateArtifact(ctx, CreateInput{Kind: KindNote, Title: "A note", Scope: "test"})
+	_, err := p.CreateArtifact(ctx, CreateInput{Title: "A note", Scope: "test",
+		Labels: []string{LabelPrefixKind + KindNote},})
 	if err != nil {
 		t.Fatalf("create note: %v", err)
 	}
-	_, err = p.CreateArtifact(ctx, CreateInput{
-		Kind: KindTask, Title: "A task", Scope: "test",
+	_, err = p.CreateArtifact(ctx, CreateInput{Title: "A task", Scope: "test",
 		Priority: "none",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
-	})
+		Labels: []string{LabelPrefixKind + KindTask},})
 	if err != nil {
 		t.Fatalf("create task: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestFilter_FamilyFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list knowledge: %v", err)
 	}
-	if len(knowledge) != 1 || knowledge[0].Kind != KindNote {
+	if len(knowledge) != 1 || knowledge[0].ResolvedKind() != KindNote {
 		t.Errorf("list knowledge: got %d artifacts, expected 1 note", len(knowledge))
 	}
 
@@ -188,7 +188,7 @@ func TestFilter_FamilyFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list effort: %v", err)
 	}
-	if len(effort) != 1 || effort[0].Kind != KindTask {
+	if len(effort) != 1 || effort[0].ResolvedKind() != KindTask {
 		t.Errorf("list effort: got %d artifacts, expected 1 task", len(effort))
 	}
 }

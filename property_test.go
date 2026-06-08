@@ -55,15 +55,15 @@ func TestProperty_DefaultSchema_LintClean(t *testing.T) {
 // Property: Filter.Matches is monotonic — adding constraints never adds results.
 func TestProperty_Filter_Monotonic(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
+		artKind := rapid.SampledFrom([]string{"task", "spec", "bug", "goal"}).Draw(t, "kind")
 		art := &Artifact{
 			ID:     rapid.StringMatching(`[A-Z]{3}-[A-Z]{3}-[0-9]{1,3}`).Draw(t, "id"),
-			Kind:   rapid.SampledFrom([]string{"task", "spec", "bug", "goal"}).Draw(t, "kind"),
-			Status: rapid.SampledFrom([]string{"draft", "active", "complete"}).Draw(t, "status"),
+			Labels: []string{"kind:" + artKind, "status:" + rapid.SampledFrom([]string{"draft", "active", "complete"}).Draw(t, "status")},
 			Scope:  rapid.SampledFrom([]string{"backend", "frontend", ""}).Draw(t, "scope"),
 		}
 
 		loose := Filter{}
-		tight := Filter{Kind: art.Kind}
+		tight := Filter{Labels: []string{"kind:" + artKind}}
 
 		looseMatch := loose.Matches(art)
 		tightMatch := tight.Matches(art)

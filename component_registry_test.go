@@ -25,10 +25,9 @@ func TestComponentRegistry_ReloadTraits_PicksUpNewLabel(t *testing.T) {
 	// Add a new label_definition directly to the store.
 	_ = s.Put(ctx, &parchment.Artifact{
 		ID:     "LDEF-newsession",
-		Kind:   parchment.KindLabelDefinition,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
 		Scope:  parchment.SchemaScope,
 		Title:  "newsession",
-		Status: "active",
 		Extra:  map[string]any{"world": "newsession"},
 	})
 

@@ -15,14 +15,14 @@ func TestGuardDependsOnComplete_ReadsEdge(t *testing.T) {
 	ctx := t.Context()
 
 	// Create a dependency task and leave it draft (non-terminal).
-	dep, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Kind: "task", Title: "dep"})
+	dep, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "dep",
+		Labels: []string{"kind:task"},})
 
 	// Create a task that depends on dep.
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: "task", Title: "work", DependsOn: []string{dep.ID},
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "work", DependsOn: []string{dep.ID},
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
 		Priority: "medium",
-	})
+		Labels: []string{"kind:task"},})
 
 	// Advance to in_review (prerequisite for complete).
 	for _, s := range []string{"active", "mature", "allocated", "in_progress", "in_review"} {
@@ -43,10 +43,10 @@ func TestGetArtifact_DependsOnFromEdge(t *testing.T) {
 	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{IDFormat: "sequential"})
 	ctx := t.Context()
 
-	dep, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Kind: "task", Title: "dep"})
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: "task", Title: "work", DependsOn: []string{dep.ID},
-	})
+	dep, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "dep",
+		Labels: []string{"kind:task"},})
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "work", DependsOn: []string{dep.ID},
+		Labels: []string{"kind:task"},})
 
 	fetched, err := proto.GetArtifact(ctx, art.ID)
 	if err != nil {

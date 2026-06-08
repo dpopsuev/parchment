@@ -14,13 +14,11 @@ func TestArchiveArtifact_SingleOnly(t *testing.T) {
 	ctx := context.Background()
 	proto, _ := newProto(t)
 
-	parent := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "goal", Title: "parent goal",
-	})
-	child := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "task", Title: "child task", Parent: parent.ID,
+	parent := mustCreate(t, proto, parchment.CreateInput{Title: "parent goal",
+		Labels: []string{"kind:goal"},})
+	child := mustCreate(t, proto, parchment.CreateInput{Title: "child task", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-	})
+		Labels: []string{"kind:task"},})
 
 	// Archive the parent — parent_of has CascadeArchive=true, so child is archived first.
 	_, err := proto.ArchiveArtifact(ctx, []string{parent.ID}, false)
@@ -29,8 +27,8 @@ func TestArchiveArtifact_SingleOnly(t *testing.T) {
 	}
 
 	got, _ := proto.GetArtifact(ctx, child.ID)
-	if got.Status != parchment.StatusArchived {
-		t.Errorf("ArchiveArtifact with CascadeArchive should cascade to child; child status = %s", got.Status)
+	if got.ResolvedStatus() != parchment.StatusArchived {
+		t.Errorf("ArchiveArtifact with CascadeArchive should cascade to child; child status = %s", got.ResolvedStatus())
 	}
 }
 
@@ -40,13 +38,11 @@ func TestRetireArtifact_CascadeStillWorks(t *testing.T) {
 	ctx := context.Background()
 	proto, _ := newProto(t)
 
-	parent := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "goal", Title: "parent to retire",
-	})
-	child := mustCreate(t, proto, parchment.CreateInput{
-		Kind: "task", Title: "child to retire", Parent: parent.ID,
+	parent := mustCreate(t, proto, parchment.CreateInput{Title: "parent to retire",
+		Labels: []string{"kind:goal"},})
+	child := mustCreate(t, proto, parchment.CreateInput{Title: "child to retire", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-	})
+		Labels: []string{"kind:task"},})
 
 	_, err := proto.RetireArtifact(ctx, []string{parent.ID}, true)
 	if err != nil {
@@ -54,7 +50,7 @@ func TestRetireArtifact_CascadeStillWorks(t *testing.T) {
 	}
 
 	got, _ := proto.GetArtifact(ctx, child.ID)
-	if got.Status != parchment.StatusRetired {
-		t.Errorf("RetireArtifact cascade: child should be retired, got %s", got.Status)
+	if got.ResolvedStatus() != parchment.StatusRetired {
+		t.Errorf("RetireArtifact cascade: child should be retired, got %s", got.ResolvedStatus())
 	}
 }

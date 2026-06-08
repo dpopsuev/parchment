@@ -17,14 +17,18 @@ func TestLoadLabelTraitsWithComposition_InheritsFromComposedLabel(t *testing.T) 
 	_ = now
 
 	parent := &parchment.Artifact{
-		ID: "LDEF-rule", Kind: parchment.KindLabelDefinition, Scope: parchment.SchemaScope,
-		Title: "rule", Status: parchment.StatusActive,
-		Extra: map[string]any{"eviction_policy": "protected"},
+		ID:     "LDEF-rule",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
+		Scope:  parchment.SchemaScope,
+		Title:  "rule",
+		Extra:  map[string]any{"eviction_policy": "protected"},
 	}
 	child := &parchment.Artifact{
-		ID: "LDEF-rule.security", Kind: parchment.KindLabelDefinition, Scope: parchment.SchemaScope,
-		Title: "rule.security", Status: parchment.StatusActive,
-		Extra: map[string]any{},
+		ID:     "LDEF-rule.security",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
+		Scope:  parchment.SchemaScope,
+		Title:  "rule.security",
+		Extra:  map[string]any{},
 	}
 	if err := s.Put(ctx, parent); err != nil {
 		t.Fatal(err)
@@ -51,14 +55,18 @@ func TestLoadLabelTraitsWithComposition_OwnTraitOverridesParent(t *testing.T) {
 	ctx := context.Background()
 
 	parent := &parchment.Artifact{
-		ID: "LDEF-base", Kind: parchment.KindLabelDefinition, Scope: parchment.SchemaScope,
-		Title: "base", Status: parchment.StatusActive,
-		Extra: map[string]any{"eviction_policy": "protected"},
+		ID:     "LDEF-base",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
+		Scope:  parchment.SchemaScope,
+		Title:  "base",
+		Extra:  map[string]any{"eviction_policy": "protected"},
 	}
 	child := &parchment.Artifact{
-		ID: "LDEF-base.override", Kind: parchment.KindLabelDefinition, Scope: parchment.SchemaScope,
-		Title: "base.override", Status: parchment.StatusActive,
-		Extra: map[string]any{"eviction_policy": "aggressive"},
+		ID:     "LDEF-base.override",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
+		Scope:  parchment.SchemaScope,
+		Title:  "base.override",
+		Extra:  map[string]any{"eviction_policy": "aggressive"},
 	}
 	_ = s.Put(ctx, parent)
 	_ = s.Put(ctx, child)
@@ -79,9 +87,11 @@ func TestLoadLabelTraitsWithComposition_NoComposesEdge_SameAsLoadLabelTraits(t *
 	ctx := context.Background()
 
 	art := &parchment.Artifact{
-		ID: "LDEF-session", Kind: parchment.KindLabelDefinition, Scope: parchment.SchemaScope,
-		Title: "session", Status: parchment.StatusActive,
-		Extra: map[string]any{"world": "session"},
+		ID:     "LDEF-session",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
+		Scope:  parchment.SchemaScope,
+		Title:  "session",
+		Extra:  map[string]any{"world": "session"},
 	}
 	_ = s.Put(ctx, art)
 

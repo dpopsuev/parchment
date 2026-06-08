@@ -15,11 +15,9 @@ func TestCreateRefWithoutDocumentsEdge(t *testing.T) {
 	ctx := context.Background()
 	proto, _ := newProto(t)
 
-	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind:  "ref",
-		Title: "McIlroy 1964 — Unix Pipes Memo",
+	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "McIlroy 1964 — Unix Pipes Memo",
 		Goal:  "Primary source for the Unix composability lineage",
-	})
+		Labels: []string{"kind:ref"},})
 	if err != nil {
 		t.Fatalf("CreateArtifact(ref) without documents edge: %v", err)
 	}
@@ -30,10 +28,8 @@ func TestCreateDocWithoutDocumentsEdge(t *testing.T) {
 	ctx := context.Background()
 	proto, _ := newProto(t)
 
-	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind:  "doc",
-		Title: "Architecture Decision Record — store selection",
-	})
+	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "Architecture Decision Record — store selection",
+		Labels: []string{"kind:doc"},})
 	if err != nil {
 		t.Fatalf("CreateArtifact(doc) without documents edge: %v", err)
 	}
@@ -45,19 +41,15 @@ func TestCreateRefWithDocumentsEdgeStillWorks(t *testing.T) {
 	ctx := context.Background()
 	proto, _ := newProto(t)
 
-	target := mustCreate(t, proto, parchment.CreateInput{
-		Kind:  "task",
-		Title: "Implement Unix pipe support",
+	target := mustCreate(t, proto, parchment.CreateInput{Title: "Implement Unix pipe support",
 		Sections: []parchment.Section{
 			{Name: "context", Text: "add pipe operator"},
 		},
-	})
+		Labels: []string{"kind:task"},})
 
-	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Kind:  "ref",
-		Title: "POSIX pipes specification",
+	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "POSIX pipes specification",
 		Links: map[string][]string{parchment.RelDocuments: {target.ID}},
-	})
+		Labels: []string{"kind:ref"},})
 	if err != nil {
 		t.Fatalf("CreateArtifact(ref) with documents edge: %v", err)
 	}

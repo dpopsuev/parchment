@@ -31,22 +31,22 @@ func buildV042DB(t *testing.T, path string) {
 	}
 
 	artifacts := []*Artifact{
-		{UID: "u1", ID: "SCR-GOL-1", Kind: "goal", Scope: "scribe", Status: "active", Title: "Ship v1"},
-		{UID: "u2", ID: "SCR-CAM-1", Kind: "campaign", Scope: "scribe", Status: "active",
+		{UID: "u1", ID: "SCR-GOL-1", Labels: []string{"kind:goal", "status:active"}, Scope: "scribe", Title: "Ship v1"},
+		{UID: "u2", ID: "SCR-CAM-1", Labels: []string{"kind:campaign", "status:active"}, Scope: "scribe",
 			Title: "Q2 Campaign",
 			Links: map[string][]string{RelJustifies: {"SCR-GOL-1"}},
 			Sections: []Section{
 				{Name: "mission", Text: "ship the thing"},
 			},
 		},
-		{UID: "u3", ID: "SCR-TSK-1", Kind: "task", Scope: "scribe", Status: "draft",
+		{UID: "u3", ID: "SCR-TSK-1", Labels: []string{"kind:task", "status:draft"}, Scope: "scribe",
 			Title:  "Implement feature A",
 			Parent: "SCR-CAM-1",
 			Sections: []Section{
 				{Name: "context", Text: "needs doing"},
 			},
 		},
-		{UID: "u4", ID: "SCR-TSK-2", Kind: "task", Scope: "scribe", Status: "active",
+		{UID: "u4", ID: "SCR-TSK-2", Labels: []string{"kind:task", "status:active"}, Scope: "scribe",
 			Title:     "Implement feature B",
 			Parent:    "SCR-CAM-1",
 			DependsOn: []string{"SCR-TSK-1"},
@@ -54,7 +54,7 @@ func buildV042DB(t *testing.T, path string) {
 				{Name: "context", Text: "blocked on A"},
 			},
 		},
-		{UID: "u5", ID: "SCR-BUG-1", Kind: "bug", Scope: "scribe", Status: "open",
+		{UID: "u5", ID: "SCR-BUG-1", Labels: []string{"kind:bug", "status:open"}, Scope: "scribe",
 			Title: "Crash on startup",
 			Links: map[string][]string{RelDependsOn: {"SCR-TSK-1"}},
 		},
@@ -187,9 +187,9 @@ func TestV043_ReseedSkipsUUIDs(t *testing.T) {
 	if err := s.SetScopeKey(ctx, "scribe", "SCR", false); err != nil {
 		t.Fatal(err)
 	}
-	_ = s.Put(ctx, &Artifact{UID: "u1", ID: "SCR-TSK-91", Kind: "task", Scope: "scribe", Status: "draft", Title: "A"})
-	_ = s.Put(ctx, &Artifact{UID: "u2", ID: GenerateUUID(), Kind: "task", Scope: "scribe", Status: "draft", Title: "B"})
-	_ = s.Put(ctx, &Artifact{UID: "u3", ID: GenerateUUID(), Kind: "task", Scope: "scribe", Status: "draft", Title: "C"})
+	_ = s.Put(ctx, &Artifact{UID: "u1", ID: "SCR-TSK-91", Labels: []string{"kind:task", "status:draft"}, Scope: "scribe", Title: "A"})
+	_ = s.Put(ctx, &Artifact{UID: "u2", ID: GenerateUUID(), Labels: []string{"kind:task", "status:draft"}, Scope: "scribe", Title: "B"})
+	_ = s.Put(ctx, &Artifact{UID: "u3", ID: GenerateUUID(), Labels: []string{"kind:task", "status:draft"}, Scope: "scribe", Title: "C"})
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -242,12 +242,10 @@ func TestV043_DefaultFormatUnchanged(t *testing.T) {
 	tpl := PresetScoped()
 	proto := New(s, nil, []string{"scribe"}, nil, ProtocolConfig{IDTemplate: &tpl})
 
-	art, err := proto.CreateArtifact(ctx, CreateInput{
-		Kind:     "task",
-		Title:    "New task after upgrade",
+	art, err := proto.CreateArtifact(ctx, CreateInput{Title:    "New task after upgrade",
 		Scope:    "scribe",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
-	})
+		Labels: []string{"kind:task"},})
 	if err != nil {
 		t.Fatalf("CreateArtifact: %v", err)
 	}
@@ -282,12 +280,10 @@ func TestV043_NoCollisionWithExistingIDs(t *testing.T) {
 		"SCR-TSK-2": true,
 	}
 	for range 5 {
-		art, err := proto.CreateArtifact(ctx, CreateInput{
-			Kind:     "task",
-			Title:    "Collision check",
+		art, err := proto.CreateArtifact(ctx, CreateInput{Title:    "Collision check",
 			Scope:    "scribe",
 			Sections: []Section{{Name: "context", Text: "ctx"}},
-		})
+		Labels: []string{"kind:task"},})
 		if err != nil {
 			t.Fatalf("CreateArtifact: %v", err)
 		}

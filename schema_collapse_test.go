@@ -20,8 +20,8 @@ func TestKindDef_StoredAsLabelDefinition(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DEF-task not found: %v", err)
 	}
-	if art.Kind != parchment.KindLabelDefinition {
-		t.Errorf("DEF-task Kind=%q, want %q (KindLabelDefinition)", art.Kind, parchment.KindLabelDefinition)
+	if art.ResolvedKind() != parchment.KindLabelDefinition {
+		t.Errorf("DEF-task Kind=%q, want %q (KindLabelDefinition)", art.ResolvedKind(), parchment.KindLabelDefinition)
 	}
 }
 
@@ -34,10 +34,9 @@ func TestLoadSchema_ReadsFromCollapsedLabelDefs(t *testing.T) {
 	parchment.SeedDefinitions(ctx, s)
 
 	p := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
-	art, err := p.CreateArtifact(ctx, parchment.CreateInput{
-		Kind: "task", Scope: "test", Title: "kind collapse test",
+	art, err := p.CreateArtifact(ctx, parchment.CreateInput{Scope: "test", Title: "kind collapse test",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-	})
+		Labels: []string{"kind:task"},})
 	if err != nil {
 		t.Fatalf("CreateArtifact with task kind should work after schema collapse: %v", err)
 	}

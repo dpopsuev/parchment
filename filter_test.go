@@ -17,8 +17,7 @@ func TestFilter_MatchLabels_ExcludeLabels_UsesLabelCheck(t *testing.T) {
 	t.Parallel()
 	art := &parchment.Artifact{
 		ID:     "TSK-1",
-		Labels: []string{"kind:task", "status:active", "security", "go"},
-		Scope:  "test",
+		Labels: []string{"kind:task", "status:active", "security", "go", "scope:test"},
 	}
 	f := parchment.Filter{ExcludeLabels: []string{"security"}}
 	if f.Matches(art) {
@@ -26,23 +25,21 @@ func TestFilter_MatchLabels_ExcludeLabels_UsesLabelCheck(t *testing.T) {
 	}
 }
 
-func TestFilter_MatchLabels_ScopeLabelIndex_Expansion(t *testing.T) {
-	// ScopeLabelIndex: label carried by scope, not artifact directly.
-	// Given: artifact has no labels but its scope carries "backend"
-	// When: Filter.Labels=["backend"] with ScopeLabelIndex
+func TestFilter_MatchLabels_ScopeLabel_DirectMatch(t *testing.T) {
+	// Scope is now a label; direct label match replaces ScopeLabelIndex expansion.
+	// Given: artifact has scope:infra label
+	// When: Filter.Labels=["scope:infra"]
 	// Then: Matches returns true
 	t.Parallel()
 	art := &parchment.Artifact{
 		ID:     "TSK-2",
-		Labels: []string{"kind:task", "status:active"},
-		Scope:  "infra",
+		Labels: []string{"kind:task", "status:active", "scope:infra"},
 	}
 	f := parchment.Filter{
-		Labels:          []string{"backend"},
-		ScopeLabelIndex: map[string][]string{"backend": {"infra"}},
+		Labels: []string{"scope:infra"},
 	}
 	if !f.Matches(art) {
-		t.Error("artifact whose scope carries the label should match")
+		t.Error("artifact with scope label should match scope label filter")
 	}
 }
 
@@ -86,8 +83,8 @@ func TestBulkSetField_UpdatesAllMatching(t *testing.T) {
 	}
 	for _, id := range []string{a.ID, b.ID} {
 		got, _ := proto.GetArtifact(ctx, id)
-		if got.Priority != "high" {
-			t.Errorf("artifact %s priority = %q, want %q", id, got.Priority, "high")
+		if got.Priority() != "high" {
+			t.Errorf("artifact %s priority = %q, want %q", id, got.Priority(), "high")
 		}
 	}
 }
@@ -116,7 +113,7 @@ func TestBulkSetField_DryRun_NoMutation(t *testing.T) {
 		t.Error("DryRun flag should be set in result")
 	}
 	got, _ := proto.GetArtifact(ctx, art.ID)
-	if got.Priority == "critical" {
+	if got.Priority() == "critical" {
 		t.Error("DryRun should not mutate the artifact")
 	}
 }

@@ -119,10 +119,9 @@ func protocolWithTrait(t *testing.T, label string, requiredSections ...string) (
 	// Seed a label_definition artifact into _schema scope before Protocol.New
 	// so loadLabelTraits picks it up.
 	import_ctx := t.Context()
-	store.Put(import_ctx, &parchment.Artifact{
+	store.Put(import_ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "LDEF-" + label,
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
-		Scope:  parchment.SchemaScope,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  label,
 		Extra:  map[string]any{"required_sections": requiredSections},
 	})

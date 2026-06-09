@@ -6,24 +6,24 @@ import (
 	parchment "github.com/dpopsuev/parchment"
 )
 
-func TestResolvedScope_FromField(t *testing.T) {
-	art := &parchment.Artifact{Scope: "scribe"}
+func TestResolvedScope_FromLabel(t *testing.T) {
+	art := &parchment.Artifact{Labels: []string{"scope:scribe"}}
 	if got := art.ResolvedScope(); got != "scribe" {
 		t.Errorf("expected scribe, got %q", got)
 	}
 }
 
-func TestResolvedScope_FromLabel(t *testing.T) {
+func TestResolvedScope_FromLabelWithKind(t *testing.T) {
 	art := &parchment.Artifact{Labels: []string{"kind:task", "scope:parchment"}}
 	if got := art.ResolvedScope(); got != "parchment" {
 		t.Errorf("expected parchment, got %q", got)
 	}
 }
 
-func TestResolvedScope_FieldWinsOverLabel(t *testing.T) {
-	art := &parchment.Artifact{Scope: "scribe", Labels: []string{"scope:parchment"}}
+func TestResolvedScope_FirstLabelWins(t *testing.T) {
+	art := &parchment.Artifact{Labels: []string{"scope:scribe", "scope:parchment"}}
 	if got := art.ResolvedScope(); got != "scribe" {
-		t.Errorf("expected scribe (field wins), got %q", got)
+		t.Errorf("expected scribe (first label wins), got %q", got)
 	}
 }
 

@@ -499,7 +499,10 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	}
 
 	kind := labelValue(art.Labels, LabelPrefixKind)
+	scope := labelValue(art.Labels, LabelPrefixScope)
 	status := labelValue(art.Labels, LabelPrefixStatus)
+	priority := labelValue(art.Labels, LabelPrefixPriority)
+	sprint := labelValue(art.Labels, LabelPrefixSprint)
 	dependsOn, _ := json.Marshal(art.DependsOn)
 	labels, _ := json.Marshal(art.Labels)
 	sections, _ := json.Marshal(art.Sections)
@@ -521,8 +524,8 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 			criteria=excluded.criteria, links=excluded.links,
 			extra=excluded.extra,
 			annotations=excluded.annotations, updated_at=excluded.updated_at`,
-		art.UID, art.ID, art.Alias, kind, art.Scope, status, art.Parent, art.Title, art.Goal,
-		string(dependsOn), string(labels), art.Priority, art.Sprint,
+		art.UID, art.ID, art.Alias, kind, scope, status, art.Parent, art.Title, art.Goal,
+		string(dependsOn), string(labels), priority, sprint,
 		string(sections), string(features), string(criteria), string(links), string(extra),
 		string(annotations),
 		art.CreatedAt.Format(time.RFC3339Nano), art.UpdatedAt.Format(time.RFC3339Nano),
@@ -606,7 +609,10 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 		}
 
 		kind := labelValue(art.Labels, LabelPrefixKind)
+		scope := labelValue(art.Labels, LabelPrefixScope)
 		status := labelValue(art.Labels, LabelPrefixStatus)
+		priority := labelValue(art.Labels, LabelPrefixPriority)
+		sprint := labelValue(art.Labels, LabelPrefixSprint)
 		dependsOn, _ := json.Marshal(art.DependsOn)
 		labels, _ := json.Marshal(art.Labels)
 		sections, _ := json.Marshal(art.Sections)
@@ -617,8 +623,8 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 		annotations, _ := json.Marshal(art.Annotations)
 
 		_, execErr := stmt.ExecContext(ctx,
-			art.UID, art.ID, art.Alias, kind, art.Scope, status, art.Parent,
-			art.Title, art.Goal, string(dependsOn), string(labels), art.Priority, art.Sprint,
+			art.UID, art.ID, art.Alias, kind, scope, status, art.Parent,
+			art.Title, art.Goal, string(dependsOn), string(labels), priority, sprint,
 			string(sections), string(features), string(criteria), string(links), string(extra),
 			string(annotations),
 			art.CreatedAt.Format(time.RFC3339Nano),
@@ -689,7 +695,10 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 	art.UpdatedAt = now
 
 	kind := labelValue(art.Labels, LabelPrefixKind)
+	scope := labelValue(art.Labels, LabelPrefixScope)
 	status := labelValue(art.Labels, LabelPrefixStatus)
+	priority := labelValue(art.Labels, LabelPrefixPriority)
+	sprint := labelValue(art.Labels, LabelPrefixSprint)
 	dependsOn, _ := json.Marshal(art.DependsOn)
 	labels, _ := json.Marshal(art.Labels)
 	sections, _ := json.Marshal(art.Sections)
@@ -708,8 +717,8 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 			sections=?, features=?, criteria=?, links=?,
 			extra=?, annotations=?, updated_at=?
 		WHERE id=?`,
-		art.Alias, kind, art.Scope, status, art.Parent, art.Title, art.Goal,
-		string(dependsOn), string(labels), art.Priority, art.Sprint,
+		art.Alias, kind, scope, status, art.Parent, art.Title, art.Goal,
+		string(dependsOn), string(labels), priority, sprint,
 		string(sections), string(features), string(criteria), string(links),
 		string(extra), string(annotations),
 		art.UpdatedAt.Format(time.RFC3339Nano),
@@ -1122,9 +1131,7 @@ func (s *SQLiteStore) cleanDanglingRefs(ctx context.Context, tx *sql.Tx, deleted
 }
 
 // buildWhereClause constructs the WHERE clause and bound args from a Filter.
-// Returns (clauses, args, sqlLabels) where sqlLabels=true means label filtering
-// was pushed to SQL; false means post-scan filtering is required.
-func buildWhereClause(f Filter) ([]string, []any, bool) { //nolint:cyclop,gocyclo,gocritic // hugeParam: value semantics match List/ListPage callers; complexity linear not nested
+func buildWhereClause(f Filter) ([]string, []any) { //nolint:cyclop,gocyclo,gocritic // hugeParam: value semantics match List/ListPage callers; complexity linear not nested
 	var clauses []string
 	var args []any
 	if f.IDPrefix != "" {
@@ -1138,10 +1145,6 @@ func buildWhereClause(f Filter) ([]string, []any, bool) { //nolint:cyclop,gocycl
 			args = append(args, k)
 		}
 	}
-	if f.ExcludeScope != "" {
-		clauses = append(clauses, "scope != ?")
-		args = append(args, f.ExcludeScope)
-	}
 	if len(f.Scopes) > 0 {
 		ph := make([]string, len(f.Scopes))
 		for i, sc := range f.Scopes {
@@ -1149,22 +1152,10 @@ func buildWhereClause(f Filter) ([]string, []any, bool) { //nolint:cyclop,gocycl
 			args = append(args, sc)
 		}
 		clauses = append(clauses, "scope IN ("+strings.Join(ph, ",")+")")
-	} else if f.Scope != "" {
-		if f.ScopePrefix {
-			clauses = append(clauses, "(scope = ? OR scope LIKE ? || '/%')")
-			args = append(args, f.Scope, f.Scope)
-		} else {
-			clauses = append(clauses, "scope = ?")
-			args = append(args, f.Scope)
-		}
 	}
 	if f.Parent != "" {
 		clauses = append(clauses, "parent = ?")
 		args = append(args, f.Parent)
-	}
-	if f.Sprint != "" {
-		clauses = append(clauses, "sprint = ?")
-		args = append(args, f.Sprint)
 	}
 	if f.CreatedAfter != "" {
 		clauses = append(clauses, "created_at >= ?")
@@ -1191,45 +1182,56 @@ func buildWhereClause(f Filter) ([]string, []any, bool) { //nolint:cyclop,gocycl
 		args = append(args, f.InsertedBefore)
 	}
 
-	// SQL-side label filtering. Not applied when scope label expansion is active —
-	// scope expansion requires post-scan to match artifacts whose scope carries the label.
-	// kind: and status: labels map to indexed columns for performance and backward compat.
-	sqlLabels := len(f.ScopeLabelIndex) == 0
-	if sqlLabels {
-		for _, label := range f.Labels {
-			switch {
-			case strings.HasPrefix(label, LabelPrefixKind):
-				clauses = append(clauses, "kind = ?")
-				args = append(args, strings.TrimPrefix(label, LabelPrefixKind))
-			case strings.HasPrefix(label, LabelPrefixStatus):
-				clauses = append(clauses, "status = ?")
-				args = append(args, strings.TrimPrefix(label, LabelPrefixStatus))
-			default:
-				clauses = append(clauses,
-					"EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
-				args = append(args, label)
+	// SQL-side label filtering: system labels map to indexed columns for performance;
+	// all others use the artifact_labels junction table.
+	for _, label := range f.Labels {
+		switch {
+		case strings.HasPrefix(label, LabelPrefixKind):
+			clauses = append(clauses, "kind = ?")
+			args = append(args, strings.TrimPrefix(label, LabelPrefixKind))
+		case strings.HasPrefix(label, LabelPrefixStatus):
+			clauses = append(clauses, "status = ?")
+			args = append(args, strings.TrimPrefix(label, LabelPrefixStatus))
+		case strings.HasPrefix(label, LabelPrefixScope):
+			scopeVal := strings.TrimPrefix(label, LabelPrefixScope)
+			if f.ScopePrefix {
+				clauses = append(clauses, "(scope = ? OR scope LIKE ? || '/%')")
+				args = append(args, scopeVal, scopeVal)
+			} else {
+				clauses = append(clauses, "scope = ?")
+				args = append(args, scopeVal)
 			}
-		}
-		if len(f.LabelsOr) > 0 {
-			ph := make([]string, len(f.LabelsOr))
-			for i, label := range f.LabelsOr {
-				ph[i] = "?"
-				args = append(args, label)
-			}
+		case strings.HasPrefix(label, LabelPrefixPriority):
+			clauses = append(clauses, "priority = ?")
+			args = append(args, strings.TrimPrefix(label, LabelPrefixPriority))
+		case strings.HasPrefix(label, LabelPrefixSprint):
+			clauses = append(clauses, "sprint = ?")
+			args = append(args, strings.TrimPrefix(label, LabelPrefixSprint))
+		default:
 			clauses = append(clauses,
-				"EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label IN ("+strings.Join(ph, ",")+"))")
-		}
-		for _, label := range f.ExcludeLabels {
-			clauses = append(clauses,
-				"NOT EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
+				"EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
 			args = append(args, label)
 		}
 	}
-	return clauses, args, sqlLabels
+	if len(f.LabelsOr) > 0 {
+		ph := make([]string, len(f.LabelsOr))
+		for i, label := range f.LabelsOr {
+			ph[i] = "?"
+			args = append(args, label)
+		}
+		clauses = append(clauses,
+			"EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label IN ("+strings.Join(ph, ",")+"))")
+	}
+	for _, label := range f.ExcludeLabels {
+		clauses = append(clauses,
+			"NOT EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)")
+		args = append(args, label)
+	}
+	return clauses, args
 }
 
 func (s *SQLiteStore) List(ctx context.Context, f Filter) ([]*Artifact, error) { //nolint:gocritic // hugeParam: value semantics intentional
-	clauses, args, sqlLabels := buildWhereClause(f)
+	clauses, args := buildWhereClause(f)
 
 	q := "SELECT " + artifactColumns + " FROM artifacts"
 	if len(clauses) > 0 {
@@ -1250,11 +1252,6 @@ func (s *SQLiteStore) List(ctx context.Context, f Filter) ([]*Artifact, error) {
 			slog.WarnContext(ctx, "list: scan row failed, skipping artifact", slog.Any("err", err)) //nolint:sloglint // consistent with existing patterns in this file
 			continue
 		}
-		// Post-scan label check: only needed when scope label expansion is active.
-		// When sqlLabels=true the SQL WHERE already filtered correctly.
-		if !sqlLabels && !f.MatchLabels(art) {
-			continue
-		}
 		results = append(results, art)
 	}
 	return results, rows.Err()
@@ -1272,7 +1269,7 @@ func (s *SQLiteStore) ListPage(ctx context.Context, f Filter) (page Page, err er
 		return Page{Artifacts: arts, Total: len(arts)}, err
 	}
 
-	clauses, args, _ := buildWhereClause(f)
+	clauses, args := buildWhereClause(f)
 
 	// Cursor: decode as "inserted_at\x00id" — zero byte separator is safe since
 	// neither field contains null bytes.
@@ -1754,13 +1751,13 @@ const artifactColumns = `uid, id, alias, kind, scope, status, parent, title, goa
 
 func scanRow(s rowScanner) (*Artifact, error) {
 	var art Artifact
-	var kindCol, statusCol string
+	var kindCol, scopeCol, statusCol, priorityCol, sprintCol string
 	var dependsOn, labels, sections, features, criteria, links, extra, annotations string
 	var createdAt, updatedAt, insertedAt string
 
 	err := s.Scan(
-		&art.UID, &art.ID, &art.Alias, &kindCol, &art.Scope, &statusCol, &art.Parent, &art.Title, &art.Goal,
-		&dependsOn, &labels, &art.Priority, &art.Sprint,
+		&art.UID, &art.ID, &art.Alias, &kindCol, &scopeCol, &statusCol, &art.Parent, &art.Title, &art.Goal,
+		&dependsOn, &labels, &priorityCol, &sprintCol,
 		&sections, &features, &criteria, &links, &extra,
 		&annotations,
 		&createdAt, &updatedAt, &insertedAt,
@@ -1808,16 +1805,14 @@ func scanRow(s rowScanner) (*Artifact, error) {
 	if statusCol != "" && !hasLabelPrefix(art.Labels, LabelPrefixStatus) {
 		art.Labels = append(art.Labels, LabelPrefixStatus+statusCol)
 	}
-
-	// Hydrate Scope/Priority/Sprint from labels when the stored column is empty.
-	if art.Scope == "" {
-		art.Scope = art.ResolvedScope()
+	if scopeCol != "" && !hasLabelPrefix(art.Labels, LabelPrefixScope) {
+		art.Labels = append(art.Labels, LabelPrefixScope+scopeCol)
 	}
-	if art.Priority == "" {
-		art.Priority = art.ResolvedPriority()
+	if priorityCol != "" && !hasLabelPrefix(art.Labels, LabelPrefixPriority) {
+		art.Labels = append(art.Labels, LabelPrefixPriority+priorityCol)
 	}
-	if art.Sprint == "" {
-		art.Sprint = art.ResolvedSprint()
+	if sprintCol != "" && !hasLabelPrefix(art.Labels, LabelPrefixSprint) {
+		art.Labels = append(art.Labels, LabelPrefixSprint+sprintCol)
 	}
 
 	return &art, nil

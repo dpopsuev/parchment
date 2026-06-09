@@ -67,9 +67,8 @@ func SeedDefinitions(ctx context.Context, s Store) {
 		}
 		art := &Artifact{
 			ID:         id,
-			Scope:      SchemaScope,
 			Title:      name,
-			Labels:     []string{LabelPrefixKind + KindLabelDefinition, LabelPrefixStatus + StatusActive}, // collapsed: kind_definition → label_definition
+			Labels:     []string{LabelPrefixKind + KindLabelDefinition, LabelPrefixStatus + StatusActive, LabelPrefixScope + SchemaScope}, // collapsed: kind_definition → label_definition
 			Extra:      extra,
 			CreatedAt:  now,
 			UpdatedAt:  now,
@@ -93,8 +92,7 @@ func loadSchema(ctx context.Context, s Store) (*Schema, error) { //nolint:unpara
 	base := KnowledgeSchema()
 
 	arts, err := s.List(ctx, Filter{
-		Labels: []string{LabelPrefixKind + KindLabelDefinition},
-		Scope:  SchemaScope,
+		Labels: []string{LabelPrefixKind + KindLabelDefinition, LabelPrefixScope + SchemaScope},
 	})
 	if err != nil {
 		slog.WarnContext(ctx, "load schema: list definitions failed, using compiled-in schema",

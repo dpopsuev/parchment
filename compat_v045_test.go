@@ -38,18 +38,18 @@ func buildV044DB(t *testing.T, path string) {
 	}
 	ctx := context.Background()
 	artifacts := []*Artifact{
-		{UID: "u1", ID: "SCR-GOL-1", Labels: []string{"kind:goal", "status:active"}, Scope: "scribe", Title: "Ship v2"},
-		{UID: "u2", ID: "SCR-CAM-1", Labels: []string{"kind:campaign", "status:active"}, Scope: "scribe",
+		{UID: "u1", ID: "SCR-GOL-1", Labels: []string{"kind:goal", "status:active", "scope:scribe"}, Title: "Ship v2"},
+		{UID: "u2", ID: "SCR-CAM-1", Labels: []string{"kind:campaign", "status:active", "scope:scribe"},
 			Title:    "Migration campaign",
 			Sections: []Section{{Name: "mission", Text: "stay safe"}},
 			Links:    map[string][]string{RelJustifies: {"SCR-GOL-1"}},
 		},
-		{UID: "u3", ID: "SCR-TSK-1", Labels: []string{"kind:task", "status:draft"}, Scope: "scribe",
+		{UID: "u3", ID: "SCR-TSK-1", Labels: []string{"kind:task", "status:draft", "scope:scribe"},
 			Title:    "Task alpha",
 			Parent:   "SCR-CAM-1",
 			Sections: []Section{{Name: "context", Text: "do it"}},
 		},
-		{UID: "u4", ID: "SCR-TSK-2", Labels: []string{"kind:task", "status:active"}, Scope: "scribe",
+		{UID: "u4", ID: "SCR-TSK-2", Labels: []string{"kind:task", "status:active", "scope:scribe"},
 			Title:     "Task beta",
 			Parent:    "SCR-CAM-1",
 			DependsOn: []string{"SCR-TSK-1"},
@@ -151,8 +151,8 @@ func TestV045_PartialIndexDoesNotConflict(t *testing.T) {
 	// Put a new artifact with alias='' — must not fail.
 	ctx := context.Background()
 	err = s.Put(ctx, &Artifact{
-		UID: "new-u", ID: "SCR-TSK-99", Labels: []string{"kind:task", "status:draft"},
-		Scope: "scribe", Title: "No alias",
+		UID: "new-u", ID: "SCR-TSK-99", Labels: []string{"kind:task", "status:draft", "scope:scribe"},
+		Title: "No alias",
 	})
 	if err != nil {
 		t.Errorf("Put with empty alias failed: %v", err)

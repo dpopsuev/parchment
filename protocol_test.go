@@ -1027,8 +1027,8 @@ func TestCreateArtifact_ScopeInference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateArtifact: %v", err)
 	}
-	if art.Scope != "myproject" {
-		t.Errorf("expected scope='myproject', got %q", art.Scope)
+	if art.Scope() != "myproject" {
+		t.Errorf("expected scope='myproject', got %q", art.Scope())
 	}
 }
 
@@ -1536,10 +1536,9 @@ func TestCheck_DetectsUnknownKind(t *testing.T) {
 	ctx := context.Background()
 
 	// Directly insert an artifact with unknown kind via store
-	store.Put(ctx, &parchment.Artifact{
+	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "BAD-001",
-		Labels: []string{"kind:phantom"},
-		Scope:  "test",
+		Labels: []string{"kind:phantom", "scope:test"},
 		Title:  "bad kind artifact",
 	})
 
@@ -1569,10 +1568,9 @@ func TestCheck_DetectsInvalidParent(t *testing.T) {
 
 	// task cannot be child of task (task Children is empty slice = leaf)
 	parentTask := createTask(t, proto, "parent task")
-	store.Put(ctx, &parchment.Artifact{
+	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "CHILD-001",
-		Labels: []string{"kind:task", "status:draft"},
-		Scope:  "test",
+		Labels: []string{"kind:task", "status:draft", "scope:test"},
 		Title:  "child task",
 		Parent: parentTask.ID,
 	})
@@ -1598,10 +1596,9 @@ func TestCheck_DetectsEmptyArtifact(t *testing.T) {
 	ctx := context.Background()
 
 	// Insert a draft task with no goal, no sections, no parent, no edges
-	store.Put(ctx, &parchment.Artifact{
+	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "EMPTY-001",
-		Labels: []string{"kind:task", "status:draft"},
-		Scope:  "test",
+		Labels: []string{"kind:task", "status:draft", "scope:test"},
 		Title:  "empty task",
 	})
 
@@ -1828,10 +1825,9 @@ func TestCheckFix_FixesInvalidParent(t *testing.T) {
 
 	parentTask := createTask(t, proto, "parent task")
 	// Manually insert child of task (invalid: task has empty Children = leaf)
-	store.Put(ctx, &parchment.Artifact{
+	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "BAD-CHILD-1",
-		Labels: []string{"kind:task", "status:draft"},
-		Scope:  "test",
+		Labels: []string{"kind:task", "status:draft", "scope:test"},
 		Title:  "bad child",
 		Parent: parentTask.ID,
 	})
@@ -2108,10 +2104,9 @@ func TestGetConfig_WithScopedConfig(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a config artifact with a section acting as key=value
-	store.Put(ctx, &parchment.Artifact{
+	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "cfg-1",
-		Labels: []string{"kind:config", "status:active"},
-		Scope:  "test",
+		Labels: []string{"kind:config", "status:active", "scope:test"},
 		Title:  "test config",
 		Sections: []parchment.Section{
 			{Name: "default_scope", Text: "test"},
@@ -2160,8 +2155,8 @@ func TestCreateArtifact_TemplateIsScopeless(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateArtifact template: %v", err)
 	}
-	if tpl.Scope != "" {
-		t.Errorf("expected empty scope for template, got %q", tpl.Scope)
+	if tpl.Scope() != "" {
+		t.Errorf("expected empty scope for template, got %q", tpl.Scope())
 	}
 }
 
@@ -2202,10 +2197,9 @@ func TestDetectOrphans_RefWithoutDocuments(t *testing.T) {
 
 	// ref kind has RequiredOutgoing: ["documents"]
 	// Insert a ref without the link to trigger orphan detection
-	store.Put(ctx, &parchment.Artifact{
+	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "REF-ORPHAN-1",
-		Labels: []string{"kind:ref", "status:draft"},
-		Scope:  "test",
+		Labels: []string{"kind:ref", "status:draft", "scope:test"},
 		Title:  "orphaned reference",
 	})
 
@@ -2256,8 +2250,8 @@ func setupTemplateProtoForConformance(t *testing.T) *parchment.Protocol {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	store.Put(ctx, &parchment.Artifact{
-		ID: "TPL-BUG-1", Labels: []string{"kind:template", "status:active"}, Title: "Bug Template", Scope: "test",
+	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
+		ID: "TPL-BUG-1", Labels: []string{"kind:template", "status:active", "scope:test"}, Title: "Bug Template",
 		Sections: []parchment.Section{
 			{Name: "content", Text: "raw markdown"},
 			{Name: "observed", Text: "Observed vs expected behavior"},

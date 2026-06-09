@@ -252,8 +252,7 @@ func TestDetectEvictionCandidates_FleetingOrphan_IsCandidate(t *testing.T) {
 	old := time.Now().Add(-60 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
 		ID:    "NOT-OLD-1",
-		Labels: []string{"kind:note", "status:" + parchment.StatusFleeting},
-		Scope: "test",
+		Labels: []string{"kind:note", "status:" + parchment.StatusFleeting, "scope:test"},
 		Title: "old fleeting orphan",
 		CreatedAt: old, UpdatedAt: old,
 	})
@@ -287,8 +286,7 @@ func TestDetectEvictionCandidates_Evergreen_NotCandidate(t *testing.T) {
 	old := time.Now().Add(-60 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
 		ID:    "NOT-EVER-1",
-		Labels: []string{"kind:note", "status:" + parchment.StatusEvergreen},
-		Scope: "test",
+		Labels: []string{"kind:note", "status:" + parchment.StatusEvergreen, "scope:test"},
 		Title: "old evergreen",
 		CreatedAt: old, UpdatedAt: old,
 	})
@@ -319,8 +317,7 @@ func TestDetectEvictionCandidates_PinnedAnnotation_Excluded(t *testing.T) {
 	old := time.Now().Add(-90 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
 		ID:    "NOT-PIN-1",
-		Labels: []string{"kind:note", "status:" + parchment.StatusFleeting},
-		Scope: "test",
+		Labels: []string{"kind:note", "status:" + parchment.StatusFleeting, "scope:test"},
 		Title: "pinned note",
 		CreatedAt: old, UpdatedAt: old,
 		Annotations: []parchment.Annotation{{Kind: parchment.AnnotationPin, Comment: "keep forever"}},

@@ -52,9 +52,9 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 		s := newStore(t)
 		ctx := context.Background()
 
-		s.Put(ctx, &Artifact{UID: "u1", ID: "T-1", Labels: []string{"kind:task", "status:draft"}, Scope: "a", Title: "one"})    //nolint:errcheck // test seeding
-		s.Put(ctx, &Artifact{UID: "u2", ID: "T-2", Labels: []string{"kind:spec", "status:draft"}, Scope: "a", Title: "two"})    //nolint:errcheck // test seeding
-		s.Put(ctx, &Artifact{UID: "u3", ID: "T-3", Labels: []string{"kind:task", "status:active"}, Scope: "b", Title: "three"}) //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{UID: "u1", ID: "T-1", Labels: []string{"kind:task", "status:draft", "scope:a"}, Title: "one"})    //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{UID: "u2", ID: "T-2", Labels: []string{"kind:spec", "status:draft", "scope:a"}, Title: "two"})    //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{UID: "u3", ID: "T-3", Labels: []string{"kind:task", "status:active", "scope:b"}, Title: "three"}) //nolint:errcheck // test seeding
 
 		arts, err := s.List(ctx, Filter{Labels: []string{"kind:task"}})
 		if err != nil {
@@ -64,7 +64,7 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 			t.Errorf("expected 2 tasks, got %d", len(arts))
 		}
 
-		arts, err = s.List(ctx, Filter{Scope: "a"})
+		arts, err = s.List(ctx, Filter{Labels: []string{"scope:a"}})
 		if err != nil {
 			t.Fatal(err)
 		}

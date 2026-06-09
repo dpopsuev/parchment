@@ -36,8 +36,7 @@ func TestSeedDefinitions_KindArtifact_HasGuidanceSections(t *testing.T) {
 
 	// Find the task kind_definition artifact.
 	arts, err := s.List(ctx, parchment.Filter{
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition},
-		Scope:    parchment.SchemaScope,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixScope + parchment.SchemaScope},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -84,8 +83,7 @@ func TestSeedEdgeTypeTraits_HasGuidanceSections(t *testing.T) {
 	parchment.SeedEdgeTypeTraits(ctx, s)
 
 	arts, err := s.List(ctx, parchment.Filter{
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition},
-		Scope:  parchment.SchemaScope,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixScope + parchment.SchemaScope},
 	})
 	if err != nil {
 		t.Fatal(err)

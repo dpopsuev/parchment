@@ -57,7 +57,7 @@ func (p *Protocol) createHookArtifacts(ctx context.Context, parent *Artifact, ra
 		child, err := p.CreateArtifact(ctx, CreateInput{
 			Title:     title,
 			Goal:      goal,
-			Scope:     parent.Scope,
+			Scope:     parent.Scope(),
 			Parent:    parent.ID,
 			Priority:  priority,
 			Labels:    []string{LabelPrefixKind + kind, "auto-generated"},
@@ -102,7 +102,8 @@ func (p *Protocol) findTemplateForKind(ctx context.Context, kind, scope string) 
 
 	tplLabels := []string{LabelPrefixKind + KindTemplate, LabelPrefixStatus + StatusActive}
 	if scope != "" {
-		templates, err := p.store.List(ctx, Filter{Labels: tplLabels, Scope: scope})
+		scopedLabels := append(tplLabels, LabelPrefixScope+scope) //nolint:gocritic // intentional append to new slice; tplLabels is a local literal
+		templates, err := p.store.List(ctx, Filter{Labels: scopedLabels})
 		if err == nil && len(templates) > 0 {
 			if id := match(templates); id != "" {
 				return id
@@ -110,7 +111,7 @@ func (p *Protocol) findTemplateForKind(ctx context.Context, kind, scope string) 
 		}
 	}
 
-	global, err := p.store.List(ctx, Filter{Labels: tplLabels, Scope: ""})
+	global, err := p.store.List(ctx, Filter{Labels: tplLabels})
 	if err == nil && len(global) > 0 {
 		return match(global)
 	}

@@ -58,7 +58,7 @@ func (l LabelTrait) ConflictPolicy() ConflictPolicy { return ConflictUnion }
 // loadLabelTraits reads label_definition artifacts from SchemaScope and returns
 // a map keyed by label slug (artifact Title). Mirrors extraToKindDef pattern.
 func loadLabelTraits(ctx context.Context, s Store) map[string]LabelTrait {
-	arts, err := s.List(ctx, Filter{Labels: []string{LabelPrefixKind + KindLabelDefinition}, Scope: SchemaScope})
+	arts, err := s.List(ctx, Filter{Labels: []string{LabelPrefixKind + KindLabelDefinition, LabelPrefixScope + SchemaScope}})
 	if err != nil {
 		slog.WarnContext(ctx, "load label traits: list failed", slog.Any(LogKeyError, err))
 		return nil
@@ -84,7 +84,7 @@ func loadLabelTraits(ctx context.Context, s Store) map[string]LabelTrait {
 // over composed parent traits (explicit wins). Replaces loadLabelTraits once
 // all label_definition artifacts have composes edges seeded (PRC-TSK-138).
 func LoadLabelTraitsWithComposition(ctx context.Context, s Store) map[string]LabelTrait {
-	arts, err := s.List(ctx, Filter{Labels: []string{LabelPrefixKind + KindLabelDefinition}, Scope: SchemaScope})
+	arts, err := s.List(ctx, Filter{Labels: []string{LabelPrefixKind + KindLabelDefinition, LabelPrefixScope + SchemaScope}})
 	if err != nil {
 		slog.WarnContext(ctx, "load label traits with composition: list failed", slog.Any(LogKeyError, err))
 		return nil
@@ -340,8 +340,7 @@ func SeedLabelTraits(ctx context.Context, s Store) {
 		}
 		art := &Artifact{
 			ID:     id,
-			Labels: []string{LabelPrefixKind + KindLabelDefinition, LabelPrefixStatus + StatusActive},
-			Scope:  SchemaScope,
+			Labels: []string{LabelPrefixKind + KindLabelDefinition, LabelPrefixStatus + StatusActive, LabelPrefixScope + SchemaScope},
 			Title:  entry.label,
 			Extra:  extra,
 		}

@@ -13,8 +13,8 @@ func setupTemplateProto(t *testing.T) *parchment.Protocol {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	store.Put(ctx, &parchment.Artifact{
-		ID: "TPL-1", Labels: []string{"kind:template", "status:active"}, Title: "Bug Template", Scope: "test",
+	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
+		ID: "TPL-1", Labels: []string{"kind:template", "status:active", "scope:test"}, Title: "Bug Template",
 		Sections: []parchment.Section{
 			{Name: "content", Text: "raw markdown"},
 			{Name: "observed", Text: "Observed vs expected behavior"},

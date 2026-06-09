@@ -56,10 +56,14 @@ func TestProperty_DefaultSchema_LintClean(t *testing.T) {
 func TestProperty_Filter_Monotonic(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		artKind := rapid.SampledFrom([]string{"task", "spec", "bug", "goal"}).Draw(t, "kind")
+		scopeVal := rapid.SampledFrom([]string{"backend", "frontend", ""}).Draw(t, "scope")
+		labels := []string{"kind:" + artKind, "status:" + rapid.SampledFrom([]string{"draft", "active", "complete"}).Draw(t, "status")}
+		if scopeVal != "" {
+			labels = append(labels, "scope:"+scopeVal)
+		}
 		art := &Artifact{
 			ID:     rapid.StringMatching(`[A-Z]{3}-[A-Z]{3}-[0-9]{1,3}`).Draw(t, "id"),
-			Labels: []string{"kind:" + artKind, "status:" + rapid.SampledFrom([]string{"draft", "active", "complete"}).Draw(t, "status")},
-			Scope:  rapid.SampledFrom([]string{"backend", "frontend", ""}).Draw(t, "scope"),
+			Labels: labels,
 		}
 
 		loose := Filter{}

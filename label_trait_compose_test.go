@@ -16,17 +16,16 @@ func TestLoadLabelTraitsWithComposition_InheritsFromComposedLabel(t *testing.T) 
 	now := func() string { return "2026-01-01T00:00:00Z" }
 	_ = now
 
+	schemaLabels := []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope}
 	parent := &parchment.Artifact{
 		ID:     "LDEF-rule",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
-		Scope:  parchment.SchemaScope,
+		Labels: schemaLabels,
 		Title:  "rule",
 		Extra:  map[string]any{"eviction_policy": "protected"},
 	}
 	child := &parchment.Artifact{
 		ID:     "LDEF-rule.security",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
-		Scope:  parchment.SchemaScope,
+		Labels: schemaLabels,
 		Title:  "rule.security",
 		Extra:  map[string]any{},
 	}
@@ -54,17 +53,16 @@ func TestLoadLabelTraitsWithComposition_OwnTraitOverridesParent(t *testing.T) {
 	s := parchment.NewMemoryStore()
 	ctx := context.Background()
 
+	schemaLabels2 := []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope}
 	parent := &parchment.Artifact{
 		ID:     "LDEF-base",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
-		Scope:  parchment.SchemaScope,
+		Labels: schemaLabels2,
 		Title:  "base",
 		Extra:  map[string]any{"eviction_policy": "protected"},
 	}
 	child := &parchment.Artifact{
 		ID:     "LDEF-base.override",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
-		Scope:  parchment.SchemaScope,
+		Labels: schemaLabels2,
 		Title:  "base.override",
 		Extra:  map[string]any{"eviction_policy": "aggressive"},
 	}
@@ -88,8 +86,7 @@ func TestLoadLabelTraitsWithComposition_NoComposesEdge_SameAsLoadLabelTraits(t *
 
 	art := &parchment.Artifact{
 		ID:     "LDEF-session",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
-		Scope:  parchment.SchemaScope,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  "session",
 		Extra:  map[string]any{"world": "session"},
 	}

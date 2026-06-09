@@ -74,8 +74,7 @@ func TestUniqueWikilinks(t *testing.T) {
 func TestRenderVaultMarkdown_RoundTrip(t *testing.T) {
 	art := &Artifact{
 		ID:     "REL-r-1",
-		Labels: []string{"kind:relic", "status:active", "philosophy", "stoicism"},
-		Scope:  "reliquary",
+		Labels: []string{"kind:relic", "status:active", "philosophy", "stoicism", "scope:reliquary"},
 		Title:  "The Dichotomy of Control",
 		Goal:   "Understand what is and is not in our power.",
 		Sections: []Section{

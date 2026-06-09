@@ -213,7 +213,7 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 		slog.String(LogKeyID, sourceID),
 		slog.String(LogKeyRelation, relation),
 		slog.Int(LogKeyCount, len(targetIDs)))
-	p.emitEvent(ctx, EventLinked, sourceID, art.Scope, map[string]any{"relation": relation, "targets": targetIDs})
+	p.emitEvent(ctx, EventLinked, sourceID, art.Scope(), map[string]any{"relation": relation, "targets": targetIDs})
 	return results, nil
 }
 
@@ -314,7 +314,7 @@ func (p *Protocol) ArtifactTree(ctx context.Context, in TreeInput) (*TreeNode, e
 		return p.buildTree(ctx, root), nil
 	}
 
-	node := &TreeNode{ID: root.ID, Labels: root.Labels, Title: root.Title, Scope: root.Scope}
+	node := &TreeNode{ID: root.ID, Labels: root.Labels, Title: root.Title, Scope: root.Scope()}
 	visited := map[string]bool{root.ID: true}
 	p.buildGraphTree(ctx, node, rel, storeDir, depth, 1, visited)
 	return node, nil
@@ -382,7 +382,7 @@ func (p *Protocol) TopoSort(ctx context.Context, rootID string) ([]TopoEntry, er
 		for id, art := range arts {
 			partial = append(partial, TopoEntry{
 				ID: id, Labels: art.Labels,
-				Title: art.Title, Priority: art.Priority,
+				Title: art.Title, Priority: art.Priority(),
 			})
 		}
 		return partial, fmt.Errorf("cycle detected in dependency graph: %w", err)
@@ -393,7 +393,7 @@ func (p *Protocol) TopoSort(ctx context.Context, rootID string) ([]TopoEntry, er
 		art := arts[id]
 		result = append(result, TopoEntry{
 			ID: id, Labels: art.Labels,
-			Title: art.Title, Priority: art.Priority,
+			Title: art.Title, Priority: art.Priority(),
 		})
 	}
 	return result, nil
@@ -408,7 +408,7 @@ type TopoEntry struct {
 }
 
 func (p *Protocol) buildTree(ctx context.Context, art *Artifact) *TreeNode {
-	node := &TreeNode{ID: art.ID, Labels: art.Labels, Title: art.Title, Scope: art.Scope}
+	node := &TreeNode{ID: art.ID, Labels: art.Labels, Title: art.Title, Scope: art.Scope()}
 	children, _ := p.store.Children(ctx, art.ID)
 	for _, ch := range children {
 		node.Children = append(node.Children, p.buildTree(ctx, ch))
@@ -449,7 +449,7 @@ func (p *Protocol) buildGraphTree(ctx context.Context, node *TreeNode, rel strin
 			ID:        target.ID,
 			Labels:    target.Labels,
 			Title:     target.Title,
-			Scope:     target.Scope,
+			Scope:     target.Scope(),
 			Edge:      e.Relation,
 			Direction: edgeDir,
 		}

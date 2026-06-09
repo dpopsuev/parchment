@@ -23,8 +23,7 @@ func TestRule_ParsedFromArtifact(t *testing.T) {
 	t.Parallel()
 	art := &parchment.Artifact{
 		ID:     "RULE-001",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindRule},
-		Scope:  parchment.SchemaScope,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindRule, parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  "priority_required",
 		Sections: []parchment.Section{
 			{Name: "trigger", Text: "status_changed"},
@@ -64,8 +63,7 @@ func TestRule_SeededInSchema(t *testing.T) {
 	parchment.SeedRules(ctx, s)
 
 	arts, err := s.List(ctx, parchment.Filter{
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindRule},
-		Scope:  parchment.SchemaScope,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindRule, parchment.LabelPrefixScope + parchment.SchemaScope},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -91,8 +89,7 @@ func TestRule_LoadedByProtocol(t *testing.T) {
 	now := time.Now().UTC()
 	_ = s.Put(ctx, &parchment.Artifact{
 		ID:     "RULE-test",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindRule, parchment.LabelPrefixStatus + parchment.StatusActive},
-		Scope:  parchment.SchemaScope,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindRule, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  "test_rule",
 		Sections: []parchment.Section{
 			{Name: "trigger", Text: "status_changed"},

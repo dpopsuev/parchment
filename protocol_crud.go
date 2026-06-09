@@ -141,8 +141,8 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	// Inherit defaults from parent
 	if in.Parent != "" {
 		if parent, err := p.store.Get(ctx, in.Parent); err == nil {
-			if in.Priority == "" && parent.Priority != "" {
-				in.Priority = parent.Priority
+			if in.Priority == "" && parent.Priority() != "" {
+				in.Priority = parent.Priority()
 			}
 		}
 	}
@@ -223,14 +223,10 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	art := &Artifact{
 		ID: id, Alias: in.Alias, Parent: in.Parent,
 		Title: in.Title, Goal: in.Goal,
-		Priority:  in.Priority,
 		DependsOn: in.DependsOn, Labels: seedLabels,
 		Links: in.Links, Extra: in.Extra,
 		Sections: in.Sections,
 	}
-	// Scope, Priority are still field-backed; derive from labels when not set directly.
-	art.Scope = art.ResolvedScope()
-	art.Priority = art.ResolvedPriority()
 	if in.CreatedAt != "" {
 		if t, err := time.Parse(time.RFC3339, in.CreatedAt); err == nil {
 			art.CreatedAt = t
@@ -300,7 +296,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 			}
 		}
 		// Duplicate awareness: warn if similar non-terminal artifact exists
-		if existing, _ := p.store.List(ctx, Filter{Labels: []string{LabelPrefixKind + art.ResolvedKind()}, Scope: art.Scope}); len(existing) > 0 {
+		if existing, _ := p.store.List(ctx, Filter{Labels: []string{LabelPrefixKind + art.ResolvedKind(), LabelPrefixScope + art.Scope()}}); len(existing) > 0 {
 			for _, e := range existing {
 				if !p.IsTerminal(e.ResolvedStatus()) && e.Title == art.Title {
 					slog.WarnContext(ctx, "duplicate title detected on create",
@@ -320,7 +316,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		p.executeTemplateHooks(ctx, art)
 	}
 
-	p.emitEvent(ctx, EventCreated, art.ID, art.Scope, nil)
+	p.emitEvent(ctx, EventCreated, art.ID, art.Scope(), nil)
 	return art, nil
 }
 
@@ -424,12 +420,10 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 	f := Filter{
 		Family:         in.Family,
 		Parent:         in.Parent,
-		Sprint:         in.Sprint,
 		IDPrefix:       in.IDPrefix,
-		ExcludeScope:   SchemaScope, // definition artifacts are never in user-facing results
 		Labels:         in.Labels,
 		LabelsOr:       in.LabelsOr,
-		ExcludeLabels:  in.ExcludeLabels,
+		ExcludeLabels:  append(in.ExcludeLabels, LabelPrefixScope+SchemaScope),
 		CreatedAfter:   in.CreatedAfter,
 		CreatedBefore:  in.CreatedBefore,
 		UpdatedAfter:   in.UpdatedAfter,
@@ -437,12 +431,14 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 		InsertedAfter:  in.InsertedAfter,
 		InsertedBefore: in.InsertedBefore,
 	}
+	if in.Sprint != "" {
+		f.Labels = append(f.Labels, LabelPrefixSprint+in.Sprint)
+	}
 	if in.Scope != "" {
-		f.Scope = in.Scope
+		f.Labels = append(f.Labels, LabelPrefixScope+in.Scope)
 	} else if len(p.scopes) > 0 {
 		f.Scopes = p.scopes
 	}
-	p.populateScopeLabelIndex(ctx, &f)
 	p.populateFamilyKinds(&f)
 	arts, err := p.store.List(ctx, f)
 	if err != nil {
@@ -465,12 +461,10 @@ func (p *Protocol) ListPage(ctx context.Context, in ListInput) (Page, error) { /
 	f := Filter{
 		Family:         in.Family,
 		Parent:         in.Parent,
-		Sprint:         in.Sprint,
 		IDPrefix:       in.IDPrefix,
-		ExcludeScope:   SchemaScope,
 		Labels:         in.Labels,
 		LabelsOr:       in.LabelsOr,
-		ExcludeLabels:  in.ExcludeLabels,
+		ExcludeLabels:  append(in.ExcludeLabels, LabelPrefixScope+SchemaScope),
 		CreatedAfter:   in.CreatedAfter,
 		CreatedBefore:  in.CreatedBefore,
 		UpdatedAfter:   in.UpdatedAfter,
@@ -480,12 +474,14 @@ func (p *Protocol) ListPage(ctx context.Context, in ListInput) (Page, error) { /
 		Limit:          in.Limit,
 		Cursor:         in.Cursor,
 	}
+	if in.Sprint != "" {
+		f.Labels = append(f.Labels, LabelPrefixSprint+in.Sprint)
+	}
 	if in.Scope != "" {
-		f.Scope = in.Scope
+		f.Labels = append(f.Labels, LabelPrefixScope+in.Scope)
 	} else if len(p.scopes) > 0 {
 		f.Scopes = p.scopes
 	}
-	p.populateScopeLabelIndex(ctx, &f)
 	p.populateFamilyKinds(&f)
 	page, err := p.store.ListPage(ctx, f)
 	if err != nil {
@@ -527,31 +523,7 @@ func (p *Protocol) populateFamilyKinds(f *Filter) {
 	}
 }
 
-func (p *Protocol) populateScopeLabelIndex(ctx context.Context, f *Filter) {
-	allLabels := make(map[string]bool)
-	for _, l := range f.Labels {
-		allLabels[l] = true
-	}
-	for _, l := range f.LabelsOr {
-		allLabels[l] = true
-	}
-	for _, l := range f.ExcludeLabels {
-		allLabels[l] = true
-	}
-	if len(allLabels) == 0 {
-		return
-	}
-	idx := make(map[string][]string)
-	for label := range allLabels {
-		scopes, err := p.store.ScopesByLabel(ctx, label)
-		if err == nil && len(scopes) > 0 {
-			idx[label] = scopes
-		}
-	}
-	if len(idx) > 0 {
-		f.ScopeLabelIndex = idx
-	}
-}
+
 
 func (p *Protocol) SearchArtifacts(ctx context.Context, query string, in ListInput) ([]*Artifact, error) { //nolint:gocritic // hugeParam: value semantics intentional, changing to pointer would require updating all callers including MCP handlers
 	if query == "" {
@@ -563,7 +535,7 @@ func (p *Protocol) SearchArtifacts(ctx context.Context, query string, in ListInp
 	if ftsErr == nil && len(ftsIDs) > 0 { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity
 		scopeFilter := Filter{Labels: in.Labels}
 		if in.Scope != "" {
-			scopeFilter.Scope = in.Scope
+			scopeFilter.Labels = append(scopeFilter.Labels, LabelPrefixScope+in.Scope)
 		} else if len(p.scopes) > 0 {
 			scopeFilter.Scopes = p.scopes
 		}
@@ -584,7 +556,7 @@ func (p *Protocol) SearchArtifacts(ctx context.Context, query string, in ListInp
 	// Fallback: in-memory substring scan
 	f := Filter{Labels: in.Labels}
 	if in.Scope != "" {
-		f.Scope = in.Scope
+		f.Labels = append(f.Labels, LabelPrefixScope+in.Scope)
 	} else if len(p.scopes) > 0 {
 		f.Scopes = p.scopes
 	}
@@ -720,15 +692,15 @@ func (p *Protocol) inferScope(ctx context.Context, explicit, parentID, kind stri
 	// Templates and config artifacts can be global (scopeless)
 	if kind == KindTemplate || kind == KindConfig {
 		if parentID != "" {
-			if parent, err := p.store.Get(ctx, parentID); err == nil && parent.Scope != "" {
-				return parent.Scope, nil
+			if parent, err := p.store.Get(ctx, parentID); err == nil && parent.Scope() != "" {
+				return parent.Scope(), nil
 			}
 		}
 		return "", nil
 	}
 	if parentID != "" {
-		if parent, err := p.store.Get(ctx, parentID); err == nil && parent.Scope != "" {
-			return parent.Scope, nil
+		if parent, err := p.store.Get(ctx, parentID); err == nil && parent.Scope() != "" {
+			return parent.Scope(), nil
 		}
 	}
 	if len(p.scopes) == 1 {
@@ -976,7 +948,7 @@ func (p *Protocol) SearchSemantic(ctx context.Context, query string, in ListInpu
 		if err != nil {
 			continue
 		}
-		if in.Scope != "" && art.Scope != in.Scope {
+		if in.Scope != "" && art.Scope() != in.Scope {
 			continue
 		}
 		results = append(results, ScoredArtifact{Artifact: art, Score: hit.Score})

@@ -170,7 +170,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		if value == "" {
 			return Result{ID: id, Error: "scope cannot be empty"}
 		}
-		art.Scope = value
+		art.Labels = mirrorLabel(art.Labels, LabelPrefixScope, value)
 	case FieldStatus:
 		return p.setStatusForce(ctx, art, value, opt.Force || opt.BypassGuards)
 	case FieldParent:
@@ -189,10 +189,8 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		if value != "" && !p.schema.ValidPriority(value) {
 			return Result{ID: id, Error: fmt.Sprintf("invalid priority %q — valid: %s", value, strings.Join(p.schema.Priorities, ", "))}
 		}
-		art.Priority = value
 		art.Labels = mirrorLabel(art.Labels, LabelPrefixPriority, value)
 	case FieldSprint:
-		art.Sprint = value
 		art.Labels = mirrorLabel(art.Labels, LabelPrefixSprint, value)
 	case FieldKind:
 		if err := ValidateKind(value, p.vocab); err != nil {
@@ -233,7 +231,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 	if err := p.store.Put(ctx, art); err != nil {
 		return Result{ID: id, Error: err.Error()}
 	}
-	p.emitEvent(ctx, EventUpdated, art.ID, art.Scope, map[string]string{"field": field, "value": value})
+	p.emitEvent(ctx, EventUpdated, art.ID, art.Scope(), map[string]string{"field": field, "value": value})
 
 	// scope+rename_id: generate a new ID from the new scope's key and migrate.
 	if field == FieldScope && opt.RenameID { //nolint:nestif // scope key resolution has legitimate branching; splitting into helper would just move it
@@ -338,7 +336,7 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 	if err := p.store.Put(ctx, art); err != nil {
 		return Result{ID: art.ID, Error: err.Error()}
 	}
-	p.emitEvent(ctx, EventStatusChanged, art.ID, art.Scope, map[string]string{"from": oldStatus, "to": status})
+	p.emitEvent(ctx, EventStatusChanged, art.ID, art.Scope(), map[string]string{"from": oldStatus, "to": status})
 
 	slog.InfoContext(ctx, "lifecycle transition",
 		slog.String(LogKeyID, art.ID),

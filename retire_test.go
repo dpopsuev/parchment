@@ -122,8 +122,8 @@ func TestVacuum_SkipsRetired(t *testing.T) {
 	old := time.Now().Add(-100 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
 		ID:     "TSK-RETIRED-1",
-		Labels: []string{"kind:task", parchment.LabelPrefixStatus + parchment.StatusRetired},
-		Scope:  "test", Title: "old retired",
+		Labels: []string{"kind:task", parchment.LabelPrefixStatus + parchment.StatusRetired, "scope:test"},
+		Title:  "old retired",
 		UpdatedAt: old,
 	})
 
@@ -145,8 +145,8 @@ func TestVacuum_DeletesOldArchived(t *testing.T) {
 	old := time.Now().Add(-100 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
 		ID:     "TSK-ARCH-1",
-		Labels: []string{"kind:task", parchment.LabelPrefixStatus + parchment.StatusArchived},
-		Scope:  "test", Title: "old archived",
+		Labels: []string{"kind:task", parchment.LabelPrefixStatus + parchment.StatusArchived, "scope:test"},
+		Title:  "old archived",
 		UpdatedAt: old,
 	})
 
@@ -175,8 +175,8 @@ func TestVacuum_SkipsNonVacuumableKind(t *testing.T) {
 	old := time.Now().Add(-100 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
 		ID:     "NOT-1",
-		Labels: []string{"kind:note", parchment.LabelPrefixStatus + parchment.StatusArchived},
-		Scope:  "test", Title: "old note",
+		Labels: []string{"kind:note", parchment.LabelPrefixStatus + parchment.StatusArchived, "scope:test"},
+		Title:  "old note",
 		UpdatedAt: old,
 	})
 
@@ -200,8 +200,7 @@ func TestVacuum_SkipsProtectedLabelTrait(t *testing.T) {
 	old := time.Now().Add(-100 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
 		ID:     "RUL-OLD-1",
-		Labels: []string{"kind:rule", parchment.LabelPrefixStatus + parchment.StatusArchived, "rule"},
-		Scope:  "global",
+		Labels: []string{"kind:rule", parchment.LabelPrefixStatus + parchment.StatusArchived, "rule", "scope:global"},
 		Title:  "old rule",
 		UpdatedAt: old,
 	})

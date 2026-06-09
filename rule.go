@@ -78,8 +78,7 @@ func SeedRules(ctx context.Context, s Store) {
 // Invalid rule artifacts are logged and skipped — they never block startup.
 func (p *Protocol) LoadRules(ctx context.Context) ([]*RuleDef, error) {
 	arts, err := p.store.List(ctx, Filter{
-		Labels: []string{LabelPrefixKind + KindRule},
-		Scope:  SchemaScope,
+		Labels: []string{LabelPrefixKind + KindRule, LabelPrefixScope + SchemaScope},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("load rules: %w", err)
@@ -106,10 +105,9 @@ func seedRulesFromRegistry(ctx context.Context, s Store) {
 			continue
 		}
 		art := &Artifact{
-			ID:         id,
-			Labels:     []string{LabelPrefixKind + KindRule, LabelPrefixStatus + StatusActive},
-			Scope:      SchemaScope,
-			Title:      r.Name,
+			ID:     id,
+			Labels: []string{LabelPrefixKind + KindRule, LabelPrefixStatus + StatusActive, LabelPrefixScope + SchemaScope},
+			Title:  r.Name,
 			CreatedAt:  now,
 			UpdatedAt:  now,
 			InsertedAt: now,
@@ -304,9 +302,9 @@ func fieldValue(field string, art *Artifact, toStatus string) string {
 	case "status":
 		return art.ResolvedStatus()
 	case "priority":
-		return art.Priority
+		return art.Priority()
 	case FieldScope:
-		return art.Scope
+		return art.Scope()
 	default:
 		return "" // unknown field — treated as empty
 	}

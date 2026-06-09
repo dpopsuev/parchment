@@ -16,17 +16,17 @@ func RenderMarkdown(art *Artifact) string { //nolint:gocyclo // display logic is
 
 	renderWriteField(&b, "Kind", art.ResolvedKind())
 	renderWriteField(&b, "Status", art.ResolvedStatus())
-	if art.Scope != "" {
-		renderWriteField(&b, "Scope", art.Scope)
+	if art.Scope() != "" {
+		renderWriteField(&b, "Scope", art.Scope())
 	}
 	if art.Parent != "" {
 		renderWriteField(&b, "Parent", art.Parent)
 	}
-	if art.Priority != "" {
-		renderWriteField(&b, "Priority", art.Priority)
+	if art.Priority() != "" {
+		renderWriteField(&b, "Priority", art.Priority())
 	}
-	if art.Sprint != "" {
-		renderWriteField(&b, "Sprint", art.Sprint)
+	if art.Sprint() != "" {
+		renderWriteField(&b, "Sprint", art.Sprint())
 	}
 	if len(art.DependsOn) > 0 {
 		renderWriteField(&b, "Depends On", strings.Join(art.DependsOn, ", "))
@@ -68,7 +68,7 @@ func RenderTable(arts []*Artifact) string {
 	hasParent := false
 	hasDeps := false
 	for _, a := range arts {
-		if a.Sprint != "" {
+		if a.Sprint() != "" {
 			hasSprint = true
 		}
 		if a.Parent != "" {
@@ -98,7 +98,7 @@ func RenderTable(arts []*Artifact) string {
 	writeRow("----", "----", "-----", "------", "------", "------", "----------", "-----")
 	for _, a := range arts {
 		deps := strings.Join(a.DependsOn, ",")
-		writeRow(a.ID, a.ResolvedKind(), a.Scope, a.ResolvedStatus(), a.Sprint, a.Parent, deps, a.Title)
+		writeRow(a.ID, a.ResolvedKind(), a.Scope(), a.ResolvedStatus(), a.Sprint(), a.Parent, deps, a.Title)
 	}
 
 	fmt.Fprintf(&b, "\n(%d artifacts)\n", len(arts))
@@ -155,18 +155,18 @@ func RenderGroupedTable(arts []*Artifact, field string, statusOrder ...[]string)
 		}
 		fmt.Fprintf(&b, "\n=== %s (%d) ===\n", strings.ToUpper(label), len(items))
 		for _, a := range items {
-			scope := ""
-			if a.Scope != "" {
-				scope = "[" + a.Scope + "] "
-			}
-			parent := ""
-			if a.Parent != "" {
-				parent = " (parent: " + a.Parent + ")"
-			}
-			sprint := ""
-			if a.Sprint != "" {
-				sprint = " (sprint: " + a.Sprint + ")"
-			}
+		scope := ""
+		if a.Scope() != "" {
+			scope = "[" + a.Scope() + "] "
+		}
+		parent := ""
+		if a.Parent != "" {
+			parent = " (parent: " + a.Parent + ")"
+		}
+		sprint := ""
+		if a.Sprint() != "" {
+			sprint = " (sprint: " + a.Sprint() + ")"
+		}
 			fmt.Fprintf(&b, "  %-20s %-15s %s%s%s%s\n", a.ID, a.ResolvedKind(), scope, a.Title, parent, sprint)
 		}
 	}
@@ -181,7 +181,7 @@ func RenderGroupedTableByScopeLabel(arts []*Artifact, scopeLabels map[string][]s
 	}
 	groups := make(map[string][]*Artifact)
 	for _, a := range arts {
-		labels := scopeLabels[a.Scope]
+		labels := scopeLabels[a.Scope()]
 		if len(labels) == 0 {
 			groups["(unlabeled)"] = append(groups["(unlabeled)"], a)
 		} else {
@@ -232,22 +232,24 @@ func RenderVaultMarkdown(art *Artifact) string {
 	}
 	fmt.Fprintf(&b, "kind: %s\n", art.ResolvedKind())
 	fmt.Fprintf(&b, "status: %s\n", art.ResolvedStatus())
-	if art.Scope != "" {
-		fmt.Fprintf(&b, "scope: %s\n", art.Scope)
+	if art.Scope() != "" {
+		fmt.Fprintf(&b, "scope: %s\n", art.Scope())
 	}
 	if art.Parent != "" {
 		fmt.Fprintf(&b, "parent: %s\n", art.Parent)
 	}
-	if art.Priority != "" {
-		fmt.Fprintf(&b, "priority: %s\n", art.Priority)
+	if art.Priority() != "" {
+		fmt.Fprintf(&b, "priority: %s\n", art.Priority())
 	}
-	if art.Sprint != "" {
-		fmt.Fprintf(&b, "sprint: %s\n", art.Sprint)
+	if art.Sprint() != "" {
+		fmt.Fprintf(&b, "sprint: %s\n", art.Sprint())
 	}
-	// kind: and status: are emitted as separate top-level fields; exclude from labels.
+	// kind:, status:, scope: are emitted as separate top-level fields; exclude from labels.
 	var userLabels []string
 	for _, l := range art.Labels {
-		if !strings.HasPrefix(l, LabelPrefixKind) && !strings.HasPrefix(l, LabelPrefixStatus) {
+		if !strings.HasPrefix(l, LabelPrefixKind) &&
+			!strings.HasPrefix(l, LabelPrefixStatus) &&
+			!strings.HasPrefix(l, LabelPrefixScope) {
 			userLabels = append(userLabels, l)
 		}
 	}
@@ -337,13 +339,13 @@ func vaultApplyFrontmatterField(art *Artifact, key, val string) { //nolint:cyclo
 	case FieldStatus:
 		art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, val)
 	case FieldScope:
-		art.Scope = val
+		art.Labels = mirrorLabel(art.Labels, LabelPrefixScope, val)
 	case FieldParent:
 		art.Parent = val
 	case FieldPriority:
-		art.Priority = val
+		art.Labels = mirrorLabel(art.Labels, LabelPrefixPriority, val)
 	case FieldSprint:
-		art.Sprint = val
+		art.Labels = mirrorLabel(art.Labels, LabelPrefixSprint, val)
 	case FieldLabels:
 		for _, l := range strings.Split(strings.Trim(val, "[]"), ",") {
 			if l = strings.TrimSpace(l); l != "" {
@@ -437,11 +439,11 @@ func renderGroupKey(a *Artifact, field string) string {
 	case FieldStatus:
 		return a.ResolvedStatus()
 	case FieldScope:
-		return a.Scope
+		return a.Scope()
 	case FieldKind:
 		return a.ResolvedKind()
 	case "sprint":
-		return a.Sprint
+		return a.Sprint()
 	default:
 		return a.ResolvedStatus()
 	}

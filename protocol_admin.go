@@ -116,7 +116,7 @@ func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force boo
 	maxAge := time.Duration(days) * 24 * time.Hour
 	f := Filter{Labels: []string{LabelPrefixStatus + StatusArchived}}
 	if scope != "" {
-		f.Scope = scope
+		f.Labels = append(f.Labels, LabelPrefixScope+scope)
 	}
 	arts, err := p.store.List(ctx, f)
 	if err != nil {
@@ -276,7 +276,7 @@ type OrphanInput struct {
 func (p *Protocol) DetectOrphans(ctx context.Context, in OrphanInput) (*OrphanReport, error) {
 	f := Filter{}
 	if in.Scope != "" {
-		f.Scope = in.Scope
+		f.Labels = append(f.Labels, LabelPrefixScope+in.Scope)
 	} else if len(p.scopes) > 0 {
 		f.Scopes = p.scopes
 	}
@@ -398,9 +398,9 @@ func (p *Protocol) ListScopeInfo(ctx context.Context) ([]ScopeInfo, error) {
 // Each line is a complete artifact with sections, edges, and metadata.
 func (p *Protocol) Export(ctx context.Context, w io.Writer, scope string) (int, error) {
 	slog.InfoContext(ctx, "export start", slog.String(LogKeyScope, scope))
-	filter := Filter{ExcludeScope: SchemaScope}
+	filter := Filter{ExcludeLabels: []string{LabelPrefixScope + SchemaScope}}
 	if scope != "" {
-		filter.Scope = scope
+		filter.Labels = append(filter.Labels, LabelPrefixScope+scope)
 	}
 	arts, err := p.store.List(ctx, filter)
 	if err != nil {
@@ -467,7 +467,8 @@ func (p *Protocol) GetConfig(ctx context.Context, key, scope string) string {
 	kindStatusLabels := []string{LabelPrefixKind + KindConfig, LabelPrefixStatus + StatusActive}
 	// 1. Try scoped config
 	if scope != "" {
-		configs, _ := p.store.List(ctx, Filter{Labels: kindStatusLabels, Scope: scope})
+		scopedLabels := append(kindStatusLabels, LabelPrefixScope+scope) //nolint:gocritic // intentional append to new slice; kindStatusLabels is a local literal
+		configs, _ := p.store.List(ctx, Filter{Labels: scopedLabels})
 		for _, cfg := range configs {
 			for _, sec := range cfg.Sections {
 				if sec.Name == key {
@@ -477,7 +478,7 @@ func (p *Protocol) GetConfig(ctx context.Context, key, scope string) string {
 		}
 	}
 	// 2. Try global (scopeless) config
-	configs, _ := p.store.List(ctx, Filter{Labels: kindStatusLabels, Scope: ""})
+	configs, _ := p.store.List(ctx, Filter{Labels: kindStatusLabels})
 	for _, cfg := range configs {
 		for _, sec := range cfg.Sections {
 			if sec.Name == key {
@@ -541,9 +542,9 @@ type CheckReport struct {
 
 // Check walks all artifacts and validates each against the resolved schema.
 func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error) { //nolint:gocyclo,funlen // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol.go
-	f := Filter{ExcludeScope: SchemaScope}
+	f := Filter{ExcludeLabels: []string{LabelPrefixScope + SchemaScope}}
 	if scope != "" {
-		f.Scope = scope
+		f.Labels = append(f.Labels, LabelPrefixScope+scope)
 	} else if len(p.scopes) > 0 {
 		f.Scopes = p.scopes
 	}
@@ -743,7 +744,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		if p.IsTerminal(art.ResolvedStatus()) {
 			continue
 		}
-		key := scopeKindTitle{art.Scope, art.ResolvedKind(), art.Title}
+		key := scopeKindTitle{art.Scope(), art.ResolvedKind(), art.Title}
 		titleGroups[key] = append(titleGroups[key], art.ID)
 		if titleGroupLabels[key] == nil {
 			titleGroupLabels[key] = art.Labels
@@ -792,7 +793,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		}
 	}
 	for _, art := range arts {
-		expectedKey, ok := keyByScope[art.Scope]
+		expectedKey, ok := keyByScope[art.Scope()]
 		if !ok {
 			continue
 		}
@@ -801,7 +802,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 			report.Violations = append(report.Violations, CheckViolation{
 				ID: art.ID, Labels: art.Labels, Title: art.Title,
 				Category: "id_prefix_mismatch",
-				Detail:   fmt.Sprintf("ID prefix %q does not match scope %q key %q", prefix, art.Scope, expectedKey),
+				Detail:   fmt.Sprintf("ID prefix %q does not match scope %q key %q", prefix, art.Scope(), expectedKey),
 			})
 		}
 	}

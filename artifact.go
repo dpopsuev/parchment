@@ -11,14 +11,11 @@ type Artifact struct {
 	UID         string              `json:"uid,omitempty"`
 	ID          string              `json:"id"`
 	Alias       string              `json:"alias,omitempty"`
-	Scope       string              `json:"scope,omitempty"`
 	Parent      string              `json:"parent,omitempty"`
 	Title       string              `json:"title"`
 	Goal        string              `json:"goal,omitempty"`
 	DependsOn   []string            `json:"depends_on,omitempty"`
 	Labels      []string            `json:"labels,omitempty"`
-	Priority    string              `json:"priority,omitempty"`
-	Sprint      string              `json:"sprint,omitempty"`
 	Sections    []Section           `json:"sections,omitempty"`
 	Links       map[string][]string `json:"links,omitempty"`
 	Extra       map[string]any      `json:"extra,omitempty"`
@@ -109,28 +106,25 @@ type IDConfig struct {
 
 // Filter constrains artifact list/query operations.
 type Filter struct {
-	Family          string            // restrict to a kind family (intent, effort, knowledge, support)
-	FamilyKinds     map[string]bool   // populated at query time: kind → true for the requested family
-	ExcludeScope    string // exclude artifacts with this scope (used to hide _schema)
-	IDPrefix        string // match artifacts whose ID starts with this prefix
-	Scope           string
-	// ScopePrefix enables hierarchical scope matching: Scope='org/project' matches
-	// 'org/project' and any 'org/project/*' sub-scope. Strict (false) is the default
-	// exact-match behavior.
-	ScopePrefix     bool
-	Scopes          []string // multi-scope IN filter (takes precedence over Scope when non-empty)
-	Parent          string
-	Sprint          string
-	Labels          []string
-	LabelsOr        []string
-	ExcludeLabels   []string
-	ScopeLabelIndex map[string][]string // populated at query time: label -> matching scopes
-	CreatedAfter    string
-	CreatedBefore   string
-	UpdatedAfter    string
-	UpdatedBefore   string
-	InsertedAfter   string
-	InsertedBefore  string
+	Family      string          // restrict to a kind family (intent, effort, knowledge, support)
+	FamilyKinds map[string]bool // populated at query time: kind → true for the requested family
+	IDPrefix    string          // match artifacts whose ID starts with this prefix
+	// ScopePrefix enables hierarchical scope matching when a scope: label is in Labels:
+	// scope:org/project matches 'org/project' and any 'org/project/*' sub-scope.
+	ScopePrefix bool
+	// Scopes is a multi-scope OR query modifier (scope IN [...]); it is not an Artifact field.
+	// Maps to a column-level IN predicate rather than a label lookup.
+	Scopes         []string
+	Parent         string
+	Labels         []string
+	LabelsOr       []string
+	ExcludeLabels  []string
+	CreatedAfter   string
+	CreatedBefore  string
+	UpdatedAfter   string
+	UpdatedBefore  string
+	InsertedAfter  string
+	InsertedBefore string
 	// Pagination — used by ListPage. Limit=0 with no Cursor returns all (existing behavior).
 	Limit  int
 	Cursor string // opaque; encodes (inserted_at, id) from the previous page's last element
@@ -158,33 +152,20 @@ const LabelPrefixPriority = "priority:"
 // LabelPrefixSprint is the label namespace for sprint assignment.
 const LabelPrefixSprint = "sprint:"
 
-// ResolvedPriority returns the artifact's priority. The Priority field is
-// authoritative; if empty, the first "priority:<value>" label is used.
-func (a *Artifact) ResolvedPriority() string {
-	if a.Priority != "" {
-		return a.Priority
-	}
-	for _, l := range a.Labels {
-		if strings.HasPrefix(l, LabelPrefixPriority) {
-			return strings.TrimPrefix(l, LabelPrefixPriority)
-		}
-	}
-	return ""
-}
+// Scope returns the artifact's scope derived from its labels.
+func (a *Artifact) Scope() string { return labelValue(a.Labels, LabelPrefixScope) }
 
-// ResolvedSprint returns the artifact's sprint. The Sprint field is
-// authoritative; if empty, the first "sprint:<value>" label is used.
-func (a *Artifact) ResolvedSprint() string {
-	if a.Sprint != "" {
-		return a.Sprint
-	}
-	for _, l := range a.Labels {
-		if strings.HasPrefix(l, LabelPrefixSprint) {
-			return strings.TrimPrefix(l, LabelPrefixSprint)
-		}
-	}
-	return ""
-}
+// Priority returns the artifact's priority derived from its labels.
+func (a *Artifact) Priority() string { return labelValue(a.Labels, LabelPrefixPriority) }
+
+// Sprint returns the artifact's sprint derived from its labels.
+func (a *Artifact) Sprint() string { return labelValue(a.Labels, LabelPrefixSprint) }
+
+// ResolvedPriority is an alias for Priority, kept for call sites not yet updated.
+func (a *Artifact) ResolvedPriority() string { return a.Priority() }
+
+// ResolvedSprint is an alias for Sprint, kept for call sites not yet updated.
+func (a *Artifact) ResolvedSprint() string { return a.Sprint() }
 
 // MirrorLabel replaces any existing label with the given prefix with a new
 // one built from prefix+value. If value is empty the label is simply removed.
@@ -230,21 +211,10 @@ func (a *Artifact) ResolvedKind() string { return a.Kind() }
 // ResolvedStatus is an alias for Status, kept for call sites not yet updated.
 func (a *Artifact) ResolvedStatus() string { return a.Status() }
 
-// ResolvedScope returns the artifact's scope. The Scope field is authoritative;
-// if empty, the first "scope:<value>" label is used.
-func (a *Artifact) ResolvedScope() string {
-	if a.Scope != "" {
-		return a.Scope
-	}
-	for _, l := range a.Labels {
-		if strings.HasPrefix(l, LabelPrefixScope) {
-			return strings.TrimPrefix(l, LabelPrefixScope)
-		}
-	}
-	return ""
-}
+// ResolvedScope is an alias for Scope, kept for call sites not yet updated.
+func (a *Artifact) ResolvedScope() string { return a.Scope() }
 
-func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic // hugeParam: Filter is read-only in all callers; pointer would complicate call sites
+func (f Filter) Matches(art *Artifact) bool { //nolint:gocritic // hugeParam: Filter is read-only in all callers; pointer would complicate call sites
 	if f.Family != "" && len(f.FamilyKinds) > 0 {
 		if !f.FamilyKinds[art.ResolvedKind()] {
 			return false
@@ -253,13 +223,10 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic /
 	if f.IDPrefix != "" && !strings.HasPrefix(art.ID, f.IDPrefix) {
 		return false
 	}
-	if f.ExcludeScope != "" && art.ResolvedScope() == f.ExcludeScope {
-		return false
-	}
-	if len(f.Scopes) > 0 { //nolint:nestif // scope filter has legitimate branching; splitting would reduce clarity
+	if len(f.Scopes) > 0 {
 		found := false
 		for _, s := range f.Scopes {
-			if art.ResolvedScope() == s {
+			if art.Scope() == s {
 				found = true
 				break
 			}
@@ -267,19 +234,8 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:cyclop,gocyclo,gocritic /
 		if !found {
 			return false
 		}
-	} else if f.Scope != "" {
-		if f.ScopePrefix {
-			if art.ResolvedScope() != f.Scope && !strings.HasPrefix(art.ResolvedScope(), f.Scope+"/") {
-				return false
-			}
-		} else if art.ResolvedScope() != f.Scope {
-			return false
-		}
 	}
 	if f.Parent != "" && art.Parent != f.Parent {
-		return false
-	}
-	if f.Sprint != "" && art.ResolvedSprint() != f.Sprint {
 		return false
 	}
 	return f.MatchLabels(art)
@@ -317,19 +273,11 @@ func (f Filter) MatchLabels(art *Artifact) bool { //nolint:gocritic // hugeParam
 	return true
 }
 
-// labelCheck returns true if the artifact has the label directly
-// or its scope carries the label (via the pre-populated ScopeLabelIndex).
+// labelCheck returns true if the artifact has the given label.
 func (f Filter) labelCheck(label string, art *Artifact) bool { //nolint:gocritic // hugeParam: Filter is read-only in all callers; pointer would complicate call sites
 	for _, l := range art.Labels {
 		if l == label {
 			return true
-		}
-	}
-	if f.ScopeLabelIndex != nil {
-		for _, s := range f.ScopeLabelIndex[label] {
-			if art.ResolvedScope() == s {
-				return true
-			}
 		}
 	}
 	return false

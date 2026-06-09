@@ -74,8 +74,7 @@ func seedEdgeType(t *testing.T, store parchment.Store, name string, trait parchm
 	extra := parchment.EdgeTypeTraitToExtra(trait)
 	if err := store.Put(ctx, &parchment.Artifact{
 		ID:     "EDT-" + name,
-		Labels: []string{"kind:edge_type_definition", "status:active"},
-		Scope:  "_schema",
+		Labels: []string{"kind:edge_type_definition", "status:active", "scope:_schema"},
 		Title:  name, Extra: extra,
 		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	}); err != nil {

@@ -68,7 +68,7 @@ func (p *Protocol) Seed(ctx context.Context, dir string) (*SeedResult, error) {
 				return result, fmt.Errorf("seed %s: %w", art.ID, err)
 			}
 			result.Created = append(result.Created, art.ID)
-			slog.InfoContext(ctx, "seed: created config", slog.String(LogKeyID, art.ID), slog.String(LogKeyScope, art.Scope))
+			slog.InfoContext(ctx, "seed: created config", slog.String(LogKeyID, art.ID), slog.String(LogKeyScope, art.Scope()))
 		}
 	}
 
@@ -106,12 +106,12 @@ func ParseMDFile(path string) (*Artifact, error) { //nolint:gosec,gocyclo,cyclop
 					art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, val)
 				case "title":
 					art.Title = val
-				case FieldScope:
-					art.Scope = val
-				case "status":
-					art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, val)
-				case "priority":
-					art.Priority = val
+			case FieldScope:
+				art.Labels = mirrorLabel(art.Labels, LabelPrefixScope, val)
+			case "status":
+				art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, val)
+			case "priority":
+				art.Labels = mirrorLabel(art.Labels, LabelPrefixPriority, val)
 				case "parent":
 					art.Parent = val
 				case "labels":
@@ -199,10 +199,13 @@ func parseConfigFile(path string) (*Artifact, error) {
 		scope = ""
 	}
 
+	labels := []string{LabelPrefixKind + KindConfig, LabelPrefixStatus + StatusActive}
+	if scope != "" {
+		labels = append(labels, LabelPrefixScope+scope)
+	}
 	art := &Artifact{
 		ID:     "CFG-SEED-" + strings.ToUpper(strings.ReplaceAll(base, "-", "_")),
-		Labels: []string{LabelPrefixKind + KindConfig, LabelPrefixStatus + StatusActive},
-		Scope:  scope,
+		Labels: labels,
 		Title:  base + " config",
 	}
 

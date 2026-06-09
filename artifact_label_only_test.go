@@ -22,7 +22,7 @@ func TestArtifact_ScanHydration_KindFromLabel(t *testing.T) {
 
 	ctx := context.Background()
 	art := &parchment.Artifact{
-		ID: "TEST-1", Scope: "test",
+		ID:     "TEST-1",
 		Title:  "hydration test",
 		Labels: []string{"kind:task", "scope:test", "status:active"},
 	}
@@ -38,8 +38,8 @@ func TestArtifact_ScanHydration_KindFromLabel(t *testing.T) {
 	if got.ResolvedKind() != "task" {
 		t.Errorf("scan hydration failed: ResolvedKind()=%q, want 'task' from label", got.ResolvedKind())
 	}
-	if got.Scope != "test" {
-		t.Errorf("scan hydration failed: Scope=%q, want 'test' from label", got.Scope)
+	if got.Scope() != "test" {
+		t.Errorf("scan hydration failed: Scope()=%q, want 'test' from label", got.Scope())
 	}
 	if got.ResolvedStatus() != "active" {
 		t.Errorf("scan hydration failed: ResolvedStatus()=%q, want 'active' from label", got.ResolvedStatus())
@@ -61,7 +61,6 @@ func TestArtifact_ScanHydration_ListAlsoHydrates(t *testing.T) {
 	for i, kind := range []string{"task", "spec", "bug"} {
 		art := &parchment.Artifact{
 			ID:     "TEST-" + kind,
-			Scope:  "test",
 			Title:  "test " + kind,
 			Labels: []string{"kind:" + kind, "scope:test", "status:draft"},
 		}

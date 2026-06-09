@@ -242,7 +242,10 @@ func (p *Protocol) DetectEvictionCandidates(ctx context.Context, policy Eviction
 		window = 90
 	}
 
-	f := Filter{Scope: policy.Scope}
+	f := Filter{}
+	if policy.Scope != "" {
+		f.Labels = append(f.Labels, LabelPrefixScope+policy.Scope)
+	}
 	if len(policy.Kinds) > 0 {
 		// For simplicity with multiple kinds, iterate per kind.
 		// For now treat first kind as filter; caller can aggregate.

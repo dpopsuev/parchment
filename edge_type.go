@@ -34,7 +34,7 @@ type EdgeTypeTrait struct {
 func (e EdgeTypeTrait) ConflictPolicy() ConflictPolicy { return ConflictUnion }
 
 func loadEdgeTypeTraits(ctx context.Context, s Store) map[string]EdgeTypeTrait {
-	arts, err := s.List(ctx, Filter{Labels: []string{LabelPrefixKind + KindEdgeTypeDefinition}, Scope: SchemaScope})
+	arts, err := s.List(ctx, Filter{Labels: []string{LabelPrefixKind + KindEdgeTypeDefinition, LabelPrefixScope + SchemaScope}})
 	if err != nil {
 		slog.WarnContext(ctx, "load edge type traits: list failed", slog.Any(LogKeyError, err))
 		return nil
@@ -213,10 +213,9 @@ func SeedEdgeTypeTraits(ctx context.Context, s Store) {
 			continue
 		}
 		art := &Artifact{
-			ID:         id,
-			Labels:     []string{LabelPrefixKind + KindEdgeTypeDefinition, LabelPrefixStatus + StatusActive},
-			Scope:      SchemaScope,
-			Title:      et.name,
+			ID:     id,
+			Labels: []string{LabelPrefixKind + KindEdgeTypeDefinition, LabelPrefixStatus + StatusActive, LabelPrefixScope + SchemaScope},
+			Title:  et.name,
 			Extra:      edgeTypeTraitToExtra(et.trait),
 			CreatedAt:  now,
 			UpdatedAt:  now,

@@ -19,8 +19,7 @@ func TestSeedEdgeTypeTraits_PopulatesRegistry(t *testing.T) {
 	parchment.SeedEdgeTypeTraits(ctx, s)
 
 	arts, err := s.List(ctx, parchment.Filter{
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition},
-		Scope:  parchment.SchemaScope,
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixScope + parchment.SchemaScope},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -61,9 +60,9 @@ func TestBond_RejectsWhenMaxOutgoingExceeded(t *testing.T) {
 	now := time.Now().UTC()
 	if err := s.Put(ctx, &parchment.Artifact{
 		ID:     "EDT-owns",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
-		Scope:  parchment.SchemaScope, Title: "owns",
-		Extra: map[string]any{"max_outgoing": float64(1)},
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope},
+		Title:  "owns",
+		Extra:  map[string]any{"max_outgoing": float64(1)},
 		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	}); err != nil {
 		t.Fatal(err)
@@ -97,8 +96,8 @@ func TestValidRelation_AcceptsRegisteredEdgeType(t *testing.T) {
 	now := time.Now().UTC()
 	if err := s.Put(ctx, &parchment.Artifact{
 		ID:     "EDT-mentors",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
-		Scope:  parchment.SchemaScope, Title: "mentors",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope},
+		Title:  "mentors",
 		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	}); err != nil {
 		t.Fatal(err)
@@ -126,8 +125,8 @@ func TestLinkArtifacts_ErrorListsRegisteredRelations(t *testing.T) {
 	now := time.Now().UTC()
 	if err := s.Put(ctx, &parchment.Artifact{
 		ID:     "EDT-sponsors",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
-		Scope:  parchment.SchemaScope, Title: "sponsors",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope},
+		Title:  "sponsors",
 		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	}); err != nil {
 		t.Fatal(err)
@@ -154,8 +153,8 @@ func TestProtocol_RegisteredRelations_IncludesTraits(t *testing.T) {
 	now := time.Now().UTC()
 	if err := s.Put(ctx, &parchment.Artifact{
 		ID:     "EDT-coaches",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive},
-		Scope:  parchment.SchemaScope, Title: "coaches",
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope},
+		Title:  "coaches",
 		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	}); err != nil {
 		t.Fatal(err)

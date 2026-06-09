@@ -66,8 +66,8 @@ func TestSetField_SprintWritesLabel(t *testing.T) {
 
 func TestFilter_SprintMatchesLabelSprint(t *testing.T) {
 	art := &parchment.Artifact{Labels: []string{"sprint:2026-Q2"}}
-	f := parchment.Filter{Sprint: "2026-Q2"}
+	f := parchment.Filter{Labels: []string{"sprint:2026-Q2"}}
 	if !f.Matches(art) {
-		t.Error("Filter.Sprint=2026-Q2 should match artifact with labels[sprint:2026-Q2]")
+		t.Error("Filter with sprint label should match artifact with labels[sprint:2026-Q2]")
 	}
 }

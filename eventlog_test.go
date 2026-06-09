@@ -42,8 +42,8 @@ func TestEventLog_CreateArtifact_EmitsCreated(t *testing.T) {
 	if events[0].ArtifactID != art.ID {
 		t.Errorf("event artifact_id = %q, want %q", events[0].ArtifactID, art.ID)
 	}
-	if events[0].Scope != art.Scope {
-		t.Errorf("event scope = %q, want %q", events[0].Scope, art.Scope)
+	if events[0].Scope != art.Scope() {
+		t.Errorf("event scope = %q, want %q", events[0].Scope, art.Scope())
 	}
 }
 

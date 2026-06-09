@@ -286,7 +286,7 @@ func TestProtocol_SemanticRecall_BeatsFTSOnSemantic(t *testing.T) {
 	// Embeddings are supplied externally (by the librarian sidecar); the store holds them.
 	t.Parallel()
 	store := parchment.NewMemoryStore()
-	vocab := []string{"template", "conformance", "create", "promote", "draft",
+	vocab := []string{"template", "conformance", "create", "promote", "draft", "deferred",
 		"ptp", "clock", "holdover", "synchronization"}
 	embedFn := parchment.SemanticEmbeddingFunc(vocab)
 

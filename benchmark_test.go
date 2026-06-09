@@ -18,10 +18,7 @@ func benchStore(b *testing.B) (store *SQLiteStore, cleanup func()) {
 
 func benchProto(b *testing.B, store *SQLiteStore) *Protocol {
 	b.Helper()
-	return New(store, DefaultSchema(), []string{"bench"}, nil, ProtocolConfig{
-		IDFormat:  "scoped",
-		ScopeKeys: map[string]string{"bench": "BNC"},
-	})
+	return New(store, DefaultSchema(), []string{"bench"}, nil, ProtocolConfig{})
 }
 
 // seedArtifacts creates n artifacts and returns their IDs.
@@ -147,19 +144,12 @@ func BenchmarkSearch(b *testing.B) {
 	}
 }
 
-// BenchmarkNextScopedID — budget: > 10K/sec
-func BenchmarkNextScopedID(b *testing.B) {
-	s, cleanup := benchStore(b)
-	defer cleanup()
-	ctx := context.Background()
-
+// BenchmarkGenerateUUID — budget: > 100K/sec
+func BenchmarkGenerateUUID(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for range b.N {
-		_, err := s.NextScopedID(ctx, "BNC", "TSK")
-		if err != nil {
-			b.Fatal(err)
-		}
+		_ = GenerateUUID()
 	}
 }
 

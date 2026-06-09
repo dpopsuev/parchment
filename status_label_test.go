@@ -39,7 +39,7 @@ func TestFilter_ExcludeStatusMatchesLabelStatus(t *testing.T) {
 
 func TestSetField_StatusWritesLabel(t *testing.T) {
 	store := parchment.NewMemoryStore()
-	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{IDFormat: "sequential"})
+	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{})
 	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{Title: "status test",
 		Labels: []string{"kind:note"},})
 	if err != nil {

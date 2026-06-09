@@ -91,20 +91,8 @@ type GraphStore interface {
 	ListEdges(ctx context.Context, ids, relations []string) ([]Edge, error)
 }
 
-// SequenceStore handles atomic ID generation and counters.
-type SequenceStore interface {
-	NextID(ctx context.Context, prefix string) (string, error)
-	SeedSequence(ctx context.Context, prefix string, val uint64, force bool) error
-	NextScopedID(ctx context.Context, scopeKey, kindCode string) (string, error)
-	NextScopedAlias(ctx context.Context, scopeKey, kindCode string) (string, error)
-	NextSeq(ctx context.Context, key string) (int64, error)
-}
-
-// ScopeStore handles scope key registry and labels.
+// ScopeStore handles scope label registry.
 type ScopeStore interface {
-	GetScopeKey(ctx context.Context, scope string) (key string, auto bool, err error)
-	SetScopeKey(ctx context.Context, scope, key string, auto bool) error
-	ListScopeKeys(ctx context.Context) (map[string]string, error)
 	SetScopeLabels(ctx context.Context, scope string, labels []string) error
 	GetScopeLabels(ctx context.Context, scope string) ([]string, error)
 	ScopesByLabel(ctx context.Context, label string) ([]string, error)
@@ -115,7 +103,6 @@ type ScopeStore interface {
 type Store interface {
 	ArtifactStore
 	GraphStore
-	SequenceStore
 	ScopeStore
 	EventStore
 	Close() error

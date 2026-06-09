@@ -134,21 +134,18 @@ func TestMigrateID_UpdatesDependsOn(t *testing.T) {
 }
 
 func TestSetField_ScopeWithRenameID_MigratesID(t *testing.T) {
-	// Given: scope "alpha" has key "ALP" and an artifact ALP-TSK-001
-	// When: SetField(scope=beta) with rename_id=true (scope "beta" has key "BET")
-	// Then: artifact is moved to scope "beta" with new ID starting with BET
+	// Given: an artifact in scope "alpha"
+	// When: SetField(scope=beta) with rename_id=true
+	// Then: artifact gets a new UUID and moves to scope "beta"
 	t.Parallel()
 	dir := t.TempDir()
 	s, err := parchment.OpenSQLite(dir + "/test.db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer s.Close() //nolint:errcheck // deferred close in test
 
 	ctx := context.Background()
-	_ = s.SetScopeKey(ctx, "alpha", "ALP", false)
-	_ = s.SetScopeKey(ctx, "beta", "BET", false)
-
 	proto := parchment.New(s, nil, []string{"alpha", "beta"}, nil, parchment.ProtocolConfig{})
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "move me", Scope: "alpha",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
@@ -163,10 +160,12 @@ func TestSetField_ScopeWithRenameID_MigratesID(t *testing.T) {
 		t.Fatalf("SetField failed: %+v", results)
 	}
 
-	// Artifact should now be in scope beta with a BET- prefixed ID.
 	newID := results[0].NewID
 	if newID == "" {
 		t.Fatal("Result.NewID should be populated when rename_id=true")
+	}
+	if !parchment.IsUUIDShaped(newID) {
+		t.Errorf("new ID %q should be UUID-shaped", newID)
 	}
 	got, err := proto.GetArtifact(ctx, newID)
 	if err != nil {

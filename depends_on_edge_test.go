@@ -11,7 +11,7 @@ import (
 // the guard still fires.
 func TestGuardDependsOnComplete_ReadsEdge(t *testing.T) {
 	store := parchment.NewMemoryStore()
-	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{IDFormat: "sequential"})
+	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{})
 	ctx := t.Context()
 
 	// Create a dependency task and leave it draft (non-terminal).
@@ -40,7 +40,7 @@ func TestGuardDependsOnComplete_ReadsEdge(t *testing.T) {
 // derived from the depends_on edge even when the field was not explicitly set.
 func TestGetArtifact_DependsOnFromEdge(t *testing.T) {
 	store := parchment.NewMemoryStore()
-	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{IDFormat: "sequential"})
+	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{})
 	ctx := t.Context()
 
 	dep, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "dep",

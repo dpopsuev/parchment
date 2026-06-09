@@ -127,11 +127,6 @@ const (
 	LogKeyIncomingEdges  = "incoming_edges"
 )
 
-// ID format identifiers.
-const (
-	IDFormatUUID   = "uuid"
-)
-
 // Graph traversal directions.
 const (
 	DirOutbound = "outbound"

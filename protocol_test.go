@@ -2029,24 +2029,7 @@ func TestLint_DefaultSchemaIsClean(t *testing.T) {
 
 // --- Scope management ---
 
-func TestScopeKeys_SetAndList(t *testing.T) {
-	t.Parallel()
-	proto, _ := newProto(t)
-	ctx := context.Background()
 
-	err := proto.SetScopeKey(ctx, "my-project", "MYP")
-	if err != nil {
-		t.Fatalf("SetScopeKey: %v", err)
-	}
-
-	keys, err := proto.ListScopeKeys(ctx)
-	if err != nil {
-		t.Fatalf("ListScopeKeys: %v", err)
-	}
-	if keys["my-project"] != "MYP" {
-		t.Errorf("expected key 'MYP', got %q", keys["my-project"])
-	}
-}
 
 func TestScopeLabels_SetAndGet(t *testing.T) {
 	t.Parallel()
@@ -2072,7 +2055,6 @@ func TestListScopeInfo(t *testing.T) {
 	proto, _ := newProto(t)
 	ctx := context.Background()
 
-	proto.SetScopeKey(ctx, "test", "TST")
 	proto.SetScopeLabels(ctx, "test", []string{"backend"})
 
 	infos, err := proto.ListScopeInfo(ctx)

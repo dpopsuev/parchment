@@ -79,20 +79,15 @@ func TestProperty_Filter_Monotonic(t *testing.T) {
 	})
 }
 
-// Property: FormatScopedID produces SCOPE-KIND-SEQ format.
-func TestProperty_FormatScopedID_Format(t *testing.T) {
+// Property: GenerateUUID always produces valid UUID-shaped strings.
+func TestProperty_GenerateUUID_Shape(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		scope := rapid.StringMatching(`[A-Z]{2,4}`).Draw(t, "scope")
-		kind := rapid.StringMatching(`[A-Z]{3}`).Draw(t, "kind")
-		seq := rapid.IntRange(1, 9999).Draw(t, "seq")
-
-		id := FormatScopedID(scope, kind, seq)
-		if id == "" {
-			t.Fatal("empty ID")
+		id := GenerateUUID()
+		if !IsUUIDShaped(id) {
+			t.Fatalf("GenerateUUID produced non-UUID-shaped %q", id)
 		}
-		// Must contain all three components.
-		if len(id) < len(scope)+len(kind)+2 { // +2 for separators
-			t.Fatalf("ID %q too short for scope=%s kind=%s seq=%d", id, scope, kind, seq)
+		if len(id) != 36 {
+			t.Fatalf("UUID %q has wrong length %d, want 36", id, len(id))
 		}
 	})
 }

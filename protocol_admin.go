@@ -372,16 +372,6 @@ func (p *Protocol) VocabRemove(ctx context.Context, kind string) error {
 // Vocab returns the current vocabulary slice (for persistence by callers).
 func (p *Protocol) Vocab() []string { return p.vocab }
 
-// ListScopeKeys returns scope -> key mappings from the store.
-func (p *Protocol) ListScopeKeys(ctx context.Context) (map[string]string, error) {
-	return p.store.ListScopeKeys(ctx)
-}
-
-// SetScopeKey sets the key for a scope. auto=false for explicit mappings.
-func (p *Protocol) SetScopeKey(ctx context.Context, scope, key string) error {
-	return p.store.SetScopeKey(ctx, scope, key, false)
-}
-
 func (p *Protocol) SetScopeLabels(ctx context.Context, scope string, labels []string) error {
 	return p.store.SetScopeLabels(ctx, scope, labels)
 }
@@ -487,33 +477,6 @@ func (p *Protocol) GetConfig(ctx context.Context, key, scope string) string {
 		}
 	}
 	return ""
-}
-
-func (p *Protocol) generateTemplatedID(ctx context.Context, scope, kind string) (string, error) {
-	tmpl := p.idTemplate
-	scopeKey := ""
-	for _, c := range tmpl.Components {
-		if c.Type == FieldScope {
-			var err error
-			scopeKey, err = p.resolveScopeKey(ctx, scope)
-			if err != nil {
-				return "", err
-			}
-			break
-		}
-	}
-	idCtx := IDContext{
-		ScopeKey: scopeKey,
-		KindCode: p.resolveKindCode(kind),
-		Prefix:   p.schema.Prefix(kind),
-	}
-	seqKey := tmpl.SeqKey(idCtx)
-	seq, err := p.store.NextSeq(ctx, seqKey)
-	if err != nil {
-		return "", fmt.Errorf("generate templated ID: %w", err)
-	}
-	idCtx.Seq = seq
-	return tmpl.FormatTemplate(idCtx), nil
 }
 
 // Lint validates the schema and returns structured results.
@@ -780,30 +743,6 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 					Detail:   "no goal, no sections, no parent, no outgoing edges",
 				})
 			}
-		}
-	}
-
-	// ID prefix mismatch: artifact ID prefix does not match the scope's registered key.
-	// Non-blocking warning — the artifact is valid but was likely created in a different scope.
-	scopeKeys, _ := p.ListScopeKeys(ctx) // map[scope]key
-	keyByScope := make(map[string]string, len(scopeKeys))
-	for scope, key := range scopeKeys {
-		if key != "" {
-			keyByScope[scope] = strings.ToUpper(key)
-		}
-	}
-	for _, art := range arts {
-		expectedKey, ok := keyByScope[labelValue(art.Labels, LabelPrefixScope)]
-		if !ok {
-			continue
-		}
-		prefix := strings.SplitN(art.ID, "-", 2)[0]
-		if !strings.EqualFold(prefix, expectedKey) {
-			report.Violations = append(report.Violations, CheckViolation{
-				ID: art.ID, Labels: art.Labels, Title: art.Title,
-				Category: "id_prefix_mismatch",
-				Detail:   fmt.Sprintf("ID prefix %q does not match scope %q key %q", prefix, labelValue(art.Labels, LabelPrefixScope), expectedKey),
-			})
 		}
 	}
 

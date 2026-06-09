@@ -57,13 +57,8 @@ func (d *staticDefaults) GetDashboardStaleCap() int  { return d.staleCap }
 func (d *staticDefaults) GetBriefRecentHours() int   { return d.briefHours }
 func (d *staticDefaults) GetTreeMaxDepth() int       { return d.treeDepth }
 
-// ProtocolConfig configures scoped ID generation, key resolution, field mutability,
-// and runtime defaults for the Protocol.
+// ProtocolConfig configures field mutability and runtime defaults for the Protocol.
 type ProtocolConfig struct {
-	IDFormat         string
-	IDTemplate       *IDTemplate
-	ScopeKeys        map[string]string
-	KindCodes        map[string]string
 	MutableCreatedAt bool
 	Defaults         DefaultsProvider
 	ScopePolicies    map[string]ScopePolicy
@@ -79,16 +74,12 @@ type ProtocolConfig struct {
 type Protocol struct {
 	store            Store
 	schema           *Schema
-	registry         *ComponentRegistry      // reloadable trait + rule store (Step 9)
-	traits           *TraitStore             // deprecated: use registry.Traits()
-	labelTraits      map[string]LabelTrait   // deprecated: use registry.Traits().LabelMap()
+	registry         *ComponentRegistry       // reloadable trait + rule store (Step 9)
+	traits           *TraitStore              // deprecated: use registry.Traits()
+	labelTraits      map[string]LabelTrait    // deprecated: use registry.Traits().LabelMap()
 	edgeTypeTraits   map[string]EdgeTypeTrait // deprecated: use registry.Traits().EdgeMap()
 	scopes           []string
 	vocab            []string
-	idFormat         string
-	idTemplate       *IDTemplate
-	scopeKeys        map[string]string
-	kindCodes        map[string]string
 	mutableCreatedAt bool
 	defaults         DefaultsProvider
 	scopePolicies    map[string]ScopePolicy
@@ -134,10 +125,6 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 		// ComponentRegistry wraps the trait store and rules for hot-reload (Step 9).
 		p.registry = newComponentRegistry(s, p.traits, p.rules)
 	}
-	p.idFormat = idc.IDFormat
-	p.idTemplate = idc.IDTemplate
-	p.scopeKeys = idc.ScopeKeys
-	p.kindCodes = idc.KindCodes
 	p.mutableCreatedAt = idc.MutableCreatedAt
 	if idc.Defaults != nil {
 		p.defaults = idc.Defaults

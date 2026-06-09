@@ -12,7 +12,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -63,24 +62,12 @@ CREATE TABLE IF NOT EXISTS edges (
 );
 CREATE INDEX IF NOT EXISTS idx_edges_rev ON edges(to_id, relation, from_id);
 
-CREATE TABLE IF NOT EXISTS sequences (
-	prefix   TEXT PRIMARY KEY,
-	next_val INTEGER NOT NULL DEFAULT 1
-);
-
 CREATE TABLE IF NOT EXISTS scope_keys (
 	scope   TEXT PRIMARY KEY,
-	key     TEXT UNIQUE NOT NULL,
+	key     TEXT NOT NULL DEFAULT '',
 	auto    INTEGER NOT NULL DEFAULT 1,
 	created TEXT NOT NULL DEFAULT '',
 	labels  TEXT NOT NULL DEFAULT ''
-);
-
-CREATE TABLE IF NOT EXISTS scoped_sequences (
-	scope_key TEXT NOT NULL,
-	kind_code TEXT NOT NULL,
-	next_val  INTEGER NOT NULL DEFAULT 1,
-	PRIMARY KEY (scope_key, kind_code)
 );
 
 CREATE TABLE IF NOT EXISTS artifact_embeddings (
@@ -227,7 +214,7 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 		"ALTER TABLE artifacts ADD COLUMN inserted_at TEXT NOT NULL DEFAULT ''")
 	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: best-effort backfill
 		"UPDATE artifacts SET inserted_at = created_at WHERE inserted_at = ''")
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
+	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist (old DBs have key/auto columns)
 		"ALTER TABLE scope_keys ADD COLUMN labels TEXT NOT NULL DEFAULT ''")
 	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
 		"ALTER TABLE artifacts ADD COLUMN alias TEXT NOT NULL DEFAULT ''")
@@ -269,11 +256,6 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 		 SELECT a.id, json_each.value
 		 FROM artifacts a, json_each(a.labels)
 		 WHERE json_each.value != ''`)
-
-	// Reseed scoped sequences to avoid ID collisions with existing artifacts.
-	if err := reseedScopedSequences(writer); err != nil {
-		log.WarnContext(context.Background(), "reseed scoped sequences failed", slog.Any(LogKeyError, err))
-	}
 
 	ensureEventSchema(writer)
 
@@ -331,7 +313,7 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 func syncFTSInTx(ctx context.Context, tx *sql.Tx, old, cur *Artifact) error {
 	var rowid int64
 	if err := tx.QueryRowContext(ctx,
-		"SELECT rowid FROM artifacts WHERE uid = ?", cur.UID).Scan(&rowid); err != nil {
+		"SELECT rowid FROM artifacts WHERE id = ?", cur.ID).Scan(&rowid); err != nil {
 		return fmt.Errorf("fts rowid lookup: %w", err)
 	}
 	if old != nil {
@@ -381,69 +363,6 @@ func generateUID() string {
 	return hex.EncodeToString(b)
 }
 
-// reseedScopedSequences scans all artifacts and ensures scoped_sequences
-// counters are above the max existing sequence number for each scope+kind pair.
-// This prevents ID collisions with archived or migrated artifacts.
-func reseedScopedSequences(db *sql.DB) error {
-	rows, err := db.Query(`
-		SELECT sk.key, id FROM artifacts
-		JOIN scope_keys sk ON sk.scope = artifacts.scope
-		WHERE id LIKE '%-%-%'`)
-	if err != nil {
-		return err
-	}
-	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
-
-	// Track max seq per (scope_key, kind_code)
-	type seqKey struct{ scopeKey, kindCode string }
-	maxSeq := make(map[seqKey]int64)
-
-	for rows.Next() {
-		var scopeKey, id string
-		if err := rows.Scan(&scopeKey, &id); err != nil {
-			continue
-		}
-		// Parse ID: PROJ-TSK-91 → scopeKey=PROJ, kindCode=TSK, seq=91
-		parts := strings.SplitN(id, "-", 3)
-		if len(parts) != 3 || parts[0] != scopeKey {
-			continue
-		}
-		kindCode := parts[1]
-		seq, err := strconv.ParseInt(parts[2], 10, 64)
-		if err != nil {
-			continue
-		}
-		k := seqKey{scopeKey, kindCode}
-		if seq >= maxSeq[k] {
-			maxSeq[k] = seq
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-
-	for k, max := range maxSeq {
-		_, err := db.Exec(
-			`INSERT INTO scoped_sequences (scope_key, kind_code, next_val) VALUES (?, ?, ?)
-			 ON CONFLICT(scope_key, kind_code) DO UPDATE SET next_val = MAX(scoped_sequences.next_val, excluded.next_val)`,
-			k.scopeKey, k.kindCode, max+1)
-		if err != nil {
-			return fmt.Errorf("reseed scoped %s-%s: %w", k.scopeKey, k.kindCode, err)
-		}
-
-		// Also reseed the sequences table (used by generateTemplatedID → NextSeq)
-		seqPrefix := fmt.Sprintf("%s-%s", k.scopeKey, k.kindCode)
-		_, err = db.Exec(
-			`INSERT INTO sequences (prefix, next_val) VALUES (?, ?)
-			 ON CONFLICT(prefix) DO UPDATE SET next_val = MAX(sequences.next_val, excluded.next_val)`,
-			seqPrefix, max+1)
-		if err != nil {
-			return fmt.Errorf("reseed seq %s: %w", seqPrefix, err)
-		}
-	}
-	return nil
-}
-
 func (s *SQLiteStore) Close() error {
 	s.stopWAL()
 	s.walStopped.Wait()
@@ -469,9 +388,6 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	if art.ID == "" {
 		return fmt.Errorf("artifact ID is required") //nolint:err113 // sentinel; no runtime values
 	}
-	if art.UID == "" {
-		art.UID = generateUID()
-	}
 	now := time.Now().UTC()
 	if art.CreatedAt.IsZero() {
 		art.CreatedAt = now
@@ -487,16 +403,15 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	}
 	defer tx.Rollback() //nolint:errcheck // deferred rollback; commit is checked explicitly
 
-	// Check for human ID collision: same ID but different UID
+	// Resolve uid for upsert key — reuse existing uid or generate one for new artifacts.
+	var uid string
+	_ = tx.QueryRowContext(ctx, "SELECT uid FROM artifacts WHERE id = ?", art.ID).Scan(&uid)
+	if uid == "" {
+		uid = generateUID()
+	}
+
 	var old *Artifact
 	old, _ = scanArtifact(tx.QueryRowContext(ctx, "SELECT "+artifactColumns+" FROM artifacts WHERE id = ?", art.ID))
-	if old != nil && old.UID != "" && old.UID != art.UID {
-		// Collision: auto-rename the existing artifact
-		if err := s.autoRenameArtifact(ctx, tx, old); err != nil {
-			return fmt.Errorf("auto-rename collision on %s: %w", art.ID, err)
-		}
-		old = nil // treat as new insert after rename
-	}
 
 	kind := labelValue(art.Labels, LabelPrefixKind)
 	scope := labelValue(art.Labels, LabelPrefixScope)
@@ -524,7 +439,7 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 			criteria=excluded.criteria, links=excluded.links,
 			extra=excluded.extra,
 			annotations=excluded.annotations, updated_at=excluded.updated_at`,
-		art.UID, art.ID, art.Alias, kind, scope, status, art.Parent, art.Title, art.Goal,
+		uid, art.ID, art.Alias, kind, scope, status, art.Parent, art.Title, art.Goal,
 		string(dependsOn), string(labels), priority, sprint,
 		string(sections), string(features), string(criteria), string(links), string(extra),
 		string(annotations),
@@ -597,15 +512,19 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 			errs[i] = ErrArtifactIDRequired
 			continue
 		}
-		if art.UID == "" {
-			art.UID = generateUID()
-		}
 		if art.CreatedAt.IsZero() {
 			art.CreatedAt = now
 		}
 		art.UpdatedAt = now
 		if art.InsertedAt.IsZero() {
 			art.InsertedAt = now
+		}
+
+		// Resolve uid for upsert — reuse existing or generate new.
+		var uid string
+		_ = tx.QueryRowContext(ctx, "SELECT uid FROM artifacts WHERE id = ?", art.ID).Scan(&uid)
+		if uid == "" {
+			uid = generateUID()
 		}
 
 		kind := labelValue(art.Labels, LabelPrefixKind)
@@ -623,7 +542,7 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 		annotations, _ := json.Marshal(art.Annotations)
 
 		_, execErr := stmt.ExecContext(ctx,
-			art.UID, art.ID, art.Alias, kind, scope, status, art.Parent,
+			uid, art.ID, art.Alias, kind, scope, status, art.Parent,
 			art.Title, art.Goal, string(dependsOn), string(labels), priority, sprint,
 			string(sections), string(features), string(criteria), string(links), string(extra),
 			string(annotations),
@@ -686,11 +605,7 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 		return ErrConflict
 	}
 
-	// Version matches — proceed with the write. Reuse Put logic inline so we
-	// keep the same transaction rather than starting a nested one.
-	if art.UID == "" {
-		art.UID = generateUID()
-	}
+	// Version matches — proceed with the write.
 	now := time.Now().UTC()
 	art.UpdatedAt = now
 
@@ -817,54 +732,6 @@ func (s *SQLiteStore) PatchArtifact(ctx context.Context, id string, patch Artifa
 	return tx.Commit()
 }
 
-// autoRenameArtifact renames an existing artifact's human ID to the next free
-// sequence number, updating all edges that reference the old ID.
-func (s *SQLiteStore) autoRenameArtifact(ctx context.Context, tx *sql.Tx, existing *Artifact) error {
-	oldID := existing.ID
-
-	// Parse ID to find prefix and sequence number.
-	// Supports both "PREFIX-SEQ" (T-001) and "SCOPE-KIND-SEQ" (PROJ-SPC-1) formats.
-	lastDash := strings.LastIndex(oldID, "-")
-	if lastDash < 0 {
-		return fmt.Errorf("cannot auto-rename ID without sequence number: %q", oldID) //nolint:err113 // runtime value (oldID) required
-	}
-	prefix := oldID[:lastDash]
-	seq, err := strconv.ParseInt(oldID[lastDash+1:], 10, 64)
-	if err != nil {
-		return fmt.Errorf("cannot parse seq from ID %q: %w", oldID, err)
-	}
-
-	for {
-		seq++
-		candidateID := fmt.Sprintf("%s-%d", prefix, seq)
-		var exists int
-		err := tx.QueryRowContext(ctx, "SELECT 1 FROM artifacts WHERE id = ?", candidateID).Scan(&exists)
-		if errors.Is(err, sql.ErrNoRows) {
-			_, err = tx.ExecContext(ctx, "UPDATE artifacts SET id = ? WHERE uid = ?", candidateID, existing.UID)
-			if err != nil {
-				return fmt.Errorf("rename %s -> %s: %w", oldID, candidateID, err)
-			}
-			_, err = tx.ExecContext(ctx, "UPDATE edges SET from_id = ? WHERE from_id = ?", candidateID, oldID)
-			if err != nil {
-				return err
-			}
-			_, err = tx.ExecContext(ctx, "UPDATE edges SET to_id = ? WHERE to_id = ?", candidateID, oldID)
-			if err != nil {
-				return err
-			}
-			_, err = tx.ExecContext(ctx, "UPDATE artifacts SET parent = ? WHERE parent = ?", candidateID, oldID)
-			if err != nil {
-				return err
-			}
-		slog.WarnContext(context.Background(), "auto-renamed artifact on collision", slog.String("old_id", oldID), slog.String("new_id", candidateID), slog.String("uid", existing.UID)) //nolint:sloglint // old_id/new_id/uid have no LogKey constants
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-	}
-}
-
 // RenameID atomically renames oldID to newID in a single transaction.
 // Cascades to: edges (from_id, to_id), parent fields, depends_on JSON arrays.
 // Registers oldID as alias on the renamed artifact for backward-compat lookup.
@@ -956,53 +823,6 @@ func (s *SQLiteStore) GetByAlias(ctx context.Context, alias string) (*Artifact, 
 		return nil, fmt.Errorf("artifact with alias %q: %w", alias, ErrArtifactNotFound)
 	}
 	return art, nil
-}
-
-// NextScopedAlias generates the next unique scope-derived alias (e.g. TST-TSK-3)
-// by checking the alias column. Used in UUID mode where id holds a UUID v4.
-func (s *SQLiteStore) NextScopedAlias(ctx context.Context, scopeKey, kindCode string) (string, error) {
-	return s.nextScopedValue(ctx, scopeKey, kindCode, "alias")
-}
-
-// nextScopedValue is the shared implementation for NextScopedID and NextScopedAlias.
-// checkColumn is either "id" or "alias" — an internal constant, never user input.
-func (s *SQLiteStore) nextScopedValue(ctx context.Context, scopeKey, kindCode, checkColumn string) (string, error) {
-	tx, err := s.writer.BeginTx(ctx, nil)
-	if err != nil {
-		return "", err
-	}
-	defer tx.Rollback() //nolint:errcheck // deferred rollback
-
-	var seq int64
-	err = tx.QueryRowContext(ctx,
-		"SELECT next_val FROM scoped_sequences WHERE scope_key = ? AND kind_code = ?",
-		scopeKey, kindCode).Scan(&seq)
-	if errors.Is(err, sql.ErrNoRows) {
-		seq = 1
-	} else if err != nil {
-		return "", err
-	}
-
-	for {
-		candidate := FormatScopedID(scopeKey, kindCode, int(seq))
-		var exists int
-		//nolint:gosec // checkColumn is an internal constant ("id" or "alias"), not user input
-		err = tx.QueryRowContext(ctx, "SELECT 1 FROM artifacts WHERE "+checkColumn+" = ?", candidate).Scan(&exists)
-		if errors.Is(err, sql.ErrNoRows) {
-			_, err = tx.ExecContext(ctx,
-				`INSERT INTO scoped_sequences (scope_key, kind_code, next_val) VALUES (?, ?, ?)
-				 ON CONFLICT(scope_key, kind_code) DO UPDATE SET next_val = ?`,
-				scopeKey, kindCode, seq+1, seq+1)
-			if err != nil {
-				return "", err
-			}
-			return candidate, tx.Commit()
-		}
-		if err != nil {
-			return "", err
-		}
-		seq++
-	}
 }
 
 func (s *SQLiteStore) Search(ctx context.Context, query string) ([]string, error) {
@@ -1537,139 +1357,13 @@ func (s *SQLiteStore) Children(ctx context.Context, parentID string) ([]*Artifac
 	return children, nil
 }
 
-func (s *SQLiteStore) NextID(ctx context.Context, prefix string) (string, error) {
-	tx, err := s.writer.BeginTx(ctx, nil)
-	if err != nil {
-		return "", err
-	}
-	defer tx.Rollback() //nolint:errcheck // deferred rollback; commit is checked explicitly
-
-	var seq int64
-	err = tx.QueryRowContext(ctx, "SELECT next_val FROM sequences WHERE prefix = ?", prefix).Scan(&seq)
-	if errors.Is(err, sql.ErrNoRows) {
-		seq = 1
-	} else if err != nil {
-		return "", err
-	}
-
-	id := FormatID(prefix, int(seq))
-
-	_, err = tx.ExecContext(ctx,
-		"INSERT INTO sequences (prefix, next_val) VALUES (?, ?) ON CONFLICT(prefix) DO UPDATE SET next_val = ?",
-		prefix, seq+1, seq+1)
-	if err != nil {
-		return "", err
-	}
-	return id, tx.Commit()
-}
-
-func (s *SQLiteStore) SeedSequence(ctx context.Context, prefix string, val uint64, force bool) error {
-	if force {
-		_, err := s.writer.ExecContext(ctx,
-			"INSERT INTO sequences (prefix, next_val) VALUES (?, ?) ON CONFLICT(prefix) DO UPDATE SET next_val = ?",
-			prefix, val, val)
-		return err
-	}
-	_, err := s.writer.ExecContext(ctx,
-		`INSERT INTO sequences (prefix, next_val) VALUES (?, ?)
-		 ON CONFLICT(prefix) DO UPDATE SET next_val = MAX(sequences.next_val, excluded.next_val)`,
-		prefix, val)
-	return err
-}
-
-// NextScopedID generates the next unique scoped ID (e.g. PROJ-TSK-3),
-// skipping any value that already exists in the id column.
-func (s *SQLiteStore) NextScopedID(ctx context.Context, scopeKey, kindCode string) (string, error) {
-	return s.nextScopedValue(ctx, scopeKey, kindCode, "id")
-}
-
-func (s *SQLiteStore) NextSeq(ctx context.Context, key string) (int64, error) {
-	tx, err := s.writer.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, err
-	}
-	defer tx.Rollback() //nolint:errcheck // deferred rollback; commit is checked explicitly
-
-	var seq int64
-	err = tx.QueryRowContext(ctx, "SELECT next_val FROM sequences WHERE prefix = ?", key).Scan(&seq)
-	if errors.Is(err, sql.ErrNoRows) {
-		seq = 1
-	} else if err != nil {
-		return 0, err
-	}
-
-	// Skip sequence numbers whose formatted IDs already exist in artifacts.
-	// The caller (generateTemplatedID) formats the ID using the template,
-	// but the key is always "SCOPE-KIND" and the ID is "SCOPE-KIND-SEQ",
-	// so we can check for collisions using the key as prefix.
-	for {
-		candidateID := fmt.Sprintf("%s-%d", key, seq)
-		var exists int
-		err = tx.QueryRowContext(ctx, "SELECT 1 FROM artifacts WHERE id = ?", candidateID).Scan(&exists)
-		if errors.Is(err, sql.ErrNoRows) {
-			// ID is free
-			_, err = tx.ExecContext(ctx,
-				"INSERT INTO sequences (prefix, next_val) VALUES (?, ?) ON CONFLICT(prefix) DO UPDATE SET next_val = ?",
-				key, seq+1, seq+1)
-			if err != nil {
-				return 0, err
-			}
-			return seq, tx.Commit()
-		}
-		if err != nil {
-			return 0, err
-		}
-		seq++ // ID exists, try next
-	}
-}
-
-func (s *SQLiteStore) GetScopeKey(ctx context.Context, scope string) (string, bool, error) { //nolint:gocritic // unnamedResult: local vars key/auto already named; named returns would shadow them
-	var key string
-	var auto int
-	err := s.reader.QueryRowContext(ctx,
-		"SELECT key, auto FROM scope_keys WHERE scope = ?", scope).Scan(&key, &auto)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", false, nil
-	}
-	if err != nil {
-		return "", false, err
-	}
-	return key, auto == 1, nil
-}
-
-func (s *SQLiteStore) SetScopeKey(ctx context.Context, scope, key string, auto bool) error {
-	autoInt := 0
-	if auto {
-		autoInt = 1
-	}
-	_, err := s.writer.ExecContext(ctx,
-		`INSERT INTO scope_keys (scope, key, auto, created) VALUES (?, ?, ?, ?)
-		 ON CONFLICT(scope) DO UPDATE SET key = excluded.key, auto = excluded.auto`,
-		scope, key, autoInt, time.Now().UTC().Format(time.RFC3339))
-	return err
-}
-
-func (s *SQLiteStore) ListScopeKeys(ctx context.Context) (map[string]string, error) {
-	rows, err := s.reader.QueryContext(ctx, "SELECT scope, key FROM scope_keys")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
-
-	result := make(map[string]string)
-	for rows.Next() {
-		var scope, key string
-		if err := rows.Scan(&scope, &key); err == nil {
-			result[scope] = key
-		}
-	}
-	return result, rows.Err()
-}
-
 func (s *SQLiteStore) SetScopeLabels(ctx context.Context, scope string, labels []string) error {
 	csv := strings.Join(labels, ",")
+	// Use scope name as placeholder key for new rows; old DBs with a prior key keep it on conflict.
 	_, err := s.writer.ExecContext(ctx,
-		`UPDATE scope_keys SET labels = ? WHERE scope = ?`, csv, scope)
+		`INSERT INTO scope_keys (scope, key, labels) VALUES (?, ?, ?)
+		 ON CONFLICT(scope) DO UPDATE SET labels = excluded.labels`,
+		scope, scope, csv)
 	return err
 }
 
@@ -1751,12 +1445,13 @@ const artifactColumns = `uid, id, alias, kind, scope, status, parent, title, goa
 
 func scanRow(s rowScanner) (*Artifact, error) {
 	var art Artifact
+	var uid string // internal upsert key — not exposed on Artifact
 	var kindCol, scopeCol, statusCol, priorityCol, sprintCol string
 	var dependsOn, labels, sections, features, criteria, links, extra, annotations string
 	var createdAt, updatedAt, insertedAt string
 
 	err := s.Scan(
-		&art.UID, &art.ID, &art.Alias, &kindCol, &scopeCol, &statusCol, &art.Parent, &art.Title, &art.Goal,
+		&uid, &art.ID, &art.Alias, &kindCol, &scopeCol, &statusCol, &art.Parent, &art.Title, &art.Goal,
 		&dependsOn, &labels, &priorityCol, &sprintCol,
 		&sections, &features, &criteria, &links, &extra,
 		&annotations,

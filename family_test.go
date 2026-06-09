@@ -121,9 +121,6 @@ func TestFilter_FamilyFilter_SQLite(t *testing.T) {
 	}
 	defer s.Close() //nolint:errcheck // deferred close in test
 
-	if err := s.SetScopeKey(ctx, "test", "TST", false); err != nil {
-		t.Fatal(err)
-	}
 	p := New(s, KnowledgeSchema(), []string{"test"}, nil, ProtocolConfig{})
 
 	if _, err := p.CreateArtifact(ctx, CreateInput{Title: "a note", Scope: "test",

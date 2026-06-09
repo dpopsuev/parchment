@@ -93,7 +93,6 @@ type CreateInput struct {
 	Priority   string              `json:"priority,omitempty"`
 	DependsOn  []string            `json:"depends_on,omitempty"`
 	Labels     []string            `json:"labels,omitempty"`
-	Prefix     string              `json:"prefix,omitempty"`
 	Alias      string              `json:"alias,omitempty"`
 	Links      map[string][]string `json:"links,omitempty"`
 	Extra      map[string]any      `json:"extra,omitempty"`
@@ -147,50 +146,10 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		}
 	}
 	var id string
-	if in.ExplicitID != "" { //nolint:gocritic,nestif // ifElseChain: legitimate branching for ID validation
+	if in.ExplicitID != "" {
 		id = in.ExplicitID
-	} else if p.idFormat == IDFormatUUID && in.Prefix == "" {
-		id = GenerateUUID()
-		// Auto-generate a human-readable alias unless the caller supplied one.
-		if in.Alias == "" && scope != "" {
-			scopeKey, skErr := p.resolveScopeKey(ctx, scope)
-			if skErr == nil {
-				kindCode := p.resolveKindCode(kind)
-				in.Alias, _ = p.store.NextScopedAlias(ctx, scopeKey, kindCode)
-			}
-		}
-	} else if p.idTemplate != nil && in.Prefix == "" {
-		id, err = p.generateTemplatedID(ctx, scope, kind)
-		if err != nil {
-			return nil, err
-		}
-	} else if p.idFormat == "scoped" && in.Prefix == "" {
-		if scope == "" {
-			prefix := p.schema.Prefix(kind)
-			id, err = p.store.NextID(ctx, prefix)
-			if err != nil {
-				return nil, fmt.Errorf("generate ID: %w", err)
-			}
-		} else {
-			scopeKey, err := p.resolveScopeKey(ctx, scope)
-			if err != nil {
-				return nil, err
-			}
-			kindCode := p.resolveKindCode(kind)
-			id, err = p.store.NextScopedID(ctx, scopeKey, kindCode)
-			if err != nil {
-				return nil, fmt.Errorf("generate scoped ID: %w", err)
-			}
-		}
 	} else {
-		prefix := in.Prefix
-		if prefix == "" {
-			prefix = p.schema.Prefix(kind)
-		}
-		id, err = p.store.NextID(ctx, prefix)
-		if err != nil {
-			return nil, fmt.Errorf("generate ID: %w", err)
-		}
+		id = GenerateUUID()
 	}
 	status := labelValue(in.Labels, LabelPrefixStatus)
 	if status == "" {
@@ -714,41 +673,7 @@ func (p *Protocol) inferScope(ctx context.Context, explicit, parentID, kind stri
 	return "", fmt.Errorf("scope is required (available scopes: %s)", strings.Join(p.scopes, ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 }
 
-func (p *Protocol) resolveScopeKey(ctx context.Context, scope string) (string, error) {
-	if scope == "" {
-		return "UNK", nil
-	}
-	if key, ok := p.scopeKeys[scope]; ok {
-		return key, nil
-	}
-	key, _, err := p.store.GetScopeKey(ctx, scope)
-	if err != nil {
-		return "", fmt.Errorf("lookup scope key: %w", err)
-	}
-	if key != "" {
-		return key, nil
-	}
-	existing := make(map[string]bool)
-	for _, v := range p.scopeKeys {
-		existing[v] = true
-	}
-	dbKeys, _ := p.store.ListScopeKeys(ctx)
-	for _, v := range dbKeys {
-		existing[v] = true
-	}
-	key = DeriveKey(scope, existing)
-	if err := p.store.SetScopeKey(ctx, scope, key, true); err != nil {
-		return "", fmt.Errorf("persist scope key: %w", err)
-	}
-	return key, nil
-}
 
-func (p *Protocol) resolveKindCode(kind string) string {
-	if code, ok := p.kindCodes[kind]; ok {
-		return code
-	}
-	return p.schema.KindCode(kind)
-}
 
 // --- Composite actions ---
 

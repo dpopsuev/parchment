@@ -233,24 +233,9 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 	}
 	p.emitEvent(ctx, EventUpdated, art.ID, labelValue(art.Labels, LabelPrefixScope), map[string]string{"field": field, "value": value})
 
-	// scope+rename_id: generate a new ID from the new scope's key and migrate.
-	if field == FieldScope && opt.RenameID { //nolint:nestif // scope key resolution has legitimate branching; splitting into helper would just move it
-		scopeKey, _, _ := p.store.GetScopeKey(ctx, value)
-		kindCode := p.resolveKindCode(labelValue(art.Labels, LabelPrefixKind))
-		var newID string
-		var genErr error
-		if scopeKey != "" {
-			newID, genErr = p.store.NextScopedID(ctx, scopeKey, kindCode)
-		} else {
-			prefix := scopeKey + kindCode
-			if prefix == "" {
-				prefix = labelValue(art.Labels, LabelPrefixKind)
-			}
-			newID, genErr = p.store.NextID(ctx, prefix)
-		}
-		if genErr != nil {
-			return Result{ID: id, OK: true, Error: fmt.Sprintf("rename_id: generate new ID: %v", genErr)}
-		}
+	// scope+rename_id: generate a new UUID and migrate.
+	if field == FieldScope && opt.RenameID {
+		newID := GenerateUUID()
 		if migrateErr := p.MigrateID(ctx, id, newID); migrateErr != nil {
 			return Result{ID: id, OK: true, Error: fmt.Sprintf("rename_id: migrate: %v", migrateErr)}
 		}

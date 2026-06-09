@@ -125,7 +125,7 @@ func protocolWithTrait(t *testing.T, label string, requiredSections ...string) (
 		Title:  label,
 		Extra:  map[string]any{"required_sections": requiredSections},
 	})
-	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{IDFormat: "sequential"})
+	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{})
 	return proto, store
 }
 

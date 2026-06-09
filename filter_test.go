@@ -43,17 +43,13 @@ func TestFilter_MatchLabels_ScopeLabel_DirectMatch(t *testing.T) {
 	}
 }
 
-// --- FormatID / FormatScopedID (already 100% but document intent) ---
+// --- GenerateUUID ---
 
-func TestFormatID_ContainsYearAndSeq(t *testing.T) {
+func TestGenerateUUID_IsUUIDShaped(t *testing.T) {
 	t.Parallel()
-	id := parchment.FormatID("TSK", 7)
-	if id == "" {
-		t.Error("FormatID returned empty string")
-	}
-	// Should contain the sequence padded to 3 digits
-	if id[len(id)-3:] != "007" {
-		t.Errorf("FormatID seq = %q, want suffix 007", id)
+	id := parchment.GenerateUUID()
+	if !parchment.IsUUIDShaped(id) {
+		t.Errorf("GenerateUUID returned non-UUID-shaped %q", id)
 	}
 }
 

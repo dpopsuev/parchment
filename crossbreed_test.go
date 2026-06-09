@@ -18,7 +18,7 @@ func TestArtifact_Annotations_RoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	art := &Artifact{
-		UID: "u1", ID: "ANN-1", Labels: []string{"kind:task", "status:draft"}, Title: "with annotations",
+		ID: "ANN-1", Labels: []string{"kind:task", "status:draft"}, Title: "with annotations",
 		Annotations: []Annotation{
 			{Kind: "+", Comment: "good approach"},
 			{Kind: "-", Comment: "missing error handling"},
@@ -50,10 +50,7 @@ func TestCascade_DependencyEdges(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	p := New(s, DefaultSchema(), []string{"test"}, nil, ProtocolConfig{
-		IDFormat:  "scoped",
-		ScopeKeys: map[string]string{"test": "TST"},
-	})
+	p := New(s, DefaultSchema(), []string{"test"}, nil, ProtocolConfig{})
 	ctx := context.Background()
 
 	// A → B → C (depends_on chain)
@@ -92,10 +89,7 @@ func TestQualityGate_BlockingPreventsCompletion(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	p := New(s, DefaultSchema(), []string{"test"}, nil, ProtocolConfig{
-		IDFormat:  "scoped",
-		ScopeKeys: map[string]string{"test": "TST"},
-	})
+	p := New(s, DefaultSchema(), []string{"test"}, nil, ProtocolConfig{})
 	ctx := context.Background()
 
 	// Register a blocking gate
@@ -151,10 +145,7 @@ func TestQualityGate_WarningAllowsCompletion(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	p := New(s, DefaultSchema(), []string{"test"}, nil, ProtocolConfig{
-		IDFormat:  "scoped",
-		ScopeKeys: map[string]string{"test": "TST"},
-	})
+	p := New(s, DefaultSchema(), []string{"test"}, nil, ProtocolConfig{})
 	ctx := context.Background()
 
 	// Register a warning gate (not blocking)

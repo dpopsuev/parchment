@@ -22,7 +22,7 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 		s := newStore(t)
 		ctx := context.Background()
 
-		art := &Artifact{UID: "u1", ID: "TST-TSK-1", Labels: []string{"kind:task", "status:draft"}, Title: "test"}
+		art := &Artifact{ID: "TST-TSK-1", Labels: []string{"kind:task", "status:draft"}, Title: "test"}
 		if err := s.Put(ctx, art); err != nil {
 			t.Fatal(err)
 		}
@@ -52,9 +52,9 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 		s := newStore(t)
 		ctx := context.Background()
 
-		s.Put(ctx, &Artifact{UID: "u1", ID: "T-1", Labels: []string{"kind:task", "status:draft", "scope:a"}, Title: "one"})    //nolint:errcheck // test seeding
-		s.Put(ctx, &Artifact{UID: "u2", ID: "T-2", Labels: []string{"kind:spec", "status:draft", "scope:a"}, Title: "two"})    //nolint:errcheck // test seeding
-		s.Put(ctx, &Artifact{UID: "u3", ID: "T-3", Labels: []string{"kind:task", "status:active", "scope:b"}, Title: "three"}) //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "T-1", Labels: []string{"kind:task", "status:draft", "scope:a"}, Title: "one"})    //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "T-2", Labels: []string{"kind:spec", "status:draft", "scope:a"}, Title: "two"})    //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "T-3", Labels: []string{"kind:task", "status:active", "scope:b"}, Title: "three"}) //nolint:errcheck // test seeding
 
 		arts, err := s.List(ctx, Filter{Labels: []string{"kind:task"}})
 		if err != nil {
@@ -78,8 +78,8 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 		s := newStore(t)
 		ctx := context.Background()
 
-		s.Put(ctx, &Artifact{UID: "u1", ID: "A", Labels: []string{"kind:goal", "status:draft"}, Title: "a"}) //nolint:errcheck // test seeding
-		s.Put(ctx, &Artifact{UID: "u2", ID: "B", Labels: []string{"kind:task", "status:draft"}, Title: "b"}) //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "A", Labels: []string{"kind:goal", "status:draft"}, Title: "a"}) //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "B", Labels: []string{"kind:task", "status:draft"}, Title: "b"}) //nolint:errcheck // test seeding
 
 		if err := s.AddEdge(ctx, Edge{From: "A", To: "B", Relation: RelParentOf}); err != nil {
 			t.Fatal(err)
@@ -102,21 +102,15 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 		}
 	})
 
-	t.Run("NextScopedID_Monotonic", func(t *testing.T) {
+	t.Run("GenerateUUID_Unique", func(t *testing.T) {
 		t.Parallel()
-		s := newStore(t)
-		ctx := context.Background()
-
-		id1, err := s.NextScopedID(ctx, "TST", "TSK")
-		if err != nil {
-			t.Fatal(err)
+		id1 := GenerateUUID()
+		id2 := GenerateUUID()
+		if !IsUUIDShaped(id1) {
+			t.Errorf("id1 %q not UUID-shaped", id1)
 		}
-		id2, err := s.NextScopedID(ctx, "TST", "TSK")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if id1 >= id2 {
-			t.Errorf("IDs not monotonic: %s >= %s", id1, id2)
+		if id1 == id2 {
+			t.Errorf("GenerateUUID produced duplicate: %s", id1)
 		}
 	})
 
@@ -125,7 +119,7 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 		s := newStore(t)
 		ctx := context.Background()
 
-		s.Put(ctx, &Artifact{UID: "u1", ID: "DEL-1", Labels: []string{"kind:task", "status:draft"}, Title: "delete me"}) //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "DEL-1", Labels: []string{"kind:task", "status:draft"}, Title: "delete me"}) //nolint:errcheck // test seeding
 
 		if err := s.Delete(ctx, "DEL-1"); err != nil {
 			t.Fatal(err)
@@ -141,7 +135,7 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 		s := newStore(t)
 		ctx := context.Background()
 
-		s.Put(ctx, &Artifact{UID: "u1", ID: "S-1", Labels: []string{"kind:task", "status:draft"}, Title: "uniquesearchterm"}) //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "S-1", Labels: []string{"kind:task", "status:draft"}, Title: "uniquesearchterm"}) //nolint:errcheck // test seeding
 
 		ids, err := s.Search(ctx, "uniquesearchterm")
 		if err != nil {
@@ -262,7 +256,7 @@ func TestSQLiteStore_MigrationCompat(t *testing.T) {
 
 	// Write a new artifact with the new fields.
 	err = s.Put(ctx, &Artifact{
-		UID:         "new-uid", ID: "NEW-TSK-1", Labels: []string{"kind:task", "status:draft"},
+		ID: "NEW-TSK-1", Labels: []string{"kind:task", "status:draft"},
 		Title:       "new artifact",
 		Annotations: []Annotation{{Kind: "+", Comment: "good"}},
 		CreatedAt:   art.CreatedAt, UpdatedAt: art.CreatedAt,
@@ -299,7 +293,7 @@ func TestSQLiteStore_ListDoesNotSilentlyDropRows(t *testing.T) {
 	// Insert 50 artifacts.
 	for i := range 50 {
 		err := s.Put(ctx, &Artifact{
-			UID:    fmt.Sprintf("u%d", i),
+			// uid generated internally
 			ID:     fmt.Sprintf("ND-TSK-%d", i),
 			Labels: []string{"kind:task", "status:draft"},
 			Title:  fmt.Sprintf("task %d", i),
@@ -325,9 +319,9 @@ func TestMemoryStore_SaveLoad(t *testing.T) {
 	ctx := context.Background()
 	m := NewMemoryStore()
 
-	m.Put(ctx, &Artifact{UID: "u1", ID: "SL-1", Labels: []string{"kind:task", "status:draft"}, Title: "persist me"}) //nolint:errcheck // test seeding
-	m.AddEdge(ctx, Edge{From: "SL-1", To: "SL-2", Relation: RelDependsOn})                           //nolint:errcheck // test seeding
-	m.SetScopeKey(ctx, "test", "TST", false)                                                         //nolint:errcheck // test seeding
+	m.Put(ctx, &Artifact{ID: "SL-1", Labels: []string{"kind:task", "status:draft"}, Title: "persist me"}) //nolint:errcheck // test seeding
+	m.AddEdge(ctx, Edge{From: "SL-1", To: "SL-2", Relation: RelDependsOn})                               //nolint:errcheck // test seeding
+	m.SetScopeLabels(ctx, "test", []string{"backend"})                                                    //nolint:errcheck // test seeding
 
 	path := t.TempDir() + "/store.json"
 	if err := m.Save(path); err != nil {
@@ -352,8 +346,8 @@ func TestMemoryStore_SaveLoad(t *testing.T) {
 		t.Errorf("expected 1 edge, got %d", len(edges))
 	}
 
-	key, _, _ := loaded.GetScopeKey(ctx, "test")
-	if key != "TST" {
-		t.Errorf("scope key = %q, want TST", key)
+	labels, _ := loaded.GetScopeLabels(ctx, "test")
+	if len(labels) != 1 || labels[0] != "backend" {
+		t.Errorf("scope labels = %v, want [backend]", labels)
 	}
 }

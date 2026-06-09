@@ -20,8 +20,6 @@ type MemoryStore struct {
 	artifacts   map[string]*Artifact
 	aliases     map[string]string // alias → artifact ID
 	edges       map[string]Edge   // key: "from|rel|to"
-	sequences   map[string]int64
-	scopeKeys   map[string]scopeKeyEntry
 	scopeLabels map[string][]string
 	// embeddings["artifactID:model"] = vector
 	embeddings      map[string][]float32
@@ -32,26 +30,19 @@ type MemoryStore struct {
 	eventID int64
 }
 
-type scopeKeyEntry struct {
-	key  string
-	auto bool
-}
-
 // Compile-time interface verification.
 var _ Store = (*MemoryStore)(nil)
 
 // NewMemoryStore creates an empty in-memory store.
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		artifacts:   make(map[string]*Artifact),
-		aliases:     make(map[string]string),
-		edges:       make(map[string]Edge),
-		sequences:   make(map[string]int64),
-		scopeKeys:   make(map[string]scopeKeyEntry),
-		scopeLabels: make(map[string][]string),
+		artifacts:       make(map[string]*Artifact),
+		aliases:         make(map[string]string),
+		edges:           make(map[string]Edge),
+		scopeLabels:     make(map[string][]string),
 		embeddings:      make(map[string][]float32),
 		embeddingHashes: make(map[string]string),
-		metrics:     make(map[string]ArtifactMetrics),
+		metrics:         make(map[string]ArtifactMetrics),
 	}
 }
 
@@ -340,84 +331,7 @@ func (m *MemoryStore) walkRecursive(id, rel string, dir Direction, depth, maxDep
 	}
 }
 
-// --- SequenceStore ---
-
-func (m *MemoryStore) NextID(_ context.Context, prefix string) (string, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.sequences[prefix]++
-	return FormatID(prefix, int(m.sequences[prefix])), nil
-}
-
-func (m *MemoryStore) SeedSequence(_ context.Context, prefix string, val uint64, force bool) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	cur := m.sequences[prefix]
-	v := int64(val) //nolint:gosec // uint64 values in practice are small sequence numbers
-	if force || v > cur {
-		m.sequences[prefix] = v
-	}
-	return nil
-}
-
-func (m *MemoryStore) NextScopedID(_ context.Context, scopeKey, kindCode string) (string, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	key := scopeKey + "-" + kindCode
-	m.sequences[key]++
-	return FormatScopedID(scopeKey, kindCode, int(m.sequences[key])), nil
-}
-
-// NextScopedAlias generates the next unique scope-derived alias (e.g. TST-TSK-3)
-// by checking the in-memory alias index. Used in UUID mode.
-func (m *MemoryStore) NextScopedAlias(_ context.Context, scopeKey, kindCode string) (string, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	key := scopeKey + "-" + kindCode
-	for {
-		m.sequences[key]++
-		candidate := FormatScopedID(scopeKey, kindCode, int(m.sequences[key]))
-		if _, taken := m.aliases[candidate]; !taken {
-			return candidate, nil
-		}
-	}
-}
-
-func (m *MemoryStore) NextSeq(_ context.Context, key string) (int64, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.sequences[key]++
-	return m.sequences[key], nil
-}
-
 // --- ScopeStore ---
-
-func (m *MemoryStore) GetScopeKey(_ context.Context, scope string) (key string, auto bool, err error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	entry, ok := m.scopeKeys[scope]
-	if !ok {
-		return "", false, nil
-	}
-	return entry.key, entry.auto, nil
-}
-
-func (m *MemoryStore) SetScopeKey(_ context.Context, scope, key string, auto bool) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.scopeKeys[scope] = scopeKeyEntry{key: key, auto: auto}
-	return nil
-}
-
-func (m *MemoryStore) ListScopeKeys(_ context.Context) (map[string]string, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	result := make(map[string]string, len(m.scopeKeys))
-	for scope, entry := range m.scopeKeys {
-		result[scope] = entry.key
-	}
-	return result, nil
-}
 
 func (m *MemoryStore) SetScopeLabels(_ context.Context, scope string, labels []string) error {
 	m.mu.Lock()
@@ -450,9 +364,9 @@ func (m *MemoryStore) ScopesByLabel(_ context.Context, label string) ([]string, 
 func (m *MemoryStore) ListScopeInfo(_ context.Context) ([]ScopeInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	result := make([]ScopeInfo, 0, len(m.scopeKeys))
-	for scope, entry := range m.scopeKeys {
-		result = append(result, ScopeInfo{Scope: scope, Key: entry.key, Labels: m.scopeLabels[scope]})
+	result := make([]ScopeInfo, 0, len(m.scopeLabels))
+	for scope, labels := range m.scopeLabels {
+		result = append(result, ScopeInfo{Scope: scope, Labels: labels})
 	}
 	return result, nil
 }
@@ -464,8 +378,6 @@ func (m *MemoryStore) Close() error { return nil }
 type memState struct {
 	Artifacts   []*Artifact         `json:"artifacts"`
 	Edges       []Edge              `json:"edges"`
-	Sequences   map[string]int64    `json:"sequences"`
-	ScopeKeys   map[string]string   `json:"scope_keys"`
 	ScopeLabels map[string][]string `json:"scope_labels,omitempty"`
 }
 
@@ -484,12 +396,7 @@ func (m *MemoryStore) Save(path string) error {
 	state := memState{
 		Artifacts:   arts,
 		Edges:       edges,
-		Sequences:   m.sequences,
-		ScopeKeys:   make(map[string]string),
 		ScopeLabels: m.scopeLabels,
-	}
-	for scope, entry := range m.scopeKeys {
-		state.ScopeKeys[scope] = entry.key
 	}
 	m.mu.RUnlock()
 
@@ -536,14 +443,6 @@ func (m *MemoryStore) Load(path string) error {
 	m.edges = make(map[string]Edge, len(state.Edges))
 	for _, e := range state.Edges {
 		m.edges[edgeKey(e.From, e.Relation, e.To)] = e
-	}
-	m.sequences = state.Sequences
-	if m.sequences == nil {
-		m.sequences = make(map[string]int64)
-	}
-	m.scopeKeys = make(map[string]scopeKeyEntry, len(state.ScopeKeys))
-	for scope, key := range state.ScopeKeys {
-		m.scopeKeys[scope] = scopeKeyEntry{key: key}
 	}
 	m.scopeLabels = state.ScopeLabels
 	if m.scopeLabels == nil {

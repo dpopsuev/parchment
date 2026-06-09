@@ -45,7 +45,7 @@ func TestFilter_ExcludeKindMatchesLabelKind(t *testing.T) {
 func TestCreateArtifact_KindFromLabel(t *testing.T) {
 	// Given a protocol and a CreateInput with no Kind field but a kind label
 	store := parchment.NewMemoryStore()
-	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{IDFormat: "sequential"})
+	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{})
 	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{
 		Title:  "test bug",
 		Labels: []string{"kind:bug"},
@@ -62,7 +62,7 @@ func TestCreateArtifact_KindFromLabel(t *testing.T) {
 
 func TestSetField_KindWritesLabel(t *testing.T) {
 	store := parchment.NewMemoryStore()
-	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{IDFormat: "sequential"})
+	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{})
 	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{Title: "original",
 		Labels: []string{"kind:task"},})
 	if err != nil {

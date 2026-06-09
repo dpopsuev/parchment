@@ -1,14 +1,12 @@
 package parchment
 
 import (
-	"fmt"
 	"strings"
 	"time"
 )
 
 // Artifact is the universal record for all work graph nodes.
 type Artifact struct {
-	UID         string              `json:"uid,omitempty"`
 	ID          string              `json:"id"`
 	Alias       string              `json:"alias,omitempty"`
 	Parent      string              `json:"parent,omitempty"`
@@ -93,15 +91,6 @@ type ArtifactPatch struct {
 type ScopePolicy struct {
 	AllowedKinds    []string `json:"allowed_kinds,omitempty" yaml:"allowed_kinds,omitempty"`
 	DefaultPriority string   `json:"default_priority,omitempty" yaml:"default_priority,omitempty"`
-}
-
-// IDConfig holds identity generation settings shared between config and protocol.
-type IDConfig struct {
-	IDFormat         string
-	IDTemplate       *IDTemplate
-	ScopeKeys        map[string]string
-	KindCodes        map[string]string
-	MutableCreatedAt bool
 }
 
 // Filter constrains artifact list/query operations.
@@ -258,120 +247,4 @@ func (f Filter) labelCheck(label string, art *Artifact) bool { //nolint:gocritic
 	return false
 }
 
-// FormatID produces PREFIX-YYYY-SEQ with minimum 3-digit zero-padded sequence.
-func FormatID(prefix string, seq int) string {
-	return fmt.Sprintf("%s-%d-%03d", prefix, time.Now().Year(), seq)
-}
 
-// FormatScopedID produces PRJ-ART-N format with no zero-padding and no year.
-func FormatScopedID(scopeKey, kindCode string, seq int) string {
-	return fmt.Sprintf("%s-%s-%d", scopeKey, kindCode, seq)
-}
-
-// --- ID Template Engine ---
-
-// IDComponent describes a single component of an ID template.
-type IDComponent struct {
-	Type       string `json:"type" yaml:"type"`                                 // scope, kind, time, suffix
-	Format     string `json:"format,omitempty" yaml:"format,omitempty"`         // time: year|yearmonth|date
-	Generation string `json:"generation,omitempty" yaml:"generation,omitempty"` // suffix: serial|random
-	ValueType  string `json:"value_type,omitempty" yaml:"value_type,omitempty"` // suffix: int|hex
-	Width      int    `json:"width,omitempty" yaml:"width,omitempty"`           // suffix: zero-pad width
-	UsePrefix  bool   `json:"use_prefix,omitempty" yaml:"use_prefix,omitempty"` // kind: use full prefix instead of code
-}
-
-// IDTemplate defines a component-based ID format.
-type IDTemplate struct {
-	Separator  string        `json:"separator,omitempty" yaml:"separator,omitempty"`
-	Components []IDComponent `json:"components" yaml:"components"`
-}
-
-// PresetScoped returns the template for the "scoped" preset: SCOPE-KIND-SEQ.
-func PresetScoped() IDTemplate {
-	return IDTemplate{
-		Separator: "-",
-		Components: []IDComponent{
-			{Type: "scope"},
-			{Type: "kind"},
-			{Type: "suffix", Generation: "serial", ValueType: "int"},
-		},
-	}
-}
-
-// IDContext provides the values needed to format an ID from a template.
-type IDContext struct {
-	ScopeKey string
-	KindCode string
-	Prefix   string
-	Seq      int64
-}
-
-// FormatTemplate formats an ID using the template and context.
-func (t IDTemplate) FormatTemplate(ctx IDContext) string {
-	sep := t.Separator
-	if sep == "" {
-		sep = "-"
-	}
-	parts := make([]string, 0, len(t.Components))
-	for _, c := range t.Components {
-		switch c.Type {
-		case "scope":
-			parts = append(parts, ctx.ScopeKey)
-		case "kind":
-			if c.UsePrefix {
-				parts = append(parts, ctx.Prefix)
-			} else {
-				parts = append(parts, ctx.KindCode)
-			}
-		case "time":
-			parts = append(parts, formatTime(c.Format))
-		case "suffix":
-			parts = append(parts, formatSuffix(ctx.Seq, c.Width))
-		}
-	}
-	return strings.Join(parts, sep)
-}
-
-// SeqKey returns the sequence key for serial suffix generation, composed from
-// all non-suffix components. Used to look up the sequence counter in the store.
-func (t IDTemplate) SeqKey(ctx IDContext) string {
-	sep := t.Separator
-	if sep == "" {
-		sep = "-"
-	}
-	var parts []string
-	for _, c := range t.Components {
-		switch c.Type {
-		case "scope":
-			parts = append(parts, ctx.ScopeKey)
-		case "kind":
-			if c.UsePrefix {
-				parts = append(parts, ctx.Prefix)
-			} else {
-				parts = append(parts, ctx.KindCode)
-			}
-		case "time":
-			parts = append(parts, formatTime(c.Format))
-		}
-	}
-	return strings.Join(parts, sep)
-}
-
-func formatTime(format string) string {
-	now := time.Now()
-	switch format {
-	case "yearmonth":
-		return now.Format("200601")
-	case "date":
-		return now.Format("20060102")
-	default:
-		return fmt.Sprintf("%d", now.Year())
-	}
-}
-
-func formatSuffix(seq int64, width int) string {
-	if width > 0 {
-		return fmt.Sprintf("%0*d", width, seq)
-	}
-	return fmt.Sprintf("%d", seq)
-}

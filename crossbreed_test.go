@@ -138,8 +138,8 @@ func TestQualityGate_BlockingPreventsCompletion(t *testing.T) {
 
 	// Artifact should still be in_review
 	art, _ := s.Get(ctx, a.ID)
-	if art.ResolvedStatus() != "in_review" {
-		t.Errorf("status = %q, want in_review (gate blocked)", art.ResolvedStatus())
+	if labelValue(art.Labels, LabelPrefixStatus) != "in_review" {
+		t.Errorf("status = %q, want in_review (gate blocked)", labelValue(art.Labels, LabelPrefixStatus))
 	}
 }
 
@@ -189,8 +189,8 @@ func TestQualityGate_WarningAllowsCompletion(t *testing.T) {
 
 	// Artifact should be complete
 	art, _ := s.Get(ctx, a.ID)
-	if art.ResolvedStatus() != "complete" {
-		t.Errorf("status = %q, want complete", art.ResolvedStatus())
+	if labelValue(art.Labels, LabelPrefixStatus) != "complete" {
+		t.Errorf("status = %q, want complete", labelValue(art.Labels, LabelPrefixStatus))
 	}
 }
 

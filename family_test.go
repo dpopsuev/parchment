@@ -140,7 +140,7 @@ func TestFilter_FamilyFilter_SQLite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list knowledge: %v", err)
 	}
-	if len(knowledge) != 1 || knowledge[0].ResolvedKind() != KindNote {
+	if len(knowledge) != 1 || knowledge[0].Label(LabelPrefixKind) != KindNote {
 		t.Errorf("list knowledge: got %d artifacts, want 1 note", len(knowledge))
 	}
 
@@ -148,7 +148,7 @@ func TestFilter_FamilyFilter_SQLite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list effort: %v", err)
 	}
-	if len(effort) != 1 || effort[0].ResolvedKind() != KindTask {
+	if len(effort) != 1 || effort[0].Label(LabelPrefixKind) != KindTask {
 		t.Errorf("list effort: got %d artifacts, want 1 task", len(effort))
 	}
 }
@@ -179,7 +179,7 @@ func TestFilter_FamilyFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list knowledge: %v", err)
 	}
-	if len(knowledge) != 1 || knowledge[0].ResolvedKind() != KindNote {
+	if len(knowledge) != 1 || knowledge[0].Label(LabelPrefixKind) != KindNote {
 		t.Errorf("list knowledge: got %d artifacts, expected 1 note", len(knowledge))
 	}
 
@@ -188,7 +188,7 @@ func TestFilter_FamilyFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list effort: %v", err)
 	}
-	if len(effort) != 1 || effort[0].ResolvedKind() != KindTask {
+	if len(effort) != 1 || effort[0].Label(LabelPrefixKind) != KindTask {
 		t.Errorf("list effort: got %d artifacts, expected 1 task", len(effort))
 	}
 }

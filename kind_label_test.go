@@ -9,14 +9,14 @@ import (
 
 func TestResolvedKind_FromLabel(t *testing.T) {
 	art := &parchment.Artifact{Labels: []string{"kind:bug", "priority:high"}}
-	if got := art.ResolvedKind(); got != "bug" {
+	if got := parchment.LabelValue(art.Labels, parchment.LabelPrefixKind); got != "bug" {
 		t.Errorf("expected bug, got %q", got)
 	}
 }
 
 func TestResolvedKind_EmptyWhenNoLabel(t *testing.T) {
 	art := &parchment.Artifact{}
-	if got := art.ResolvedKind(); got != "" {
+	if got := parchment.LabelValue(art.Labels, parchment.LabelPrefixKind); got != "" {
 		t.Errorf("expected empty, got %q", got)
 	}
 }
@@ -53,8 +53,8 @@ func TestCreateArtifact_KindFromLabel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if art.ResolvedKind() != "bug" {
-		t.Errorf("expected ResolvedKind()=bug, got %q", art.ResolvedKind())
+	if parchment.LabelValue(art.Labels, parchment.LabelPrefixKind) != "bug" {
+		t.Errorf("expected ResolvedKind()=bug, got %q", parchment.LabelValue(art.Labels, parchment.LabelPrefixKind))
 	}
 }
 
@@ -79,8 +79,8 @@ func TestSetField_KindWritesLabel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if updated.ResolvedKind() != "bug" {
-		t.Errorf("ResolvedKind(): expected bug, got %q", updated.ResolvedKind())
+	if updated.Label(parchment.LabelPrefixKind) != "bug" {
+		t.Errorf("ResolvedKind(): expected bug, got %q", updated.Label(parchment.LabelPrefixKind))
 	}
 	if !slices.Contains(updated.Labels, "kind:bug") {
 		t.Errorf("expected kind:bug in labels, got %v", updated.Labels)

@@ -117,7 +117,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	}
 	if in.Parent != "" {
 		if parent, err := p.store.Get(ctx, in.Parent); err == nil {
-			if reason, ok := p.ValidChild(parent.ResolvedKind(), kind); !ok {
+			if reason, ok := p.ValidChild(labelValue(parent.Labels, LabelPrefixKind), kind); !ok {
 				return nil, fmt.Errorf("%s", reason) //nolint:err113 // runtime values required in message; no static sentinel possible
 			}
 		}
@@ -141,8 +141,8 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	// Inherit defaults from parent
 	if in.Parent != "" {
 		if parent, err := p.store.Get(ctx, in.Parent); err == nil {
-			if in.Priority == "" && parent.Priority() != "" {
-				in.Priority = parent.Priority()
+			if in.Priority == "" && labelValue(parent.Labels, LabelPrefixPriority) != "" {
+				in.Priority = labelValue(parent.Labels, LabelPrefixPriority)
 			}
 		}
 	}
@@ -247,24 +247,24 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	}
 	// Skip template, edge enforcement, and duplicate checks for SkipGuards kinds (e.g. mirror)
 	skipGuards := false
-	if kd, ok := p.schema.Kinds[art.ResolvedKind()]; ok {
+	if kd, ok := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]; ok {
 		skipGuards = kd.SkipGuards
 	}
 
 	if !skipGuards { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity
 		// Auto-link template if no satisfies link provided
 		if art.Links == nil || len(art.Links[RelSatisfies]) == 0 {
-			if tplID := p.findTemplateForKind(ctx, art.ResolvedKind(), scope); tplID != "" {
+			if tplID := p.findTemplateForKind(ctx, labelValue(art.Labels, LabelPrefixKind), scope); tplID != "" {
 				if art.Links == nil {
 					art.Links = make(map[string][]string)
 				}
 				art.Links[RelSatisfies] = []string{tplID}
 				slog.DebugContext(ctx, "auto-linked template",
-					slog.String("artifact_kind", art.ResolvedKind()), slog.String("scope", scope), slog.String("template_id", tplID)) //nolint:sloglint // artifact_kind/scope/template_id have no LogKey constants
+					slog.String("artifact_kind", labelValue(art.Labels, LabelPrefixKind)), slog.String("scope", scope), slog.String("template_id", tplID)) //nolint:sloglint // artifact_kind/scope/template_id have no LogKey constants
 			}
 		}
 		// Check mandatory outgoing edges
-		if kd, ok := p.schema.Kinds[art.ResolvedKind()]; ok {
+		if kd, ok := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]; ok {
 			for _, reqRel := range kd.Relations.RequiredOutgoing {
 				hasEdge := false
 				if targets, ok := art.Links[reqRel]; ok && len(targets) > 0 {
@@ -278,7 +278,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 				if reqRel == RelDependsOn {
 					hint = fmt.Sprintf("depends_on: [\"<target-id>\"] or links: {%q: [\"<target-id>\"]}", reqRel)
 				}
-					return nil, fmt.Errorf("%s requires a %s edge — add it at creation time via %s", art.ResolvedKind(), reqRel, hint) //nolint:err113 // runtime values required in message; no static sentinel possible
+					return nil, fmt.Errorf("%s requires a %s edge — add it at creation time via %s", labelValue(art.Labels, LabelPrefixKind), reqRel, hint) //nolint:err113 // runtime values required in message; no static sentinel possible
 				}
 			}
 		}
@@ -296,9 +296,9 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 			}
 		}
 		// Duplicate awareness: warn if similar non-terminal artifact exists
-		if existing, _ := p.store.List(ctx, Filter{Labels: []string{LabelPrefixKind + art.ResolvedKind(), LabelPrefixScope + art.Scope()}}); len(existing) > 0 {
+		if existing, _ := p.store.List(ctx, Filter{Labels: []string{LabelPrefixKind + labelValue(art.Labels, LabelPrefixKind), LabelPrefixScope + labelValue(art.Labels, LabelPrefixScope)}}); len(existing) > 0 {
 			for _, e := range existing {
-				if !p.IsTerminal(e.ResolvedStatus()) && e.Title == art.Title {
+				if !p.IsTerminal(labelValue(e.Labels, LabelPrefixStatus)) && e.Title == art.Title {
 					slog.WarnContext(ctx, "duplicate title detected on create",
 						slog.String("new_id", art.ID), slog.String("existing_id", e.ID), slog.String("title", art.Title)) //nolint:sloglint // new_id/existing_id have no LogKey constants
 				}
@@ -316,7 +316,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		p.executeTemplateHooks(ctx, art)
 	}
 
-	p.emitEvent(ctx, EventCreated, art.ID, art.Scope(), nil)
+	p.emitEvent(ctx, EventCreated, art.ID, labelValue(art.Labels, LabelPrefixScope), nil)
 	return art, nil
 }
 
@@ -365,8 +365,8 @@ func (p *Protocol) DeleteArtifact(ctx context.Context, id string, force bool) er
 		if err != nil {
 			return err
 		}
-		if !p.IsReadonly(art.ResolvedStatus()) {
-			return fmt.Errorf("%w: %s (status: %s)", ErrNotArchived, id, art.ResolvedStatus())
+		if !p.IsReadonly(labelValue(art.Labels, LabelPrefixStatus)) {
+			return fmt.Errorf("%w: %s (status: %s)", ErrNotArchived, id, labelValue(art.Labels, LabelPrefixStatus))
 		}
 	}
 	if err := p.store.Delete(ctx, id); err != nil {
@@ -607,7 +607,7 @@ func (p *Protocol) AttachSection(ctx context.Context, id, name, text string) (bo
 	if err != nil {
 		return false, err
 	}
-	if p.schema.Guards.ArchivedReadonly && p.IsReadonly(art.ResolvedStatus()) {
+	if p.schema.Guards.ArchivedReadonly && p.IsReadonly(labelValue(art.Labels, LabelPrefixStatus)) {
 		return false, fmt.Errorf("%w: %s", ErrArchived, art.ID)
 	}
 	replaced := false
@@ -656,7 +656,7 @@ func (p *Protocol) DetachSection(ctx context.Context, id, name string) (bool, er
 	if err != nil {
 		return false, err
 	}
-	if p.schema.Guards.ArchivedReadonly && p.IsReadonly(art.ResolvedStatus()) {
+	if p.schema.Guards.ArchivedReadonly && p.IsReadonly(labelValue(art.Labels, LabelPrefixStatus)) {
 		return false, fmt.Errorf("%w: %s", ErrArchived, art.ID)
 	}
 	if tpl := p.resolveTemplate(ctx, art); tpl != nil {
@@ -692,15 +692,15 @@ func (p *Protocol) inferScope(ctx context.Context, explicit, parentID, kind stri
 	// Templates and config artifacts can be global (scopeless)
 	if kind == KindTemplate || kind == KindConfig {
 		if parentID != "" {
-			if parent, err := p.store.Get(ctx, parentID); err == nil && parent.Scope() != "" {
-				return parent.Scope(), nil
+			if parent, err := p.store.Get(ctx, parentID); err == nil && labelValue(parent.Labels, LabelPrefixScope) != "" {
+				return labelValue(parent.Labels, LabelPrefixScope), nil
 			}
 		}
 		return "", nil
 	}
 	if parentID != "" {
-		if parent, err := p.store.Get(ctx, parentID); err == nil && parent.Scope() != "" {
-			return parent.Scope(), nil
+		if parent, err := p.store.Get(ctx, parentID); err == nil && labelValue(parent.Labels, LabelPrefixScope) != "" {
+			return labelValue(parent.Labels, LabelPrefixScope), nil
 		}
 	}
 	if len(p.scopes) == 1 {
@@ -829,11 +829,11 @@ func (p *Protocol) retireSingle(ctx context.Context, id string, cascade bool) er
 	if err != nil {
 		return err
 	}
-	if art.ResolvedStatus() == StatusRetired {
+	if labelValue(art.Labels, LabelPrefixStatus) == StatusRetired {
 		return nil // idempotent
 	}
-	if p.IsReadonly(art.ResolvedStatus()) {
-		return fmt.Errorf("%s is %s (readonly) — de-archive before retiring", id, art.ResolvedStatus()) //nolint:err113 // domain error
+	if p.IsReadonly(labelValue(art.Labels, LabelPrefixStatus)) {
+		return fmt.Errorf("%s is %s (readonly) — de-archive before retiring", id, labelValue(art.Labels, LabelPrefixStatus)) //nolint:err113 // domain error
 	}
 	children, err := p.store.Children(ctx, id)
 	if err != nil {
@@ -844,14 +844,14 @@ func (p *Protocol) retireSingle(ctx context.Context, id string, cascade bool) er
 			if err := p.retireSingle(ctx, ch.ID, true); err != nil {
 				return fmt.Errorf("cascade retire %s: %w", ch.ID, err)
 			}
-		} else if !p.IsTerminal(ch.ResolvedStatus()) {
-			return fmt.Errorf("cannot retire %s: child %s is %s (use cascade to retire the whole tree)", id, ch.ID, ch.ResolvedStatus()) //nolint:err113 // domain error
+		} else if !p.IsTerminal(labelValue(ch.Labels, LabelPrefixStatus)) {
+			return fmt.Errorf("cannot retire %s: child %s is %s (use cascade to retire the whole tree)", id, ch.ID, labelValue(ch.Labels, LabelPrefixStatus)) //nolint:err113 // domain error
 		}
 	}
 	art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, StatusRetired)
 	slog.InfoContext(ctx, "retired",
 		slog.String(LogKeyID, id),
-		slog.String(LogKeyKind, art.ResolvedKind()))
+		slog.String(LogKeyKind, labelValue(art.Labels, LabelPrefixKind)))
 	return p.store.Put(ctx, art)
 }
 
@@ -870,8 +870,8 @@ func (p *Protocol) DeArchive(ctx context.Context, ids []string, cascade bool) ([
 			results = append(results, Result{ID: id, Error: err.Error()})
 			continue
 		}
-		if !p.IsReadonly(art.ResolvedStatus()) {
-			results = append(results, Result{ID: id, Error: fmt.Sprintf("%s is not archived (status: %s)", id, art.ResolvedStatus())})
+		if !p.IsReadonly(labelValue(art.Labels, LabelPrefixStatus)) {
+			results = append(results, Result{ID: id, Error: fmt.Sprintf("%s is not archived (status: %s)", id, labelValue(art.Labels, LabelPrefixStatus))})
 			continue
 		}
 		art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, StatusDraft)
@@ -883,7 +883,7 @@ func (p *Protocol) DeArchive(ctx context.Context, ids []string, cascade bool) ([
 		if cascade {
 			children, _ := p.store.Children(ctx, id)
 			for _, ch := range children {
-				if p.IsReadonly(ch.ResolvedStatus()) {
+				if p.IsReadonly(labelValue(ch.Labels, LabelPrefixStatus)) {
 					ch.Labels = mirrorLabel(ch.Labels, LabelPrefixStatus, StatusDraft)
 					_ = p.store.Put(ctx, ch)
 				}
@@ -898,7 +898,7 @@ func (p *Protocol) archiveSingle(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	if p.IsReadonly(art.ResolvedStatus()) {
+	if p.IsReadonly(labelValue(art.Labels, LabelPrefixStatus)) {
 		return nil
 	}
 	// No cascade — archive is single-artifact only. Children must already be
@@ -908,8 +908,8 @@ func (p *Protocol) archiveSingle(ctx context.Context, id string) error {
 		return err
 	}
 	for _, ch := range children {
-		if !p.IsTerminal(ch.ResolvedStatus()) {
-			return fmt.Errorf("cannot archive %s: child %s is %s — retire or complete children first", id, ch.ID, ch.ResolvedStatus()) //nolint:err113 // domain error
+		if !p.IsTerminal(labelValue(ch.Labels, LabelPrefixStatus)) {
+			return fmt.Errorf("cannot archive %s: child %s is %s — retire or complete children first", id, ch.ID, labelValue(ch.Labels, LabelPrefixStatus)) //nolint:err113 // domain error
 		}
 	}
 	art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, p.schema.ReadonlyStatuses[0])
@@ -948,7 +948,7 @@ func (p *Protocol) SearchSemantic(ctx context.Context, query string, in ListInpu
 		if err != nil {
 			continue
 		}
-		if in.Scope != "" && art.Scope() != in.Scope {
+		if in.Scope != "" && labelValue(art.Labels, LabelPrefixScope) != in.Scope {
 			continue
 		}
 		results = append(results, ScoredArtifact{Artifact: art, Score: hit.Score})

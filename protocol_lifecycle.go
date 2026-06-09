@@ -15,7 +15,7 @@ func (p *Protocol) RegisterGate(g QualityGate) { p.gates = append(p.gates, g) }
 // Components: checklist items, child completion, section coverage.
 func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 { //nolint:gocyclo // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
 	// Terminal artifacts are 100% complete by definition
-	if p.IsTerminal(art.ResolvedStatus()) {
+	if p.IsTerminal(labelValue(art.Labels, LabelPrefixStatus)) {
 		return 1.0
 	}
 
@@ -47,7 +47,7 @@ func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 {
 	if err == nil && len(children) > 0 {
 		done := 0
 		for _, ch := range children {
-			if p.IsTerminal(ch.ResolvedStatus()) {
+			if p.IsTerminal(labelValue(ch.Labels, LabelPrefixStatus)) {
 				done++
 			}
 		}
@@ -55,7 +55,7 @@ func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 {
 	}
 
 	// 3. Sections: filled should-sections
-	shouldSections := p.ShouldSections(art.ResolvedKind())
+	shouldSections := p.ShouldSections(labelValue(art.Labels, LabelPrefixKind))
 	if len(shouldSections) > 0 {
 		filled := 0
 		have := make(map[string]bool)
@@ -144,7 +144,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		return Result{ID: id, Error: err.Error()}
 	}
 
-	if !opt.BypassGuards && p.schema.Guards.ArchivedReadonly && p.IsReadonly(art.ResolvedStatus()) {
+	if !opt.BypassGuards && p.schema.Guards.ArchivedReadonly && p.IsReadonly(labelValue(art.Labels, LabelPrefixStatus)) {
 		return Result{ID: id, Error: fmt.Sprintf("%s: %s", ErrArchived, id)}
 	}
 
@@ -176,7 +176,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 	case FieldParent:
 		if value != "" {
 			if parent, err := p.store.Get(ctx, value); err == nil {
-				if reason, ok := p.ValidChild(parent.ResolvedKind(), art.ResolvedKind()); !ok {
+				if reason, ok := p.ValidChild(labelValue(parent.Labels, LabelPrefixKind), labelValue(art.Labels, LabelPrefixKind)); !ok {
 					return Result{ID: id, Error: reason}
 				}
 			}
@@ -231,12 +231,12 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 	if err := p.store.Put(ctx, art); err != nil {
 		return Result{ID: id, Error: err.Error()}
 	}
-	p.emitEvent(ctx, EventUpdated, art.ID, art.Scope(), map[string]string{"field": field, "value": value})
+	p.emitEvent(ctx, EventUpdated, art.ID, labelValue(art.Labels, LabelPrefixScope), map[string]string{"field": field, "value": value})
 
 	// scope+rename_id: generate a new ID from the new scope's key and migrate.
 	if field == FieldScope && opt.RenameID { //nolint:nestif // scope key resolution has legitimate branching; splitting into helper would just move it
 		scopeKey, _, _ := p.store.GetScopeKey(ctx, value)
-		kindCode := p.resolveKindCode(art.ResolvedKind())
+		kindCode := p.resolveKindCode(labelValue(art.Labels, LabelPrefixKind))
 		var newID string
 		var genErr error
 		if scopeKey != "" {
@@ -244,7 +244,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		} else {
 			prefix := scopeKey + kindCode
 			if prefix == "" {
-				prefix = art.ResolvedKind()
+				prefix = labelValue(art.Labels, LabelPrefixKind)
 			}
 			newID, genErr = p.store.NextID(ctx, prefix)
 		}
@@ -267,15 +267,15 @@ func (p *Protocol) setStatus(ctx context.Context, art *Artifact, status string) 
 
 
 func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status string, force bool) Result { //nolint:gocyclo,funlen // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol.go
-	reason, valid := p.schema.ValidTransition(art.ResolvedKind(), art.ResolvedStatus(), status)
+	reason, valid := p.schema.ValidTransition(labelValue(art.Labels, LabelPrefixKind), labelValue(art.Labels, LabelPrefixStatus), status)
 	if !valid {
 		if !force {
 			return Result{ID: art.ID, Error: reason}
 		}
 		slog.WarnContext(ctx, "forced status transition bypasses lifecycle model",
 			slog.String(LogKeyID, art.ID),
-			slog.String(LogKeyKind, art.ResolvedKind()),
-			slog.String(LogKeyFrom, art.ResolvedStatus()),
+			slog.String(LogKeyKind, labelValue(art.Labels, LabelPrefixKind)),
+			slog.String(LogKeyFrom, labelValue(art.Labels, LabelPrefixStatus)),
 			slog.String(LogKeyTo, status),
 			slog.String(LogKeyReason, reason))
 	}
@@ -325,32 +325,32 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 			if err != nil {
 				continue
 			}
-			if !p.IsTerminal(preceded.ResolvedStatus()) {
-				followsWarnings = append(followsWarnings, fmt.Sprintf("%s is %s", preceded.ID, preceded.ResolvedStatus()))
+			if !p.IsTerminal(labelValue(preceded.Labels, LabelPrefixStatus)) {
+				followsWarnings = append(followsWarnings, fmt.Sprintf("%s is %s", preceded.ID, labelValue(preceded.Labels, LabelPrefixStatus)))
 			}
 		}
 	}
 
-	oldStatus := art.ResolvedStatus()
+	oldStatus := labelValue(art.Labels, LabelPrefixStatus)
 	art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, status)
 	if err := p.store.Put(ctx, art); err != nil {
 		return Result{ID: art.ID, Error: err.Error()}
 	}
-	p.emitEvent(ctx, EventStatusChanged, art.ID, art.Scope(), map[string]string{"from": oldStatus, "to": status})
+	p.emitEvent(ctx, EventStatusChanged, art.ID, labelValue(art.Labels, LabelPrefixScope), map[string]string{"from": oldStatus, "to": status})
 
 	slog.InfoContext(ctx, "lifecycle transition",
 		slog.String(LogKeyID, art.ID),
-		slog.String(LogKeyKind, art.ResolvedKind()),
+		slog.String(LogKeyKind, labelValue(art.Labels, LabelPrefixKind)),
 		slog.String(LogKeyFrom, oldStatus),
 		slog.String(LogKeyTo, status))
 
-	triggerStatus := p.schema.TriggerStatusFor(art.ResolvedKind())
+	triggerStatus := p.schema.TriggerStatusFor(labelValue(art.Labels, LabelPrefixKind))
 	r := Result{ID: art.ID, OK: true}
 	var info []string
 	if len(followsWarnings) > 0 {
 		info = append(info, fmt.Sprintf("warning: activating before followed artifacts complete: %s", strings.Join(followsWarnings, ", ")))
 	}
-	if p.schema.AutoArchiveOnJustifyComplete(art.ResolvedKind()) && status == triggerStatus {
+	if p.schema.AutoArchiveOnJustifyComplete(labelValue(art.Labels, LabelPrefixKind)) && status == triggerStatus {
 		if extra := p.autoArchiveGoal(ctx, art); extra != "" {
 			info = append(info, extra)
 		}
@@ -366,11 +366,11 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 		}
 	}
 	// Auto-enrichment: on task completion, update implementing spec
-	if art.ResolvedKind() == KindTask && status == StatusComplete { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
+	if labelValue(art.Labels, LabelPrefixKind) == KindTask && status == StatusComplete { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
 		if targets, ok := art.Links[RelImplements]; ok {
 			for _, specID := range targets {
 				spec, err := p.store.Get(ctx, specID)
-				if err != nil || spec.ResolvedKind() != KindSpec {
+				if err != nil || labelValue(spec.Labels, LabelPrefixKind) != KindSpec {
 					continue
 				}
 				entry := fmt.Sprintf("- %s: %s (completed)", art.ID, art.Title)
@@ -411,8 +411,8 @@ func (p *Protocol) guardDependsOnComplete(ctx context.Context, art *Artifact) er
 		if err != nil {
 			continue // dangling edge, not a blocker
 		}
-		if !p.IsTerminal(dep.ResolvedStatus()) {
-			incomplete = append(incomplete, fmt.Sprintf("%s [%s]", dep.ID, dep.ResolvedStatus()))
+		if !p.IsTerminal(labelValue(dep.Labels, LabelPrefixStatus)) {
+			incomplete = append(incomplete, fmt.Sprintf("%s [%s]", dep.ID, labelValue(dep.Labels, LabelPrefixStatus)))
 		}
 	}
 	if len(incomplete) > 0 {
@@ -429,8 +429,8 @@ func (p *Protocol) guardChildrenComplete(ctx context.Context, art *Artifact) err
 	}
 	var incomplete []string
 	for _, ch := range children {
-		if !p.IsTerminal(ch.ResolvedStatus()) {
-			incomplete = append(incomplete, fmt.Sprintf("%s [%s]", ch.ID, ch.ResolvedStatus()))
+		if !p.IsTerminal(labelValue(ch.Labels, LabelPrefixStatus)) {
+			incomplete = append(incomplete, fmt.Sprintf("%s [%s]", ch.ID, labelValue(ch.Labels, LabelPrefixStatus)))
 		}
 	}
 	if len(incomplete) > 0 {
@@ -455,7 +455,7 @@ func (p *Protocol) autoArchiveGoal(ctx context.Context, art *Artifact) string {
 		if err != nil {
 			continue
 		}
-		if !p.schema.Kinds[goal.ResolvedKind()].IsGoalKind || goal.ResolvedStatus() != goalDef.ActiveStatus {
+		if !p.schema.Kinds[labelValue(goal.Labels, LabelPrefixKind)].IsGoalKind || labelValue(goal.Labels, LabelPrefixStatus) != goalDef.ActiveStatus {
 			continue
 		}
 		goal.Labels = mirrorLabel(goal.Labels, LabelPrefixStatus, p.schema.ReadonlyStatuses[0])
@@ -479,14 +479,14 @@ func (p *Protocol) completionRollup(ctx context.Context, art *Artifact) string {
 		sources, _ := p.store.Neighbors(ctx, art.ID, relation, Incoming)
 		for _, e := range sources {
 			source, err := p.store.Get(ctx, e.From)
-			if err != nil || p.IsTerminal(source.ResolvedStatus()) {
+			if err != nil || p.IsTerminal(labelValue(source.Labels, LabelPrefixStatus)) {
 				continue
 			}
 			targets, _ := p.store.Neighbors(ctx, source.ID, relation, Outgoing)
 			allDone := true
 			for _, t := range targets {
 				child, err := p.store.Get(ctx, t.To)
-				if err != nil || !p.IsTerminal(child.ResolvedStatus()) {
+				if err != nil || !p.IsTerminal(labelValue(child.Labels, LabelPrefixStatus)) {
 					allDone = false
 					break
 				}
@@ -507,7 +507,7 @@ func (p *Protocol) autoCompleteParent(ctx context.Context, art *Artifact) string
 		return ""
 	}
 	parent, err := p.store.Get(ctx, art.Parent)
-	if err != nil || p.IsTerminal(parent.ResolvedStatus()) {
+	if err != nil || p.IsTerminal(labelValue(parent.Labels, LabelPrefixStatus)) {
 		return ""
 	}
 	children, err := p.store.Children(ctx, parent.ID)
@@ -515,7 +515,7 @@ func (p *Protocol) autoCompleteParent(ctx context.Context, art *Artifact) string
 		return ""
 	}
 	for _, ch := range children {
-		if !p.IsTerminal(ch.ResolvedStatus()) {
+		if !p.IsTerminal(labelValue(ch.Labels, LabelPrefixStatus)) {
 			return ""
 		}
 	}

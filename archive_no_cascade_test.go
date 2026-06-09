@@ -27,8 +27,8 @@ func TestArchiveArtifact_SingleOnly(t *testing.T) {
 	}
 
 	got, _ := proto.GetArtifact(ctx, child.ID)
-	if got.ResolvedStatus() != parchment.StatusArchived {
-		t.Errorf("ArchiveArtifact with CascadeArchive should cascade to child; child status = %s", got.ResolvedStatus())
+	if got.Label(parchment.LabelPrefixStatus) != parchment.StatusArchived {
+		t.Errorf("ArchiveArtifact with CascadeArchive should cascade to child; child status = %s", got.Label(parchment.LabelPrefixStatus))
 	}
 }
 
@@ -50,7 +50,7 @@ func TestRetireArtifact_CascadeStillWorks(t *testing.T) {
 	}
 
 	got, _ := proto.GetArtifact(ctx, child.ID)
-	if got.ResolvedStatus() != parchment.StatusRetired {
-		t.Errorf("RetireArtifact cascade: child should be retired, got %s", got.ResolvedStatus())
+	if got.Label(parchment.LabelPrefixStatus) != parchment.StatusRetired {
+		t.Errorf("RetireArtifact cascade: child should be retired, got %s", got.Label(parchment.LabelPrefixStatus))
 	}
 }

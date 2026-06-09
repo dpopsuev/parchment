@@ -63,8 +63,8 @@ func TestRetireArtifact_TaskFromComplete(t *testing.T) {
 	}
 
 	art, _ := proto.GetArtifact(ctx, task.ID)
-	if art.ResolvedStatus() != parchment.StatusRetired {
-		t.Errorf("expected status=retired, got %s", art.ResolvedStatus())
+	if parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus) != parchment.StatusRetired {
+		t.Errorf("expected status=retired, got %s", parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus))
 	}
 }
 

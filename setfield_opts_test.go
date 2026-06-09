@@ -28,8 +28,8 @@ func TestSetFieldOptions_BypassGuards_ArchivesWithoutGuards(t *testing.T) {
 		t.Fatalf("expected OK with BypassGuards, got: %s", results[0].Error)
 	}
 	art, _ := proto.GetArtifact(ctx, task.ID)
-	if art.ResolvedStatus() != parchment.StatusArchived {
-		t.Errorf("status = %q, want archived", art.ResolvedStatus())
+	if parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus) != parchment.StatusArchived {
+		t.Errorf("status = %q, want archived", parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus))
 	}
 }
 
@@ -58,8 +58,8 @@ func TestSetFieldOptions_Cascade_TransitionsChildren(t *testing.T) {
 
 	for _, id := range []string{a.ID, b.ID} {
 		art, _ := proto.GetArtifact(ctx, id)
-		if art.ResolvedStatus() != parchment.StatusArchived {
-			t.Errorf("child %s status = %q, want archived", id, art.ResolvedStatus())
+		if parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus) != parchment.StatusArchived {
+			t.Errorf("child %s status = %q, want archived", id, parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus))
 		}
 	}
 }
@@ -73,7 +73,7 @@ func TestSetFieldOptions_DryRun_NoMutation(t *testing.T) {
 
 	task := mustCreate(t, proto, parchment.CreateInput{Title: "T",
 		Labels: []string{"kind:task"},})
-	original := task.ResolvedStatus()
+	original := task.Label(parchment.LabelPrefixStatus)
 
 	results, err := proto.SetField(ctx, []string{task.ID}, "status", parchment.StatusArchived,
 		parchment.SetFieldOptions{BypassGuards: true, DryRun: true})
@@ -85,7 +85,7 @@ func TestSetFieldOptions_DryRun_NoMutation(t *testing.T) {
 	}
 
 	art, _ := proto.GetArtifact(ctx, task.ID)
-	if art.ResolvedStatus() != original {
-		t.Errorf("dry run mutated status: got %q, want %q", art.ResolvedStatus(), original)
+	if parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus) != original {
+		t.Errorf("dry run mutated status: got %q, want %q", parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus), original)
 	}
 }

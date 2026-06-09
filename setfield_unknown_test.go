@@ -108,8 +108,8 @@ func TestSetField_KnownFields_StillWork(t *testing.T) {
 	}{
 		{parchment.FieldTitle, "updated", func(a *parchment.Artifact) bool { return a.Title == "updated" }},
 		{parchment.FieldGoal, "ship it", func(a *parchment.Artifact) bool { return a.Goal == "ship it" }},
-		{parchment.FieldPriority, "high", func(a *parchment.Artifact) bool { return a.Priority() == "high" }},
-		{parchment.FieldSprint, "s1", func(a *parchment.Artifact) bool { return a.Sprint() == "s1" }},
+		{parchment.FieldPriority, "high", func(a *parchment.Artifact) bool { return parchment.LabelValue(a.Labels, parchment.LabelPrefixPriority) == "high" }},
+		{parchment.FieldSprint, "s1", func(a *parchment.Artifact) bool { return parchment.LabelValue(a.Labels, parchment.LabelPrefixSprint) == "s1" }},
 	}
 
 	for _, tc := range cases {

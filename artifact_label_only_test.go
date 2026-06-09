@@ -35,14 +35,14 @@ func TestArtifact_ScanHydration_KindFromLabel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got.ResolvedKind() != "task" {
-		t.Errorf("scan hydration failed: ResolvedKind()=%q, want 'task' from label", got.ResolvedKind())
+	if got.Label(parchment.LabelPrefixKind) != "task" {
+		t.Errorf("scan hydration failed: ResolvedKind()=%q, want 'task' from label", got.Label(parchment.LabelPrefixKind))
 	}
-	if got.Scope() != "test" {
-		t.Errorf("scan hydration failed: Scope()=%q, want 'test' from label", got.Scope())
+	if got.Label(parchment.LabelPrefixScope) != "test" {
+		t.Errorf("scan hydration failed: Scope()=%q, want 'test' from label", got.Label(parchment.LabelPrefixScope))
 	}
-	if got.ResolvedStatus() != "active" {
-		t.Errorf("scan hydration failed: ResolvedStatus()=%q, want 'active' from label", got.ResolvedStatus())
+	if got.Label(parchment.LabelPrefixStatus) != "active" {
+		t.Errorf("scan hydration failed: ResolvedStatus()=%q, want 'active' from label", got.Label(parchment.LabelPrefixStatus))
 	}
 }
 
@@ -78,7 +78,7 @@ func TestArtifact_ScanHydration_ListAlsoHydrates(t *testing.T) {
 		t.Fatalf("expected 3 artifacts, got %d", len(arts))
 	}
 	for _, art := range arts {
-		if art.ResolvedKind() == "" {
+		if parchment.LabelValue(art.Labels, parchment.LabelPrefixKind) == "" {
 			t.Errorf("artifact %s: ResolvedKind() empty (labels=%v)", art.ID, art.Labels)
 		}
 		expectedKind := ""
@@ -88,8 +88,8 @@ func TestArtifact_ScanHydration_ListAlsoHydrates(t *testing.T) {
 				break
 			}
 		}
-		if art.ResolvedKind() != expectedKind {
-			t.Errorf("artifact %s: ResolvedKind()=%q, want %q from label", art.ID, art.ResolvedKind(), expectedKind)
+		if parchment.LabelValue(art.Labels, parchment.LabelPrefixKind) != expectedKind {
+			t.Errorf("artifact %s: ResolvedKind()=%q, want %q from label", art.ID, parchment.LabelValue(art.Labels, parchment.LabelPrefixKind), expectedKind)
 		}
 	}
 }
@@ -113,7 +113,7 @@ func TestCreateArtifact_KindFromLabelIsCanonical(t *testing.T) {
 	if !slices.Contains(art.Labels, "kind:task") {
 		t.Errorf("kind:task missing from labels: %v", art.Labels)
 	}
-	if art.ResolvedKind() != "task" {
-		t.Errorf("ResolvedKind() = %q, want 'task'", art.ResolvedKind())
+	if parchment.LabelValue(art.Labels, parchment.LabelPrefixKind) != "task" {
+		t.Errorf("ResolvedKind() = %q, want 'task'", parchment.LabelValue(art.Labels, parchment.LabelPrefixKind))
 	}
 }

@@ -89,8 +89,8 @@ func TestIntentLifecycle_Protocol(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create need: %v", err)
 	}
-	if art.ResolvedStatus() != StatusDraft {
-		t.Fatalf("expected draft, got %s", art.ResolvedStatus())
+	if labelValue(art.Labels, LabelPrefixStatus) != StatusDraft {
+		t.Fatalf("expected draft, got %s", labelValue(art.Labels, LabelPrefixStatus))
 	}
 
 	// Propose it.

@@ -99,11 +99,11 @@ func TestRenderVaultMarkdown_RoundTrip(t *testing.T) {
 	if got.ID != art.ID {
 		t.Errorf("ID: got %q, want %q", got.ID, art.ID)
 	}
-	if got.ResolvedKind() != art.ResolvedKind() {
-		t.Errorf("Kind: got %q, want %q", got.ResolvedKind(), art.ResolvedKind())
+	if got.Label(LabelPrefixKind) != labelValue(art.Labels, LabelPrefixKind) {
+		t.Errorf("Kind: got %q, want %q", got.Label(LabelPrefixKind), labelValue(art.Labels, LabelPrefixKind))
 	}
-	if got.ResolvedStatus() != art.ResolvedStatus() {
-		t.Errorf("Status: got %q, want %q", got.ResolvedStatus(), art.ResolvedStatus())
+	if got.Label(LabelPrefixStatus) != labelValue(art.Labels, LabelPrefixStatus) {
+		t.Errorf("Status: got %q, want %q", got.Label(LabelPrefixStatus), labelValue(art.Labels, LabelPrefixStatus))
 	}
 	if got.Title != art.Title {
 		t.Errorf("Title: got %q, want %q", got.Title, art.Title)

@@ -62,7 +62,7 @@ func sgetStatus(t *testing.T, proto *parchment.Protocol, id string) string {
 	if err != nil {
 		t.Fatalf("get %s: %v", id, err)
 	}
-	return art.ResolvedStatus()
+	return parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus)
 }
 
 // seedEdgeType stores an edge_type_definition artifact directly in the store

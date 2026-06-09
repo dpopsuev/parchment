@@ -43,8 +43,8 @@ func TestCreateBug_ShouldSucceedWithOnlyFilingTimeSections(t *testing.T) {
 	if err != nil {
 		t.Fatalf("creating a bug with only filing-time sections should succeed, but got: %v", err)
 	}
-	if art.ResolvedStatus() != "draft" {
-		t.Errorf("new bug should be in draft status, got: %s", art.ResolvedStatus())
+	if parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus) != "draft" {
+		t.Errorf("new bug should be in draft status, got: %s", parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus))
 	}
 
 	// Completing the bug WITHOUT investigation sections should fail

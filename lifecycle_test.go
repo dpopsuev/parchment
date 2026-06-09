@@ -35,8 +35,8 @@ func TestTransition_ActiveToMature(t *testing.T) {
 	}
 
 	got, _ := store.Get(ctx, art.ID)
-	if got.ResolvedStatus() != "mature" {
-		t.Errorf("status = %q, want mature", got.ResolvedStatus())
+	if got.Label(parchment.LabelPrefixStatus) != "mature" {
+		t.Errorf("status = %q, want mature", got.Label(parchment.LabelPrefixStatus))
 	}
 }
 
@@ -67,8 +67,8 @@ func TestTransition_MatureToAllocated(t *testing.T) {
 	}
 
 	got, _ := store.Get(ctx, art.ID)
-	if got.ResolvedStatus() != "allocated" {
-		t.Errorf("status = %q, want allocated", got.ResolvedStatus())
+	if got.Label(parchment.LabelPrefixStatus) != "allocated" {
+		t.Errorf("status = %q, want allocated", got.Label(parchment.LabelPrefixStatus))
 	}
 }
 
@@ -96,8 +96,8 @@ func TestTransition_FullLifecycle(t *testing.T) {
 			t.Fatalf("transition to %s: %v", status, err)
 		}
 		got, _ := store.Get(ctx, art.ID)
-		if got.ResolvedStatus() != status {
-			t.Errorf("after transition: status = %q, want %q", got.ResolvedStatus(), status)
+		if got.Label(parchment.LabelPrefixStatus) != status {
+			t.Errorf("after transition: status = %q, want %q", got.Label(parchment.LabelPrefixStatus), status)
 		}
 	}
 }
@@ -124,8 +124,8 @@ func TestTransition_InvalidTransitionBlocked(t *testing.T) {
 	}
 
 	got, _ := store.Get(ctx, art.ID)
-	if got.ResolvedStatus() != "active" {
-		t.Errorf("status = %q, want active (unchanged)", got.ResolvedStatus())
+	if got.Label(parchment.LabelPrefixStatus) != "active" {
+		t.Errorf("status = %q, want active (unchanged)", got.Label(parchment.LabelPrefixStatus))
 	}
 }
 

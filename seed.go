@@ -68,7 +68,7 @@ func (p *Protocol) Seed(ctx context.Context, dir string) (*SeedResult, error) {
 				return result, fmt.Errorf("seed %s: %w", art.ID, err)
 			}
 			result.Created = append(result.Created, art.ID)
-			slog.InfoContext(ctx, "seed: created config", slog.String(LogKeyID, art.ID), slog.String(LogKeyScope, art.Scope()))
+			slog.InfoContext(ctx, "seed: created config", slog.String(LogKeyID, art.ID), slog.String(LogKeyScope, labelValue(art.Labels, LabelPrefixScope)))
 		}
 	}
 

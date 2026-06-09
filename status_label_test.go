@@ -9,14 +9,14 @@ import (
 
 func TestResolvedStatus_FromLabel(t *testing.T) {
 	art := &parchment.Artifact{Labels: []string{"priority:high", "status:draft"}}
-	if got := art.ResolvedStatus(); got != "draft" {
+	if got := parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus); got != "draft" {
 		t.Errorf("expected draft, got %q", got)
 	}
 }
 
 func TestResolvedStatus_EmptyWhenNoLabel(t *testing.T) {
 	art := &parchment.Artifact{}
-	if got := art.ResolvedStatus(); got != "" {
+	if got := parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus); got != "" {
 		t.Errorf("expected empty, got %q", got)
 	}
 }
@@ -56,8 +56,8 @@ func TestSetField_StatusWritesLabel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if updated.ResolvedStatus() != "evergreen" {
-		t.Errorf("ResolvedStatus(): expected evergreen, got %q", updated.ResolvedStatus())
+	if updated.Label(parchment.LabelPrefixStatus) != "evergreen" {
+		t.Errorf("ResolvedStatus(): expected evergreen, got %q", updated.Label(parchment.LabelPrefixStatus))
 	}
 	if !slices.Contains(updated.Labels, "status:evergreen") {
 		t.Errorf("expected status:evergreen in labels, got %v", updated.Labels)

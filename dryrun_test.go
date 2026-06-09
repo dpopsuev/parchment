@@ -25,7 +25,7 @@ func TestArchiveArtifact_DryRun_NoMutation(t *testing.T) {
 
 	// Status must be unchanged.
 	art, _ := proto.GetArtifact(ctx, task.ID)
-	if art.ResolvedStatus() == parchment.StatusArchived {
+	if parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus) == parchment.StatusArchived {
 		t.Error("dry_run=true must not mutate status")
 	}
 }
@@ -44,7 +44,7 @@ func TestArchiveArtifact_DryRun_False_DoesArchive(t *testing.T) {
 	}
 
 	art, _ := proto.GetArtifact(ctx, task.ID)
-	if art.ResolvedStatus() != parchment.StatusArchived {
-		t.Errorf("expected archived, got %s", art.ResolvedStatus())
+	if parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus) != parchment.StatusArchived {
+		t.Errorf("expected archived, got %s", parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus))
 	}
 }

@@ -83,8 +83,8 @@ func TestBulkSetField_UpdatesAllMatching(t *testing.T) {
 	}
 	for _, id := range []string{a.ID, b.ID} {
 		got, _ := proto.GetArtifact(ctx, id)
-		if got.Priority() != "high" {
-			t.Errorf("artifact %s priority = %q, want %q", id, got.Priority(), "high")
+		if got.Label(parchment.LabelPrefixPriority) != "high" {
+			t.Errorf("artifact %s priority = %q, want %q", id, got.Label(parchment.LabelPrefixPriority), "high")
 		}
 	}
 }
@@ -113,7 +113,7 @@ func TestBulkSetField_DryRun_NoMutation(t *testing.T) {
 		t.Error("DryRun flag should be set in result")
 	}
 	got, _ := proto.GetArtifact(ctx, art.ID)
-	if got.Priority() == "critical" {
+	if got.Label(parchment.LabelPrefixPriority) == "critical" {
 		t.Error("DryRun should not mutate the artifact")
 	}
 }
@@ -174,8 +174,8 @@ func TestFilter_LabelsOr(t *testing.T) {
 		t.Errorf("got %d artifacts, want 2 (task+bug)", len(arts))
 	}
 	for _, a := range arts {
-		if a.ResolvedKind() != parchment.KindTask && a.ResolvedKind() != parchment.KindBug {
-			t.Errorf("unexpected kind %q in result", a.ResolvedKind())
+		if parchment.LabelValue(a.Labels, parchment.LabelPrefixKind) != parchment.KindTask && parchment.LabelValue(a.Labels, parchment.LabelPrefixKind) != parchment.KindBug {
+			t.Errorf("unexpected kind %q in result", parchment.LabelValue(a.Labels, parchment.LabelPrefixKind))
 		}
 	}
 }

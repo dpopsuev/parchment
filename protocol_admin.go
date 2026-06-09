@@ -128,17 +128,17 @@ func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force boo
 		if !art.UpdatedAt.Before(cutoff) {
 			continue
 		}
-		if art.ResolvedStatus() == StatusRetired {
+		if labelValue(art.Labels, LabelPrefixStatus) == StatusRetired {
 			continue
 		}
 		// Label trait protection overrides kind-level Vacuumable.
 		if ResolveTrait(p.labelTraits, art.Labels).EvictionPolicy == "protected" {
 			continue
 		}
-		if kd, ok := p.schema.Kinds[art.ResolvedKind()]; ok && !kd.Vacuumable {
+		if kd, ok := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]; ok && !kd.Vacuumable {
 			continue
 		}
-		if !force && p.schema.IsProtected(art.ResolvedKind()) {
+		if !force && p.schema.IsProtected(labelValue(art.Labels, LabelPrefixKind)) {
 			continue
 		}
 		// Skip artifacts that still have incoming edges — age alone is not enough
@@ -288,11 +288,11 @@ func (p *Protocol) DetectOrphans(ctx context.Context, in OrphanInput) (*OrphanRe
 
 	report := &OrphanReport{}
 	for _, art := range arts {
-		if p.IsTerminal(art.ResolvedStatus()) {
+		if p.IsTerminal(labelValue(art.Labels, LabelPrefixStatus)) {
 			continue
 		}
 
-		kd, ok := p.schema.Kinds[art.ResolvedKind()]
+		kd, ok := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]
 		if !ok {
 			continue
 		}
@@ -306,7 +306,7 @@ func (p *Protocol) DetectOrphans(ctx context.Context, in OrphanInput) (*OrphanRe
 			if len(edges) == 0 {
 			report.Orphans = append(report.Orphans, OrphanEntry{
 				ID: art.ID, Title: art.Title, Labels: art.Labels,
-				Reason: fmt.Sprintf("%s has no outgoing %s link", art.ResolvedKind(), rel),
+				Reason: fmt.Sprintf("%s has no outgoing %s link", labelValue(art.Labels, LabelPrefixKind), rel),
 			})
 			}
 		}
@@ -557,13 +557,13 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 	report := &CheckReport{TotalScanned: len(arts)}
 
 	for _, art := range arts {
-		kd, knownKind := p.schema.Kinds[art.ResolvedKind()]
+		kd, knownKind := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]
 
 		if !knownKind {
 			report.Violations = append(report.Violations, CheckViolation{
 				ID: art.ID, Labels: art.Labels, Title: art.Title,
 				Category: "unknown_kind",
-				Detail:   fmt.Sprintf("kind %q not in schema", art.ResolvedKind()),
+				Detail:   fmt.Sprintf("kind %q not in schema", labelValue(art.Labels, LabelPrefixKind)),
 			})
 			continue
 		}
@@ -571,7 +571,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		if art.Parent != "" {
 			parent, err := p.store.Get(ctx, art.Parent)
 			if err == nil {
-				if reason, ok := p.ValidChild(parent.ResolvedKind(), art.ResolvedKind()); !ok {
+				if reason, ok := p.ValidChild(labelValue(parent.Labels, LabelPrefixKind), labelValue(art.Labels, LabelPrefixKind)); !ok {
 					report.Violations = append(report.Violations, CheckViolation{
 						ID: art.ID, Labels: art.Labels, Title: art.Title,
 						Category: "invalid_parent",
@@ -595,7 +595,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 					report.Violations = append(report.Violations, CheckViolation{
 						ID: art.ID, Labels: art.Labels, Title: art.Title,
 						Category: "invalid_relation",
-						Detail:   fmt.Sprintf("kind %q does not allow outgoing %q", art.ResolvedKind(), rel),
+						Detail:   fmt.Sprintf("kind %q does not allow outgoing %q", labelValue(art.Labels, LabelPrefixKind), rel),
 					})
 				}
 			}
@@ -605,12 +605,12 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 					if err != nil {
 						continue
 					}
-					if !slices.Contains(validTargets, target.ResolvedKind()) {
+					if !slices.Contains(validTargets, labelValue(target.Labels, LabelPrefixKind)) {
 						report.Violations = append(report.Violations, CheckViolation{
 							ID: art.ID, Labels: art.Labels, Title: art.Title,
 							Category: "invalid_relation",
 							Detail: fmt.Sprintf("%s target %s (kind %q) not in allowed targets %v for relation %q",
-								art.ID, tid, target.ResolvedKind(), validTargets, rel),
+								art.ID, tid, labelValue(target.Labels, LabelPrefixKind), validTargets, rel),
 						})
 					}
 				}
@@ -618,7 +618,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		}
 
 		for _, reqRel := range kd.Relations.RequiredOutgoing {
-			if p.IsTerminal(art.ResolvedStatus()) {
+			if p.IsTerminal(labelValue(art.Labels, LabelPrefixStatus)) {
 				continue
 			}
 			edges, err := p.store.Neighbors(ctx, art.ID, reqRel, Outgoing)
@@ -629,7 +629,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 				report.Violations = append(report.Violations, CheckViolation{
 					ID: art.ID, Labels: art.Labels, Title: art.Title,
 					Category: "missing_link",
-					Detail:   fmt.Sprintf("%s has no outgoing %s link", art.ResolvedKind(), reqRel),
+					Detail:   fmt.Sprintf("%s has no outgoing %s link", labelValue(art.Labels, LabelPrefixKind), reqRel),
 				})
 			}
 		}
@@ -679,7 +679,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 	// Stale drafts (non-terminal, not updated in 7+ days)
 	staleCutoff := time.Now().Add(-7 * 24 * time.Hour)
 	for _, art := range arts {
-		if p.IsTerminal(art.ResolvedStatus()) {
+		if p.IsTerminal(labelValue(art.Labels, LabelPrefixStatus)) {
 			continue
 		}
 		if !art.UpdatedAt.IsZero() && art.UpdatedAt.Before(staleCutoff) {
@@ -693,10 +693,10 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 
 	// Blocked campaigns/goals: all children terminal but parent not terminal
 	for _, art := range arts {
-		if p.IsTerminal(art.ResolvedStatus()) {
+		if p.IsTerminal(labelValue(art.Labels, LabelPrefixStatus)) {
 			continue
 		}
-		if !p.IsContainerKind(art.ResolvedKind()) {
+		if !p.IsContainerKind(labelValue(art.Labels, LabelPrefixKind)) {
 			continue
 		}
 		children, _ := p.store.Children(ctx, art.ID)
@@ -705,7 +705,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		}
 		allTerminal := true
 		for _, ch := range children {
-			if !p.IsTerminal(ch.ResolvedStatus()) {
+			if !p.IsTerminal(labelValue(ch.Labels, LabelPrefixStatus)) {
 				allTerminal = false
 				break
 			}
@@ -714,23 +714,23 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 			report.Violations = append(report.Violations, CheckViolation{
 				ID: art.ID, Labels: art.Labels, Title: art.Title,
 				Category: "completable",
-				Detail:   fmt.Sprintf("all %d children are terminal but %s is %s", len(children), art.ID, art.ResolvedStatus()),
+				Detail:   fmt.Sprintf("all %d children are terminal but %s is %s", len(children), art.ID, labelValue(art.Labels, LabelPrefixStatus)),
 			})
 		}
 	}
 
 	// Spec/task mismatch
 	for _, art := range arts {
-		if p.IsTerminal(art.ResolvedStatus()) {
+		if p.IsTerminal(labelValue(art.Labels, LabelPrefixStatus)) {
 			continue
 		}
-		if p.RequiresImplementation(art.ResolvedKind()) {
+		if p.RequiresImplementation(labelValue(art.Labels, LabelPrefixKind)) {
 			edges, _ := p.store.Neighbors(ctx, art.ID, RelImplements, Incoming)
 			if len(edges) == 0 {
 				report.Violations = append(report.Violations, CheckViolation{
 					ID: art.ID, Labels: art.Labels, Title: art.Title,
 					Category: "unimplemented_spec",
-					Detail:   fmt.Sprintf("no task implements this %s", art.ResolvedKind()),
+					Detail:   fmt.Sprintf("no task implements this %s", labelValue(art.Labels, LabelPrefixKind)),
 				})
 			}
 		}
@@ -741,10 +741,10 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 	titleGroups := make(map[scopeKindTitle][]string)
 	titleGroupLabels := make(map[scopeKindTitle][]string)
 	for _, art := range arts {
-		if p.IsTerminal(art.ResolvedStatus()) {
+		if p.IsTerminal(labelValue(art.Labels, LabelPrefixStatus)) {
 			continue
 		}
-		key := scopeKindTitle{art.Scope(), art.ResolvedKind(), art.Title}
+		key := scopeKindTitle{labelValue(art.Labels, LabelPrefixScope), labelValue(art.Labels, LabelPrefixKind), art.Title}
 		titleGroups[key] = append(titleGroups[key], art.ID)
 		if titleGroupLabels[key] == nil {
 			titleGroupLabels[key] = art.Labels
@@ -762,13 +762,13 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 
 	// Empty artifacts
 	for _, art := range arts {
-		if art.ResolvedStatus() != StatusDraft {
+		if labelValue(art.Labels, LabelPrefixStatus) != StatusDraft {
 			continue
 		}
-		if p.SkipEmptyCheck(art.ResolvedKind()) {
+		if p.SkipEmptyCheck(labelValue(art.Labels, LabelPrefixKind)) {
 			continue
 		}
-		if _, known := p.schema.Kinds[art.ResolvedKind()]; !known {
+		if _, known := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]; !known {
 			continue // already flagged as unknown_kind
 		}
 		if art.Goal == "" && len(art.Sections) == 0 && art.Parent == "" {
@@ -793,7 +793,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		}
 	}
 	for _, art := range arts {
-		expectedKey, ok := keyByScope[art.Scope()]
+		expectedKey, ok := keyByScope[labelValue(art.Labels, LabelPrefixScope)]
 		if !ok {
 			continue
 		}
@@ -802,7 +802,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 			report.Violations = append(report.Violations, CheckViolation{
 				ID: art.ID, Labels: art.Labels, Title: art.Title,
 				Category: "id_prefix_mismatch",
-				Detail:   fmt.Sprintf("ID prefix %q does not match scope %q key %q", prefix, art.Scope(), expectedKey),
+				Detail:   fmt.Sprintf("ID prefix %q does not match scope %q key %q", prefix, labelValue(art.Labels, LabelPrefixScope), expectedKey),
 			})
 		}
 	}
@@ -842,7 +842,7 @@ func (p *Protocol) CheckFix(ctx context.Context, scope string) (*CheckReport, []
 					changed = true
 					continue
 				}
-				kd := p.schema.Kinds[art.ResolvedKind()]
+				kd := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]
 				if len(kd.Relations.Outgoing) > 0 {
 					if !slices.Contains(kd.Relations.Outgoing, rel) {
 						delete(art.Links, rel)
@@ -859,10 +859,10 @@ func (p *Protocol) CheckFix(ctx context.Context, scope string) (*CheckReport, []
 						keep = append(keep, tid)
 						continue
 					}
-					if slices.Contains(validTargets, target.ResolvedKind()) {
+					if slices.Contains(validTargets, labelValue(target.Labels, LabelPrefixKind)) {
 						keep = append(keep, tid)
 					} else {
-						fixes = append(fixes, fmt.Sprintf("removed %s->%s (%s %s) target mismatch", v.ID, tid, rel, target.ResolvedKind()))
+						fixes = append(fixes, fmt.Sprintf("removed %s->%s (%s %s) target mismatch", v.ID, tid, rel, labelValue(target.Labels, LabelPrefixKind)))
 					}
 				}
 					if len(keep) != len(targets) {

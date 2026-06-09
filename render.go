@@ -14,19 +14,19 @@ func RenderMarkdown(art *Artifact) string { //nolint:gocyclo // display logic is
 
 	fmt.Fprintf(&b, "# %s: %s\n\n", art.ID, art.Title)
 
-	renderWriteField(&b, "Kind", art.ResolvedKind())
-	renderWriteField(&b, "Status", art.ResolvedStatus())
-	if art.Scope() != "" {
-		renderWriteField(&b, "Scope", art.Scope())
+	renderWriteField(&b, "Kind", labelValue(art.Labels, LabelPrefixKind))
+	renderWriteField(&b, "Status", labelValue(art.Labels, LabelPrefixStatus))
+	if labelValue(art.Labels, LabelPrefixScope) != "" {
+		renderWriteField(&b, "Scope", labelValue(art.Labels, LabelPrefixScope))
 	}
 	if art.Parent != "" {
 		renderWriteField(&b, "Parent", art.Parent)
 	}
-	if art.Priority() != "" {
-		renderWriteField(&b, "Priority", art.Priority())
+	if labelValue(art.Labels, LabelPrefixPriority) != "" {
+		renderWriteField(&b, "Priority", labelValue(art.Labels, LabelPrefixPriority))
 	}
-	if art.Sprint() != "" {
-		renderWriteField(&b, "Sprint", art.Sprint())
+	if labelValue(art.Labels, LabelPrefixSprint) != "" {
+		renderWriteField(&b, "Sprint", labelValue(art.Labels, LabelPrefixSprint))
 	}
 	if len(art.DependsOn) > 0 {
 		renderWriteField(&b, "Depends On", strings.Join(art.DependsOn, ", "))
@@ -68,7 +68,7 @@ func RenderTable(arts []*Artifact) string {
 	hasParent := false
 	hasDeps := false
 	for _, a := range arts {
-		if a.Sprint() != "" {
+		if labelValue(a.Labels, LabelPrefixSprint) != "" {
 			hasSprint = true
 		}
 		if a.Parent != "" {
@@ -98,7 +98,7 @@ func RenderTable(arts []*Artifact) string {
 	writeRow("----", "----", "-----", "------", "------", "------", "----------", "-----")
 	for _, a := range arts {
 		deps := strings.Join(a.DependsOn, ",")
-		writeRow(a.ID, a.ResolvedKind(), a.Scope(), a.ResolvedStatus(), a.Sprint(), a.Parent, deps, a.Title)
+		writeRow(a.ID, labelValue(a.Labels, LabelPrefixKind), labelValue(a.Labels, LabelPrefixScope), labelValue(a.Labels, LabelPrefixStatus), labelValue(a.Labels, LabelPrefixSprint), a.Parent, deps, a.Title)
 	}
 
 	fmt.Fprintf(&b, "\n(%d artifacts)\n", len(arts))
@@ -156,18 +156,18 @@ func RenderGroupedTable(arts []*Artifact, field string, statusOrder ...[]string)
 		fmt.Fprintf(&b, "\n=== %s (%d) ===\n", strings.ToUpper(label), len(items))
 		for _, a := range items {
 		scope := ""
-		if a.Scope() != "" {
-			scope = "[" + a.Scope() + "] "
+		if labelValue(a.Labels, LabelPrefixScope) != "" {
+			scope = "[" + labelValue(a.Labels, LabelPrefixScope) + "] "
 		}
 		parent := ""
 		if a.Parent != "" {
 			parent = " (parent: " + a.Parent + ")"
 		}
 		sprint := ""
-		if a.Sprint() != "" {
-			sprint = " (sprint: " + a.Sprint() + ")"
+		if labelValue(a.Labels, LabelPrefixSprint) != "" {
+			sprint = " (sprint: " + labelValue(a.Labels, LabelPrefixSprint) + ")"
 		}
-			fmt.Fprintf(&b, "  %-20s %-15s %s%s%s%s\n", a.ID, a.ResolvedKind(), scope, a.Title, parent, sprint)
+			fmt.Fprintf(&b, "  %-20s %-15s %s%s%s%s\n", a.ID, labelValue(a.Labels, LabelPrefixKind), scope, a.Title, parent, sprint)
 		}
 	}
 	fmt.Fprintf(&b, "\n(%d artifacts)\n", total)
@@ -181,7 +181,7 @@ func RenderGroupedTableByScopeLabel(arts []*Artifact, scopeLabels map[string][]s
 	}
 	groups := make(map[string][]*Artifact)
 	for _, a := range arts {
-		labels := scopeLabels[a.Scope()]
+		labels := scopeLabels[labelValue(a.Labels, LabelPrefixScope)]
 		if len(labels) == 0 {
 			groups["(unlabeled)"] = append(groups["(unlabeled)"], a)
 		} else {
@@ -230,19 +230,19 @@ func RenderVaultMarkdown(art *Artifact) string {
 	if art.Alias != "" {
 		fmt.Fprintf(&b, "alias: %s\n", art.Alias)
 	}
-	fmt.Fprintf(&b, "kind: %s\n", art.ResolvedKind())
-	fmt.Fprintf(&b, "status: %s\n", art.ResolvedStatus())
-	if art.Scope() != "" {
-		fmt.Fprintf(&b, "scope: %s\n", art.Scope())
+	fmt.Fprintf(&b, "kind: %s\n", labelValue(art.Labels, LabelPrefixKind))
+	fmt.Fprintf(&b, "status: %s\n", labelValue(art.Labels, LabelPrefixStatus))
+	if labelValue(art.Labels, LabelPrefixScope) != "" {
+		fmt.Fprintf(&b, "scope: %s\n", labelValue(art.Labels, LabelPrefixScope))
 	}
 	if art.Parent != "" {
 		fmt.Fprintf(&b, "parent: %s\n", art.Parent)
 	}
-	if art.Priority() != "" {
-		fmt.Fprintf(&b, "priority: %s\n", art.Priority())
+	if labelValue(art.Labels, LabelPrefixPriority) != "" {
+		fmt.Fprintf(&b, "priority: %s\n", labelValue(art.Labels, LabelPrefixPriority))
 	}
-	if art.Sprint() != "" {
-		fmt.Fprintf(&b, "sprint: %s\n", art.Sprint())
+	if labelValue(art.Labels, LabelPrefixSprint) != "" {
+		fmt.Fprintf(&b, "sprint: %s\n", labelValue(art.Labels, LabelPrefixSprint))
 	}
 	// kind:, status:, scope: are emitted as separate top-level fields; exclude from labels.
 	var userLabels []string
@@ -437,15 +437,15 @@ func vaultParseSections(body string, art *Artifact) {
 func renderGroupKey(a *Artifact, field string) string {
 	switch field {
 	case FieldStatus:
-		return a.ResolvedStatus()
+		return labelValue(a.Labels, LabelPrefixStatus)
 	case FieldScope:
-		return a.Scope()
+		return labelValue(a.Labels, LabelPrefixScope)
 	case FieldKind:
-		return a.ResolvedKind()
+		return labelValue(a.Labels, LabelPrefixKind)
 	case "sprint":
-		return a.Sprint()
+		return labelValue(a.Labels, LabelPrefixSprint)
 	default:
-		return a.ResolvedStatus()
+		return labelValue(a.Labels, LabelPrefixStatus)
 	}
 }
 

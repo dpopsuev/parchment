@@ -259,7 +259,7 @@ func (s *Schema) MissingShouldSections(kind string, have []Section) []string {
 // MissingCompletionGates returns section names from completion_gates that are
 // missing or empty on the artifact. Returns nil if the kind has no gates.
 func (s *Schema) MissingCompletionGates(art *Artifact) []string {
-	kd, ok := s.Kinds[art.ResolvedKind()]
+	kd, ok := s.Kinds[labelValue(art.Labels, LabelPrefixKind)]
 	if !ok || len(kd.CompletionGates) == 0 {
 		return nil
 	}

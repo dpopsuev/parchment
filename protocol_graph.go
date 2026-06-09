@@ -159,8 +159,8 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 			if err != nil {
 				return nil, fmt.Errorf("failed to resolve %s target %s: %w", relation, tid, err)
 			}
-			if !kindPairAllowed(trait.AllowedPairs, art.ResolvedKind(), target.ResolvedKind()) {
-				return nil, fmt.Errorf("%s→%s is not a valid %s pair", art.ResolvedKind(), target.ResolvedKind(), relation) //nolint:err113 // domain constraint
+			if !kindPairAllowed(trait.AllowedPairs, labelValue(art.Labels, LabelPrefixKind), labelValue(target.Labels, LabelPrefixKind)) {
+				return nil, fmt.Errorf("%s→%s is not a valid %s pair", labelValue(art.Labels, LabelPrefixKind), labelValue(target.Labels, LabelPrefixKind), relation) //nolint:err113 // domain constraint
 			}
 		}
 	}
@@ -171,13 +171,13 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 			if err != nil {
 				return nil, fmt.Errorf("failed to resolve %s target %s: %w", relation, tid, err)
 			}
-			if tpl.ResolvedKind() != KindTemplate {
-				slog.WarnContext(ctx, "conformance_check link target is not a template", slog.String("source_id", sourceID), slog.String("target_id", tid), slog.String("target_kind", tpl.ResolvedKind())) //nolint:sloglint // source_id/target_id/target_kind have no LogKey constants
-				return nil, fmt.Errorf("conformance_check target %s is not a template (kind=%s)", tid, tpl.ResolvedKind()) //nolint:err113 // sentinel; no caller uses errors.Is on this
+			if labelValue(tpl.Labels, LabelPrefixKind) != KindTemplate {
+				slog.WarnContext(ctx, "conformance_check link target is not a template", slog.String("source_id", sourceID), slog.String("target_id", tid), slog.String("target_kind", labelValue(tpl.Labels, LabelPrefixKind))) //nolint:sloglint // source_id/target_id/target_kind have no LogKey constants
+				return nil, fmt.Errorf("conformance_check target %s is not a template (kind=%s)", tid, labelValue(tpl.Labels, LabelPrefixKind)) //nolint:err113 // sentinel; no caller uses errors.Is on this
 			}
 			artWithLink := &Artifact{
 				ID:       art.ID,
-				Labels:   []string{LabelPrefixKind + art.ResolvedKind()},
+				Labels:   []string{LabelPrefixKind + labelValue(art.Labels, LabelPrefixKind)},
 				Sections: art.Sections,
 				Links:    map[string][]string{relation: {tid}},
 			}
@@ -213,7 +213,7 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 		slog.String(LogKeyID, sourceID),
 		slog.String(LogKeyRelation, relation),
 		slog.Int(LogKeyCount, len(targetIDs)))
-	p.emitEvent(ctx, EventLinked, sourceID, art.Scope(), map[string]any{"relation": relation, "targets": targetIDs})
+	p.emitEvent(ctx, EventLinked, sourceID, labelValue(art.Labels, LabelPrefixScope), map[string]any{"relation": relation, "targets": targetIDs})
 	return results, nil
 }
 
@@ -314,7 +314,7 @@ func (p *Protocol) ArtifactTree(ctx context.Context, in TreeInput) (*TreeNode, e
 		return p.buildTree(ctx, root), nil
 	}
 
-	node := &TreeNode{ID: root.ID, Labels: root.Labels, Title: root.Title, Scope: root.Scope()}
+	node := &TreeNode{ID: root.ID, Labels: root.Labels, Title: root.Title, Scope: labelValue(root.Labels, LabelPrefixScope)}
 	visited := map[string]bool{root.ID: true}
 	p.buildGraphTree(ctx, node, rel, storeDir, depth, 1, visited)
 	return node, nil
@@ -382,7 +382,7 @@ func (p *Protocol) TopoSort(ctx context.Context, rootID string) ([]TopoEntry, er
 		for id, art := range arts {
 			partial = append(partial, TopoEntry{
 				ID: id, Labels: art.Labels,
-				Title: art.Title, Priority: art.Priority(),
+				Title: art.Title, Priority: labelValue(art.Labels, LabelPrefixPriority),
 			})
 		}
 		return partial, fmt.Errorf("cycle detected in dependency graph: %w", err)
@@ -393,7 +393,7 @@ func (p *Protocol) TopoSort(ctx context.Context, rootID string) ([]TopoEntry, er
 		art := arts[id]
 		result = append(result, TopoEntry{
 			ID: id, Labels: art.Labels,
-			Title: art.Title, Priority: art.Priority(),
+			Title: art.Title, Priority: labelValue(art.Labels, LabelPrefixPriority),
 		})
 	}
 	return result, nil
@@ -408,7 +408,7 @@ type TopoEntry struct {
 }
 
 func (p *Protocol) buildTree(ctx context.Context, art *Artifact) *TreeNode {
-	node := &TreeNode{ID: art.ID, Labels: art.Labels, Title: art.Title, Scope: art.Scope()}
+	node := &TreeNode{ID: art.ID, Labels: art.Labels, Title: art.Title, Scope: labelValue(art.Labels, LabelPrefixScope)}
 	children, _ := p.store.Children(ctx, art.ID)
 	for _, ch := range children {
 		node.Children = append(node.Children, p.buildTree(ctx, ch))
@@ -449,7 +449,7 @@ func (p *Protocol) buildGraphTree(ctx context.Context, node *TreeNode, rel strin
 			ID:        target.ID,
 			Labels:    target.Labels,
 			Title:     target.Title,
-			Scope:     target.Scope(),
+			Scope:     labelValue(target.Labels, LabelPrefixScope),
 			Edge:      e.Relation,
 			Direction: edgeDir,
 		}

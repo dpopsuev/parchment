@@ -152,29 +152,15 @@ const LabelPrefixPriority = "priority:"
 // LabelPrefixSprint is the label namespace for sprint assignment.
 const LabelPrefixSprint = "sprint:"
 
-// Scope returns the artifact's scope derived from its labels.
-func (a *Artifact) Scope() string { return labelValue(a.Labels, LabelPrefixScope) }
-
-// Priority returns the artifact's priority derived from its labels.
-func (a *Artifact) Priority() string { return labelValue(a.Labels, LabelPrefixPriority) }
-
-// Sprint returns the artifact's sprint derived from its labels.
-func (a *Artifact) Sprint() string { return labelValue(a.Labels, LabelPrefixSprint) }
-
-// ResolvedPriority is an alias for Priority, kept for call sites not yet updated.
-func (a *Artifact) ResolvedPriority() string { return a.Priority() }
-
-// ResolvedSprint is an alias for Sprint, kept for call sites not yet updated.
-func (a *Artifact) ResolvedSprint() string { return a.Sprint() }
+// Label returns the value of the first label on the artifact with the given prefix.
+// This is the single generic accessor — no per-label methods exist on Artifact.
+func (a *Artifact) Label(prefix string) string { return labelValue(a.Labels, prefix) }
 
 // MirrorLabel replaces any existing label with the given prefix with a new
 // one built from prefix+value. If value is empty the label is simply removed.
-// Used by SetField to keep system label mirrors consistent with field writes.
 func MirrorLabel(labels []string, prefix, value string) []string {
 	return mirrorLabel(labels, prefix, value)
 }
-
-// mirrorLabel is the unexported implementation shared by SetField and MirrorLabel.
 
 func mirrorLabel(labels []string, prefix, value string) []string {
 	out := make([]string, 0, len(labels)+1)
@@ -189,7 +175,11 @@ func mirrorLabel(labels []string, prefix, value string) []string {
 	return out
 }
 
-// labelValue returns the value of the first label with the given prefix, or "".
+// LabelValue returns the value of the first label with the given prefix, or "".
+func LabelValue(labels []string, prefix string) string {
+	return labelValue(labels, prefix)
+}
+
 func labelValue(labels []string, prefix string) string {
 	for _, l := range labels {
 		if strings.HasPrefix(l, prefix) {
@@ -199,24 +189,9 @@ func labelValue(labels []string, prefix string) string {
 	return ""
 }
 
-// Kind returns the artifact's kind derived from its labels.
-func (a *Artifact) Kind() string { return labelValue(a.Labels, LabelPrefixKind) }
-
-// Status returns the artifact's status derived from its labels.
-func (a *Artifact) Status() string { return labelValue(a.Labels, LabelPrefixStatus) }
-
-// ResolvedKind is an alias for Kind, kept for call sites not yet updated.
-func (a *Artifact) ResolvedKind() string { return a.Kind() }
-
-// ResolvedStatus is an alias for Status, kept for call sites not yet updated.
-func (a *Artifact) ResolvedStatus() string { return a.Status() }
-
-// ResolvedScope is an alias for Scope, kept for call sites not yet updated.
-func (a *Artifact) ResolvedScope() string { return a.Scope() }
-
 func (f Filter) Matches(art *Artifact) bool { //nolint:gocritic // hugeParam: Filter is read-only in all callers; pointer would complicate call sites
 	if f.Family != "" && len(f.FamilyKinds) > 0 {
-		if !f.FamilyKinds[art.ResolvedKind()] {
+		if !f.FamilyKinds[labelValue(art.Labels, LabelPrefixKind)] {
 			return false
 		}
 	}
@@ -226,7 +201,7 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:gocritic // hugeParam: Fi
 	if len(f.Scopes) > 0 {
 		found := false
 		for _, s := range f.Scopes {
-			if art.Scope() == s {
+			if labelValue(art.Labels, LabelPrefixScope) == s {
 				found = true
 				break
 			}

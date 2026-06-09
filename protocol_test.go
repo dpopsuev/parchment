@@ -84,8 +84,8 @@ func TestListArtifacts_FilterByKind(t *testing.T) {
 		t.Errorf("expected 2 tasks, got %d", len(arts))
 	}
 	for _, a := range arts {
-		if a.ResolvedKind() != "task" {
-			t.Errorf("expected kind=task, got %s", a.ResolvedKind())
+		if parchment.LabelValue(a.Labels, parchment.LabelPrefixKind) != "task" {
+			t.Errorf("expected kind=task, got %s", parchment.LabelValue(a.Labels, parchment.LabelPrefixKind))
 		}
 	}
 }
@@ -120,8 +120,8 @@ func TestListArtifacts_FilterByStatus(t *testing.T) {
 
 	task := createTask(t, proto, "a task")
 	// task starts in "draft" status
-	if task.ResolvedStatus() != "draft" {
-		t.Fatalf("expected draft, got %s", task.ResolvedStatus())
+	if task.Label(parchment.LabelPrefixStatus) != "draft" {
+		t.Fatalf("expected draft, got %s", task.Label(parchment.LabelPrefixStatus))
 	}
 
 	// Create a goal (starts in "current" status for goal kind)
@@ -134,8 +134,8 @@ func TestListArtifacts_FilterByStatus(t *testing.T) {
 		t.Fatalf("ListArtifacts: %v", err)
 	}
 	for _, a := range arts {
-		if a.ResolvedStatus() != "draft" {
-			t.Errorf("expected status=draft, got %s for %s", a.ResolvedStatus(), a.ID)
+		if parchment.LabelValue(a.Labels, parchment.LabelPrefixStatus) != "draft" {
+			t.Errorf("expected status=draft, got %s for %s", parchment.LabelValue(a.Labels, parchment.LabelPrefixStatus), a.ID)
 		}
 	}
 }
@@ -158,7 +158,7 @@ func TestListArtifacts_ExcludeStatus(t *testing.T) {
 		t.Fatalf("ListArtifacts: %v", err)
 	}
 	for _, a := range arts {
-		if a.ResolvedStatus() == "archived" {
+		if parchment.LabelValue(a.Labels, parchment.LabelPrefixStatus) == "archived" {
 			t.Errorf("found archived artifact %s, should be excluded", a.ID)
 		}
 	}
@@ -257,8 +257,8 @@ func TestSearchArtifacts_WithKindFilter(t *testing.T) {
 	if len(arts) != 1 {
 		t.Errorf("expected 1 result (task only), got %d", len(arts))
 	}
-	if len(arts) > 0 && arts[0].ResolvedKind() != "task" {
-		t.Errorf("expected kind=task, got %s", arts[0].ResolvedKind())
+	if len(arts) > 0 && arts[0].Label(parchment.LabelPrefixKind) != "task" {
+		t.Errorf("expected kind=task, got %s", arts[0].Label(parchment.LabelPrefixKind))
 	}
 }
 
@@ -294,8 +294,8 @@ func TestGetArtifact_Success(t *testing.T) {
 	if got.Title != "get me" {
 		t.Errorf("expected title 'get me', got %q", got.Title)
 	}
-	if got.ResolvedKind() != "task" {
-		t.Errorf("expected kind=task, got %s", got.ResolvedKind())
+	if got.Label(parchment.LabelPrefixKind) != "task" {
+		t.Errorf("expected kind=task, got %s", got.Label(parchment.LabelPrefixKind))
 	}
 }
 
@@ -643,8 +643,8 @@ func TestArchiveArtifact_Single(t *testing.T) {
 	}
 
 	got, _ := proto.GetArtifact(ctx, task.ID)
-	if got.ResolvedStatus() != "archived" {
-		t.Errorf("expected status=archived, got %s", got.ResolvedStatus())
+	if got.Label(parchment.LabelPrefixStatus) != "archived" {
+		t.Errorf("expected status=archived, got %s", got.Label(parchment.LabelPrefixStatus))
 	}
 }
 
@@ -669,8 +669,8 @@ func TestArchiveArtifact_BlockedByNonTerminalChild(t *testing.T) {
 		t.Errorf("expected archive to succeed via CascadeArchive; got: %v", results)
 	}
 	got, _ := proto.GetArtifact(ctx, child.ID)
-	if got.ResolvedStatus() != parchment.StatusArchived {
-		t.Errorf("child should be archived by cascade; status = %s", got.ResolvedStatus())
+	if got.Label(parchment.LabelPrefixStatus) != parchment.StatusArchived {
+		t.Errorf("child should be archived by cascade; status = %s", got.Label(parchment.LabelPrefixStatus))
 	}
 }
 
@@ -701,8 +701,8 @@ func TestArchiveArtifact_BlockedByActiveChild(t *testing.T) {
 		t.Errorf("expected cascade archive to succeed; got error: %s", results[0].Error)
 	}
 	got, _ := proto.GetArtifact(ctx, child.ID)
-	if got.ResolvedStatus() != parchment.StatusArchived {
-		t.Errorf("child should be archived by cascade; status = %s", got.ResolvedStatus())
+	if got.Label(parchment.LabelPrefixStatus) != parchment.StatusArchived {
+		t.Errorf("child should be archived by cascade; status = %s", got.Label(parchment.LabelPrefixStatus))
 	}
 }
 
@@ -758,8 +758,8 @@ func TestDeArchive_Single(t *testing.T) {
 	}
 
 	got, _ := proto.GetArtifact(ctx, task.ID)
-	if got.ResolvedStatus() != "draft" {
-		t.Errorf("expected status=draft after dearchive, got %s", got.ResolvedStatus())
+	if got.Label(parchment.LabelPrefixStatus) != "draft" {
+		t.Errorf("expected status=draft after dearchive, got %s", got.Label(parchment.LabelPrefixStatus))
 	}
 }
 
@@ -812,12 +812,12 @@ func TestDeArchive_Cascade(t *testing.T) {
 	}
 
 	gotParent, _ := proto.GetArtifact(ctx, parent.ID)
-	if gotParent.ResolvedStatus() != "draft" {
-		t.Errorf("parent status=%s, want draft", gotParent.ResolvedStatus())
+	if gotParent.Label(parchment.LabelPrefixStatus) != "draft" {
+		t.Errorf("parent status=%s, want draft", gotParent.Label(parchment.LabelPrefixStatus))
 	}
 	gotChild, _ := proto.GetArtifact(ctx, child.ID)
-	if gotChild.ResolvedStatus() != "draft" {
-		t.Errorf("child status=%s, want draft", gotChild.ResolvedStatus())
+	if gotChild.Label(parchment.LabelPrefixStatus) != "draft" {
+		t.Errorf("child status=%s, want draft", gotChild.Label(parchment.LabelPrefixStatus))
 	}
 }
 
@@ -1027,8 +1027,8 @@ func TestCreateArtifact_ScopeInference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateArtifact: %v", err)
 	}
-	if art.Scope() != "myproject" {
-		t.Errorf("expected scope='myproject', got %q", art.Scope())
+	if parchment.LabelValue(art.Labels, parchment.LabelPrefixScope) != "myproject" {
+		t.Errorf("expected scope='myproject', got %q", parchment.LabelValue(art.Labels, parchment.LabelPrefixScope))
 	}
 }
 
@@ -1873,7 +1873,7 @@ func TestBulkArchive_DryRun(t *testing.T) {
 	// Verify nothing was actually archived
 	arts, _ := proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{"kind:task"}})
 	for _, a := range arts {
-		if a.ResolvedStatus() == "archived" {
+		if parchment.LabelValue(a.Labels, parchment.LabelPrefixStatus) == "archived" {
 			t.Error("dry run should not archive anything")
 		}
 	}
@@ -2155,8 +2155,8 @@ func TestCreateArtifact_TemplateIsScopeless(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateArtifact template: %v", err)
 	}
-	if tpl.Scope() != "" {
-		t.Errorf("expected empty scope for template, got %q", tpl.Scope())
+	if tpl.Label(parchment.LabelPrefixScope) != "" {
+		t.Errorf("expected empty scope for template, got %q", tpl.Label(parchment.LabelPrefixScope))
 	}
 }
 

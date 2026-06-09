@@ -172,7 +172,7 @@ func TestSetField_ScopeWithRenameID_MigratesID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("migrated artifact not found at new ID %s: %v", newID, err)
 	}
-	if got.Scope() != "beta" {
-		t.Errorf("scope = %q, want beta", got.Scope())
+	if got.Label(parchment.LabelPrefixScope) != "beta" {
+		t.Errorf("scope = %q, want beta", got.Label(parchment.LabelPrefixScope))
 	}
 }

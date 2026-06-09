@@ -193,7 +193,7 @@ func ComputeTensor(art *Artifact, metrics ArtifactMetrics, incomingEdges, recenc
 	return ValueTensor{
 		AccessHeat:     ComputeAccessHeat(metrics.AccessCount, metrics.LastAccessed),
 		StructuralHeat: structuralHeatFromCount(incomingEdges),
-		QualityScore:   StatusToQuality(art.ResolvedStatus()),
+		QualityScore:   StatusToQuality(labelValue(art.Labels, LabelPrefixStatus)),
 		Recency:        ComputeRecency(art.UpdatedAt, recencyWindowDays),
 		ComputedAt:     time.Now().UTC(),
 	}

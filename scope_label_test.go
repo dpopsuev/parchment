@@ -8,21 +8,21 @@ import (
 
 func TestResolvedScope_FromLabel(t *testing.T) {
 	art := &parchment.Artifact{Labels: []string{"scope:scribe"}}
-	if got := art.ResolvedScope(); got != "scribe" {
+	if got := parchment.LabelValue(art.Labels, parchment.LabelPrefixScope); got != "scribe" {
 		t.Errorf("expected scribe, got %q", got)
 	}
 }
 
 func TestResolvedScope_FromLabelWithKind(t *testing.T) {
 	art := &parchment.Artifact{Labels: []string{"kind:task", "scope:parchment"}}
-	if got := art.ResolvedScope(); got != "parchment" {
+	if got := parchment.LabelValue(art.Labels, parchment.LabelPrefixScope); got != "parchment" {
 		t.Errorf("expected parchment, got %q", got)
 	}
 }
 
 func TestResolvedScope_FirstLabelWins(t *testing.T) {
 	art := &parchment.Artifact{Labels: []string{"scope:scribe", "scope:parchment"}}
-	if got := art.ResolvedScope(); got != "scribe" {
+	if got := parchment.LabelValue(art.Labels, parchment.LabelPrefixScope); got != "scribe" {
 		t.Errorf("expected scribe (first label wins), got %q", got)
 	}
 }

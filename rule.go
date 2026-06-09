@@ -26,8 +26,8 @@ type RuleDef struct {
 // ParseRule parses a kind=rule artifact into a RuleDef.
 // Returns an error if required sections (trigger, when, action, message) are missing.
 func ParseRule(art *Artifact) (*RuleDef, error) {
-	if art.ResolvedKind() != KindRule {
-		return nil, fmt.Errorf("artifact %s is kind=%s, want kind=rule", art.ID, art.ResolvedKind()) //nolint:err113 // user-facing hint
+	if labelValue(art.Labels, LabelPrefixKind) != KindRule {
+		return nil, fmt.Errorf("artifact %s is kind=%s, want kind=rule", art.ID, labelValue(art.Labels, LabelPrefixKind)) //nolint:err113 // user-facing hint
 	}
 	sections := make(map[string]string, len(art.Sections))
 	for _, sec := range art.Sections {
@@ -164,7 +164,7 @@ type RuleResult struct {
 //
 // Predicate syntax (simple AND-chain, intentionally minimal):
 //   to=active                — matches toStatus == "active"
-//   kind=task                — matches art.ResolvedKind() == "task"
+//   kind=task                — matches labelValue(art.Labels, LabelPrefixKind) == "task"
 //   priority==""             — matches art.Priority == ""
 //   status=draft             — matches art.Status == "draft"
 //   AND                      — conjunction (all must match)
@@ -232,14 +232,14 @@ func matchesTerm(term string, art *Artifact, toStatus string) bool {
 func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResult {
 	switch rule.Check {
 	case CheckActivationSections:
-		if !p.schema.ActivationRequiresSections(art.ResolvedKind()) {
+		if !p.schema.ActivationRequiresSections(labelValue(art.Labels, LabelPrefixKind)) {
 			return nil
 		}
-		if shouldMissing := p.schema.MissingShouldSections(art.ResolvedKind(), art.Sections); len(shouldMissing) > 0 {
+		if shouldMissing := p.schema.MissingShouldSections(labelValue(art.Labels, LabelPrefixKind), art.Sections); len(shouldMissing) > 0 {
 			msg := rule.Message + " (recommended: " + strings.Join(shouldMissing, ", ") + ")"
 			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: msg}
 		}
-		if expMissing := p.schema.MissingSections(art.ResolvedKind(), art.Sections); len(expMissing) > 0 {
+		if expMissing := p.schema.MissingSections(labelValue(art.Labels, LabelPrefixKind), art.Sections); len(expMissing) > 0 {
 			msg := rule.Message + " (expected: " + strings.Join(expMissing, ", ") + ")"
 			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: msg}
 		}
@@ -268,9 +268,9 @@ func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResul
 		children, err := p.store.Children(context.Background(), art.ID)
 		if err == nil {
 			for _, ch := range children {
-			if !p.IsReadonly(ch.ResolvedStatus()) {
+			if !p.IsReadonly(labelValue(ch.Labels, LabelPrefixStatus)) {
 				return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock,
-					Message: rule.Message + ": child " + ch.ID + " is " + ch.ResolvedStatus()}
+					Message: rule.Message + ": child " + ch.ID + " is " + labelValue(ch.Labels, LabelPrefixStatus)}
 			}
 			}
 		}
@@ -298,13 +298,13 @@ func fieldValue(field string, art *Artifact, toStatus string) string {
 	case "to":
 		return toStatus
 	case FieldKind:
-		return art.ResolvedKind()
+		return labelValue(art.Labels, LabelPrefixKind)
 	case "status":
-		return art.ResolvedStatus()
+		return labelValue(art.Labels, LabelPrefixStatus)
 	case "priority":
-		return art.Priority()
+		return labelValue(art.Labels, LabelPrefixPriority)
 	case FieldScope:
-		return art.Scope()
+		return labelValue(art.Labels, LabelPrefixScope)
 	default:
 		return "" // unknown field — treated as empty
 	}

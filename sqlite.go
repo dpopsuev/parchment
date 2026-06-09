@@ -1352,9 +1352,12 @@ func (s *SQLiteStore) KindGraph(ctx context.Context, scope string, statusLabels,
 	args := make([]any, 0, 1+len(statusLabels))
 	q := `SELECT kind, COUNT(*) FROM artifacts WHERE scope = ? AND kind != ''`
 	args = append(args, scope)
-	for _, sl := range statusLabels {
-		q += ` AND EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)`
-		args = append(args, sl)
+	if len(statusLabels) > 0 {
+		ph := strings.Repeat("?,", len(statusLabels))
+		q += ` AND EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label IN (` + ph[:len(ph)-1] + `))` //nolint:gosec // ph is only placeholders, args are bound
+		for _, sl := range statusLabels {
+			args = append(args, sl)
+		}
 	}
 	q += ` GROUP BY kind`
 

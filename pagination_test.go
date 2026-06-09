@@ -18,7 +18,7 @@ func TestProtocol_ListPage_PaginatesCorrectly(t *testing.T) {
 	ctx := context.Background()
 
 	for i := range 5 {
-		_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "artifact", Scope: "test",
+		_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "artifact",
 			Goal: string(rune('a' + i)), // distinct enough to create,
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 		if err != nil {
@@ -30,7 +30,7 @@ func TestProtocol_ListPage_PaginatesCorrectly(t *testing.T) {
 	pages := 0
 	cursor := ""
 	for {
-		page, err := proto.ListPage(ctx, parchment.ListInput{Scope: "test", Limit: 2, Cursor: cursor})
+		page, err := proto.ListPage(ctx, parchment.ListInput{Limit: 2, Cursor: cursor})
 		if err != nil {
 			t.Fatalf("ListPage: %v", err)
 		}
@@ -74,12 +74,12 @@ func TestProtocol_ListPage_ZeroLimitReturnsAll(t *testing.T) {
 	for range 3 {
 		proto.CreateArtifact(ctx, parchment.CreateInput{ //nolint:errcheck // test setup
 			Title:  "item",
-			Scope:  "test",
+
 			Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},
 		})
 	}
 
-	page, err := proto.ListPage(ctx, parchment.ListInput{Scope: "test"})
+	page, err := proto.ListPage(ctx, parchment.ListInput{Labels: []string{parchment.LabelPrefixScope + "test"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,14 +100,14 @@ func TestProtocol_ListPage_TitleContains_Filters(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	proto.CreateArtifact(ctx, parchment.CreateInput{Title: "fix authentication bug", Scope: "test",
+	proto.CreateArtifact(ctx, parchment.CreateInput{Title: "fix authentication bug",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})     //nolint:errcheck // test setup
-	proto.CreateArtifact(ctx, parchment.CreateInput{Title: "implement caching layer", Scope: "test",
+	proto.CreateArtifact(ctx, parchment.CreateInput{Title: "implement caching layer",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},}) //nolint:errcheck // test setup
-	proto.CreateArtifact(ctx, parchment.CreateInput{Title: "auth token refresh", Scope: "test",
+	proto.CreateArtifact(ctx, parchment.CreateInput{Title: "auth token refresh",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})      //nolint:errcheck // test setup
 
-	page, err := proto.ListPage(ctx, parchment.ListInput{Scope: "test", TitleContains: "auth"})
+	page, err := proto.ListPage(ctx, parchment.ListInput{TitleContains: "auth"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestProtocol_ListPage_SQLite_Paginates(t *testing.T) {
 	for range 4 {
 		proto.CreateArtifact(ctx, parchment.CreateInput{ //nolint:errcheck // test setup
 			Title:  "item",
-			Scope:  "test",
+
 			Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},
 		})
 	}
@@ -147,7 +147,7 @@ func TestProtocol_ListPage_SQLite_Paginates(t *testing.T) {
 	var all []string
 	cursor := ""
 	for {
-		page, err := proto.ListPage(ctx, parchment.ListInput{Scope: "test", Limit: 2, Cursor: cursor})
+		page, err := proto.ListPage(ctx, parchment.ListInput{Limit: 2, Cursor: cursor})
 		if err != nil {
 			t.Fatalf("ListPage: %v", err)
 		}

@@ -34,7 +34,7 @@ func TestLoadSchema_ReadsFromCollapsedLabelDefs(t *testing.T) {
 	parchment.SeedDefinitions(ctx, s)
 
 	p := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
-	art, err := p.CreateArtifact(ctx, parchment.CreateInput{Scope: "test", Title: "kind collapse test",
+	art, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "kind collapse test",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
 		Labels: []string{"kind:task"},})
 	if err != nil {

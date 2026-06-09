@@ -34,7 +34,7 @@ func TestCreateBug_ShouldSucceedWithOnlyFilingTimeSections(t *testing.T) {
 	// Filing a bug: we know what we observed and how to reproduce it.
 	// We do NOT know the root cause, fix, or security assessment yet.
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "template conformance blocks bug filing",
-		Scope: "test",
+
 		Sections: []parchment.Section{
 			{Name: "observed", Text: "Template conformance rejects creation when investigation-time sections are missing"},
 			{Name: "reproduction", Text: "1. Create a bug template with fix/root_cause/security_assessment sections\n2. Try to create a bug with only observed/reproduction\n3. Creation fails"},

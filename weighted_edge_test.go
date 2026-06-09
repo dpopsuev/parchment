@@ -16,9 +16,9 @@ func TestLinkArtifacts_WeightStoredOnEdge(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "A", Scope: "test",
+	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "A",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
-	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "B", Scope: "test",
+	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "B",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
 	_, err := proto.LinkArtifacts(ctx, a.ID, "related", []string{b.ID}, 0.75)
@@ -42,9 +42,9 @@ func TestLinkArtifacts_ZeroWeightDefaultBehavior(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "A", Scope: "test",
+	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "A",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
-	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "B", Scope: "test",
+	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "B",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
 	_, err := proto.LinkArtifacts(ctx, a.ID, "related", []string{b.ID}, 0)

@@ -69,11 +69,11 @@ func TestBond_RejectsWhenMaxOutgoingExceeded(t *testing.T) {
 	}
 
 	proto2 := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
-	a := mustCreate(t, proto2, parchment.CreateInput{Title: "A", Scope: "test",
+	a := mustCreate(t, proto2, parchment.CreateInput{Title: "A",
 		Labels: []string{"kind:task"},})
-	b := mustCreate(t, proto, parchment.CreateInput{Title: "B", Scope: "test",
+	b := mustCreate(t, proto, parchment.CreateInput{Title: "B",
 		Labels: []string{"kind:task"},})
-	c := mustCreate(t, proto, parchment.CreateInput{Title: "C", Scope: "test",
+	c := mustCreate(t, proto, parchment.CreateInput{Title: "C",
 		Labels: []string{"kind:task"},})
 
 	if _, err := proto2.LinkArtifacts(ctx, a.ID, "owns", []string{b.ID}, 0); err != nil {
@@ -105,9 +105,9 @@ func TestValidRelation_AcceptsRegisteredEdgeType(t *testing.T) {
 
 	// Reload so protocol picks up the new edge type
 	proto2 := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
-	a := mustCreate(t, proto2, parchment.CreateInput{Title: "A", Scope: "test",
+	a := mustCreate(t, proto2, parchment.CreateInput{Title: "A",
 		Labels: []string{"kind:task"},})
-	b := mustCreate(t, proto, parchment.CreateInput{Title: "B", Scope: "test",
+	b := mustCreate(t, proto, parchment.CreateInput{Title: "B",
 		Labels: []string{"kind:task"},})
 
 	_, err := proto2.LinkArtifacts(ctx, a.ID, "mentors", []string{b.ID}, 0)
@@ -132,7 +132,7 @@ func TestLinkArtifacts_ErrorListsRegisteredRelations(t *testing.T) {
 		t.Fatal(err)
 	}
 	proto2 := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
-	a := mustCreate(t, proto2, parchment.CreateInput{Title: "A", Scope: "test",
+	a := mustCreate(t, proto2, parchment.CreateInput{Title: "A",
 		Labels: []string{"kind:task"},})
 
 	_, err := proto2.LinkArtifacts(ctx, a.ID, "imaginary_xyz", []string{"x"}, 0)

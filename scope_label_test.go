@@ -30,7 +30,7 @@ func TestResolvedScope_FirstLabelWins(t *testing.T) {
 func TestCreateArtifact_MirrorsScopeToLabel(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"myproject"}, nil, parchment.ProtocolConfig{})
-	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{Title: "scoped task", Scope: "myproject",
+	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{Title: "scoped task",
 		Labels: []string{"kind:task"},})
 	if err != nil {
 		t.Fatalf("create: %v", err)

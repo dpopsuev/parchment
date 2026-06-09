@@ -21,7 +21,7 @@ func TestAlias_CustomAliasOnCreate(t *testing.T) {
 	ctx := context.Background()
 
 	art, err := proto.CreateArtifact(ctx, CreateInput{Title: "Login bug",
-		Scope:    "test",
+
 		Alias:    "login-bug",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
 		Labels:   []string{"kind:task"},})
@@ -43,7 +43,7 @@ func TestAlias_GetByAlias(t *testing.T) {
 	proto := uuidProto(t)
 	ctx := context.Background()
 
-	art, err := proto.CreateArtifact(ctx, CreateInput{Title: "Findable", Scope: "test",
+	art, err := proto.CreateArtifact(ctx, CreateInput{Title: "Findable",
 		Alias:    "find-me",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
 		Labels:   []string{"kind:task"},})
@@ -78,7 +78,7 @@ func TestAlias_Rename(t *testing.T) {
 	proto := uuidProto(t)
 	ctx := context.Background()
 
-	art, err := proto.CreateArtifact(ctx, CreateInput{Title: "Rename me", Scope: "test",
+	art, err := proto.CreateArtifact(ctx, CreateInput{Title: "Rename me",
 		Alias:    "old-name",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
 		Labels:   []string{"kind:task"},})
@@ -119,7 +119,7 @@ func TestAlias_RenameByAlias(t *testing.T) {
 	proto := uuidProto(t)
 	ctx := context.Background()
 
-	art, err := proto.CreateArtifact(ctx, CreateInput{Title: "Rename by alias", Scope: "test",
+	art, err := proto.CreateArtifact(ctx, CreateInput{Title: "Rename by alias",
 		Alias:    "step-one",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
 		Labels:   []string{"kind:task"},})
@@ -163,7 +163,7 @@ func TestAlias_SQLite_RoundTrip(t *testing.T) {
 
 	proto := New(s, nil, []string{"test"}, nil, ProtocolConfig{})
 
-	art, err := proto.CreateArtifact(ctx, CreateInput{Title: "Persistent alias", Scope: "test",
+	art, err := proto.CreateArtifact(ctx, CreateInput{Title: "Persistent alias",
 		Alias:    "persistent-one",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
 		Labels:   []string{"kind:task"},})

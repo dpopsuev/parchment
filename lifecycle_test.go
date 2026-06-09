@@ -14,7 +14,7 @@ func TestTransition_ActiveToMature(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Scope: "test",
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
 		Title: "implement feature X",
 		Goal:  "add the feature",
 		Sections: []parchment.Section{
@@ -47,7 +47,7 @@ func TestTransition_MatureToAllocated(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Scope: "test",
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
 		Title: "implement feature Y",
 		Goal:  "add the feature",
 		Sections: []parchment.Section{
@@ -79,7 +79,7 @@ func TestTransition_FullLifecycle(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Scope: "test",
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{
 		Title: "full lifecycle task",
 		Goal:  "test all transitions",
 		Sections: []parchment.Section{
@@ -109,7 +109,7 @@ func TestTransition_InvalidTransitionBlocked(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Scope: "test", Title: "blocked", Priority: "medium",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "blocked", Priority: "medium",
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
 		Labels: []string{"kind:task"},})
 	proto.SetField(ctx, []string{art.ID}, "status", "active", parchment.SetFieldOptions{Force: true})
@@ -136,7 +136,7 @@ func TestTransition_WorkerIDRequiredForAllocation(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Scope: "test", Title: "needs worker", Priority: "medium",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "needs worker", Priority: "medium",
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
 		Labels: []string{"kind:task"},})
 	proto.SetField(ctx, []string{art.ID}, "status", "active", parchment.SetFieldOptions{Force: true})
@@ -173,7 +173,7 @@ func TestTransition_StampsRequiredForReview(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Scope: "test", Title: "needs stamps", Priority: "medium",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "needs stamps", Priority: "medium",
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
 		Labels: []string{"kind:task"},})
 	// Walk to in_progress.

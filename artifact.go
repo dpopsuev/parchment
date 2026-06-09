@@ -101,10 +101,11 @@ type Filter struct {
 	// ScopePrefix enables hierarchical scope matching when a scope: label is in Labels:
 	// scope:org/project matches 'org/project' and any 'org/project/*' sub-scope.
 	ScopePrefix bool
-	// Scopes is a multi-scope OR query modifier (scope IN [...]); it is not an Artifact field.
-	// Maps to a column-level IN predicate rather than a label lookup.
-	Scopes         []string
-	Parent         string
+	// ScopesOr is set internally by Protocol when multiple home scopes are configured.
+	// It maps to `scope IN (...)` — ANDed with all other predicates, OR within the group.
+	// Not exposed on ListInput; callers express scope via Labels: ["scope:X"].
+	ScopesOr []string
+	Parent   string
 	Labels         []string
 	LabelsOr       []string
 	ExcludeLabels  []string
@@ -187,9 +188,9 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:gocritic // hugeParam: Fi
 	if f.IDPrefix != "" && !strings.HasPrefix(art.ID, f.IDPrefix) {
 		return false
 	}
-	if len(f.Scopes) > 0 {
+	if len(f.ScopesOr) > 0 {
 		found := false
-		for _, s := range f.Scopes {
+		for _, s := range f.ScopesOr {
 			if labelValue(art.Labels, LabelPrefixScope) == s {
 				found = true
 				break

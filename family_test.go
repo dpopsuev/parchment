@@ -123,17 +123,17 @@ func TestFilter_FamilyFilter_SQLite(t *testing.T) {
 
 	p := New(s, KnowledgeSchema(), []string{"test"}, nil, ProtocolConfig{})
 
-	if _, err := p.CreateArtifact(ctx, CreateInput{Title: "a note", Scope: "test",
+	if _, err := p.CreateArtifact(ctx, CreateInput{Title: "a note",
 		Labels: []string{LabelPrefixKind + KindNote},}); err != nil {
 		t.Fatalf("create note: %v", err)
 	}
-	if _, err := p.CreateArtifact(ctx, CreateInput{Title: "a task", Scope: "test", Priority: "none",
+	if _, err := p.CreateArtifact(ctx, CreateInput{Title: "a task", Priority: "none",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
 		Labels: []string{LabelPrefixKind + KindTask},}); err != nil {
 		t.Fatalf("create task: %v", err)
 	}
 
-	knowledge, err := p.ListArtifacts(ctx, ListInput{Family: "knowledge", Scope: "test"})
+	knowledge, err := p.ListArtifacts(ctx, ListInput{Family: "knowledge"})
 	if err != nil {
 		t.Fatalf("list knowledge: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestFilter_FamilyFilter_SQLite(t *testing.T) {
 		t.Errorf("list knowledge: got %d artifacts, want 1 note", len(knowledge))
 	}
 
-	effort, err := p.ListArtifacts(ctx, ListInput{Family: "effort", Scope: "test"})
+	effort, err := p.ListArtifacts(ctx, ListInput{Family: "effort"})
 	if err != nil {
 		t.Fatalf("list effort: %v", err)
 	}
@@ -158,12 +158,12 @@ func TestFilter_FamilyFilter(t *testing.T) {
 	p := New(s, KnowledgeSchema(), []string{"test"}, nil, ProtocolConfig{})
 
 	// Create one note (knowledge) and one task (effort).
-	_, err := p.CreateArtifact(ctx, CreateInput{Title: "A note", Scope: "test",
+	_, err := p.CreateArtifact(ctx, CreateInput{Title: "A note",
 		Labels: []string{LabelPrefixKind + KindNote},})
 	if err != nil {
 		t.Fatalf("create note: %v", err)
 	}
-	_, err = p.CreateArtifact(ctx, CreateInput{Title: "A task", Scope: "test",
+	_, err = p.CreateArtifact(ctx, CreateInput{Title: "A task",
 		Priority: "none",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
 		Labels: []string{LabelPrefixKind + KindTask},})
@@ -172,7 +172,7 @@ func TestFilter_FamilyFilter(t *testing.T) {
 	}
 
 	// List with family=knowledge — must return only the note.
-	knowledge, err := p.ListArtifacts(ctx, ListInput{Family: "knowledge", Scope: "test"})
+	knowledge, err := p.ListArtifacts(ctx, ListInput{Family: "knowledge"})
 	if err != nil {
 		t.Fatalf("list knowledge: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestFilter_FamilyFilter(t *testing.T) {
 	}
 
 	// List with family=effort — must return only the task.
-	effort, err := p.ListArtifacts(ctx, ListInput{Family: "effort", Scope: "test"})
+	effort, err := p.ListArtifacts(ctx, ListInput{Family: "effort"})
 	if err != nil {
 		t.Fatalf("list effort: %v", err)
 	}

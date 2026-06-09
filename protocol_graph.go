@@ -15,7 +15,6 @@ type TreeNode struct {
 	ID        string      `json:"id"`
 	Labels    []string    `json:"labels,omitempty"`
 	Title     string      `json:"title"`
-	Scope     string      `json:"scope,omitempty"`
 	Edge      string      `json:"edge,omitempty"`
 	Direction string      `json:"direction,omitempty"`
 	Children  []*TreeNode `json:"children,omitempty"`
@@ -314,7 +313,7 @@ func (p *Protocol) ArtifactTree(ctx context.Context, in TreeInput) (*TreeNode, e
 		return p.buildTree(ctx, root), nil
 	}
 
-	node := &TreeNode{ID: root.ID, Labels: root.Labels, Title: root.Title, Scope: labelValue(root.Labels, LabelPrefixScope)}
+	node := &TreeNode{ID: root.ID, Labels: root.Labels, Title: root.Title}
 	visited := map[string]bool{root.ID: true}
 	p.buildGraphTree(ctx, node, rel, storeDir, depth, 1, visited)
 	return node, nil
@@ -403,7 +402,7 @@ type TopoEntry struct {
 }
 
 func (p *Protocol) buildTree(ctx context.Context, art *Artifact) *TreeNode {
-	node := &TreeNode{ID: art.ID, Labels: art.Labels, Title: art.Title, Scope: labelValue(art.Labels, LabelPrefixScope)}
+	node := &TreeNode{ID: art.ID, Labels: art.Labels, Title: art.Title}
 	children, _ := p.store.Children(ctx, art.ID)
 	for _, ch := range children {
 		node.Children = append(node.Children, p.buildTree(ctx, ch))
@@ -444,7 +443,6 @@ func (p *Protocol) buildGraphTree(ctx context.Context, node *TreeNode, rel strin
 			ID:        target.ID,
 			Labels:    target.Labels,
 			Title:     target.Title,
-			Scope:     labelValue(target.Labels, LabelPrefixScope),
 			Edge:      e.Relation,
 			Direction: edgeDir,
 		}

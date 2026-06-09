@@ -154,7 +154,7 @@ func TestV045_NewArtifactsGetUUIDs(t *testing.T) {
 
 	art, err := proto.CreateArtifact(ctx, CreateInput{
 		Title:    "First UUID task on upgraded DB",
-		Scope:    "scribe",
+
 		Sections: []Section{{Name: "context", Text: "ctx"}},
 		Labels:   []string{"kind:task"},
 	})

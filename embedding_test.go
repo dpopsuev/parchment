@@ -265,7 +265,7 @@ func TestProtocol_NeverAutoIndexesEmbedding(t *testing.T) {
 
 	ctx := context.Background()
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "template conformance fires on promote",
-		Scope: "test",
+
 		Sections: []parchment.Section{
 			{Name: "body", Text: "template conformance check deferred from create to promote"},
 		},
@@ -295,10 +295,10 @@ func TestProtocol_SemanticRecall_BeatsFTSOnSemantic(t *testing.T) {
 
 	ctx := context.Background()
 
-	conf, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "template draft on missing sections", Scope: "test",
+	conf, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "template draft on missing sections",
 		Sections: []parchment.Section{{Name: "body", Text: "template conformance deferred, artifact created in draft"}},
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindNote},})
-	ptp, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "ptp clock holdover", Scope: "test",
+	ptp, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "ptp clock holdover",
 		Sections: []parchment.Section{{Name: "body", Text: "ptp clock synchronization holdover test"}},
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindNote},})
 
@@ -309,7 +309,7 @@ func TestProtocol_SemanticRecall_BeatsFTSOnSemantic(t *testing.T) {
 	_ = store.PutEmbedding(ctx, ptp.ID, parchment.DefaultEmbedModel, "", ptpVec)
 
 	// Query uses no keywords from either artifact — pure semantic.
-	results, err := proto.SearchSemantic(ctx, "validation deferred until status change", parchment.ListInput{Scope: "test"})
+	results, err := proto.SearchSemantic(ctx, "validation deferred until status change", parchment.ListInput{Labels: []string{parchment.LabelPrefixScope + "test"}})
 	if err != nil {
 		t.Fatalf("SearchSemantic: %v", err)
 	}

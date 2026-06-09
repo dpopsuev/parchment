@@ -14,7 +14,6 @@ import (
 )
 
 type BulkMutationInput struct {
-	Scope         string   `json:"scope,omitempty"`
 	Labels        []string `json:"labels,omitempty"`
 	IDPrefix      string   `json:"id_prefix,omitempty"`
 	ExcludeLabels []string `json:"exclude_labels,omitempty"`
@@ -31,11 +30,9 @@ type BulkMutationResult struct {
 // BulkArchive archives all artifacts matching the filter.
 func (p *Protocol) BulkArchive(ctx context.Context, in BulkMutationInput) (*BulkMutationResult, error) {
 	slog.DebugContext(ctx, "bulk archive",
-		slog.String(LogKeyScope, in.Scope),
 		slog.Bool(LogKeyDryRun, in.DryRun))
 	li := ListInput{
-		Scope: in.Scope, Labels: in.Labels,
-		IDPrefix: in.IDPrefix, ExcludeLabels: in.ExcludeLabels,
+		Labels: in.Labels, IDPrefix: in.IDPrefix, ExcludeLabels: in.ExcludeLabels,
 	}
 	arts, err := p.ListArtifacts(ctx, li)
 	if err != nil {
@@ -63,13 +60,11 @@ func (p *Protocol) BulkArchive(ctx context.Context, in BulkMutationInput) (*Bulk
 // BulkSetField sets a field on all artifacts matching the filter.
 func (p *Protocol) BulkSetField(ctx context.Context, in BulkMutationInput, field, value string) (*BulkMutationResult, error) {
 	slog.DebugContext(ctx, "bulk set field",
-		slog.String(LogKeyScope, in.Scope),
 		slog.String(LogKeyField, field),
 		slog.String(LogKeyValue, value),
 		slog.Bool(LogKeyDryRun, in.DryRun))
 	li := ListInput{
-		Scope: in.Scope, Labels: in.Labels,
-		IDPrefix: in.IDPrefix, ExcludeLabels: in.ExcludeLabels,
+		Labels: in.Labels, IDPrefix: in.IDPrefix, ExcludeLabels: in.ExcludeLabels,
 	}
 	arts, err := p.ListArtifacts(ctx, li)
 	if err != nil {
@@ -218,8 +213,12 @@ func (p *Protocol) DetectOverlaps(ctx context.Context, in OverlapInput) (*Overla
 	}
 
 	f := Filter{Labels: labels}
-	if len(p.scopes) > 0 {
-		f.Scopes = p.scopes
+	if labelValue(f.Labels, LabelPrefixScope) == "" && len(p.scopeLabels) > 0 {
+		rawScopes := make([]string, len(p.scopeLabels))
+		for i, sl := range p.scopeLabels {
+			rawScopes[i] = strings.TrimPrefix(sl, LabelPrefixScope)
+		}
+		f.ScopesOr = rawScopes
 	}
 	arts, err := p.store.List(ctx, f)
 	if err != nil {
@@ -268,17 +267,19 @@ type OrphanReport struct {
 }
 
 type OrphanInput struct {
-	Scope string `json:"scope,omitempty"`
+	Labels []string `json:"labels,omitempty"`
 }
 
 // DetectOrphans finds tasks without implements links, specs/bugs/needs without
 // incoming implements links, and ref/doc kinds missing required outgoing links.
 func (p *Protocol) DetectOrphans(ctx context.Context, in OrphanInput) (*OrphanReport, error) {
-	f := Filter{}
-	if in.Scope != "" {
-		f.Labels = append(f.Labels, LabelPrefixScope+in.Scope)
-	} else if len(p.scopes) > 0 {
-		f.Scopes = p.scopes
+	f := Filter{Labels: in.Labels}
+	if labelValue(f.Labels, LabelPrefixScope) == "" && len(p.scopeLabels) > 0 {
+		rawScopes := make([]string, len(p.scopeLabels))
+		for i, sl := range p.scopeLabels {
+			rawScopes[i] = strings.TrimPrefix(sl, LabelPrefixScope)
+		}
+		f.ScopesOr = rawScopes
 	}
 
 	arts, err := p.store.List(ctx, f)
@@ -508,8 +509,12 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 	f := Filter{ExcludeLabels: []string{LabelPrefixScope + SchemaScope}}
 	if scope != "" {
 		f.Labels = append(f.Labels, LabelPrefixScope+scope)
-	} else if len(p.scopes) > 0 {
-		f.Scopes = p.scopes
+	} else if len(p.scopeLabels) > 0 {
+		rawScopes := make([]string, len(p.scopeLabels))
+		for i, sl := range p.scopeLabels {
+			rawScopes[i] = strings.TrimPrefix(sl, LabelPrefixScope)
+		}
+		f.ScopesOr = rawScopes
 	}
 
 	arts, err := p.store.List(ctx, f)

@@ -16,7 +16,7 @@ func TestPatchArtifact_AppendAnnotations_MemStore(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "patch test", Scope: "test",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "patch test",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
 	if err := proto.PatchArtifact(ctx, art.ID, parchment.ArtifactPatch{
@@ -40,7 +40,7 @@ func TestPatchArtifact_AppendAnnotations_Concurrent(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "concurrent patch", Scope: "test",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "concurrent patch",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
 	if err := proto.PatchArtifact(ctx, art.ID, parchment.ArtifactPatch{
@@ -69,7 +69,7 @@ func TestPatchArtifact_AppendSections_MergeByName(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "section patch", Scope: "test",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "section patch",
 		Sections: []parchment.Section{{Name: "notes", Text: "original"}},
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
@@ -111,7 +111,7 @@ func TestPatchArtifact_SQLite_AppendAnnotations(t *testing.T) {
 	proto := parchment.New(s, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "sqlite patch", Scope: "test",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "sqlite patch",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
 	_ = proto.PatchArtifact(ctx, art.ID, parchment.ArtifactPatch{

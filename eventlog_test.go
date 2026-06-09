@@ -23,7 +23,7 @@ func TestEventLog_CreateArtifact_EmitsCreated(t *testing.T) {
 	proto, store := newEventProto(t)
 	ctx := context.Background()
 
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "write EventLog tests", Scope: "test",
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "write EventLog tests",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +55,7 @@ func TestEventLog_SetField_EmitsUpdated(t *testing.T) {
 	proto, store := newEventProto(t)
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "original title", Scope: "test",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "original title",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
 	_, err := proto.SetField(ctx, []string{art.ID}, "title", "new title")
@@ -80,7 +80,7 @@ func TestEventLog_SetStatus_EmitsStatusChanged(t *testing.T) {
 	proto, store := newEventProto(t)
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "status change test", Scope: "test",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "status change test",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
 	_, err := proto.SetField(ctx, []string{art.ID}, "status", "active", parchment.SetFieldOptions{BypassGuards: true})
@@ -105,9 +105,9 @@ func TestEventLog_LinkArtifacts_EmitsLinked(t *testing.T) {
 	proto, store := newEventProto(t)
 	ctx := context.Background()
 
-	src, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "source", Scope: "test",
+	src, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "source",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
-	dst, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "destination", Scope: "test",
+	dst, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "destination",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
 	_, err := proto.LinkArtifacts(ctx, src.ID, "related", []string{dst.ID}, 0)
@@ -131,7 +131,7 @@ func TestProtocol_GetEvents_ReturnsCreatedEvents(t *testing.T) {
 	proto := parchment.New(store, parchment.KnowledgeSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "GetEvents test", Scope: "test",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "GetEvents test",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
 	events, err := proto.GetEvents(ctx, time.Time{}, parchment.EventFilter{ArtifactID: art.ID})
@@ -153,7 +153,7 @@ func TestEventLog_GetEvents_FilterByEventType(t *testing.T) {
 	proto := parchment.New(store, parchment.KnowledgeSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "filter test", Scope: "test",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "filter test",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 	_, _ = proto.SetField(ctx, []string{art.ID}, "title", "updated title")
 
@@ -185,7 +185,7 @@ func TestEventLog_SQLite_GetEvents_FilterByEventType(t *testing.T) {
 	proto := parchment.New(s, parchment.KnowledgeSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "sqlite filter", Scope: "test",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "sqlite filter",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 	_, _ = proto.SetField(ctx, []string{art.ID}, "title", "new title")
 
@@ -216,9 +216,9 @@ func TestEventLog_GetEvents_FilterByScope(t *testing.T) {
 	protoB := parchment.New(store, parchment.KnowledgeSchema(), []string{"scope-b"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	_, _ = protoA.CreateArtifact(ctx, parchment.CreateInput{Title: "in scope-a", Scope: "scope-a",
+	_, _ = protoA.CreateArtifact(ctx, parchment.CreateInput{Title: "in scope-a",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindNote},})
-	_, _ = protoB.CreateArtifact(ctx, parchment.CreateInput{Title: "in scope-b", Scope: "scope-b",
+	_, _ = protoB.CreateArtifact(ctx, parchment.CreateInput{Title: "in scope-b",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindNote},})
 
 	events, _ := store.GetEvents(ctx, time.Time{}, parchment.EventFilter{Scope: "scope-a"})

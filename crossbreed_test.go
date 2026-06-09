@@ -54,11 +54,11 @@ func TestCascade_DependencyEdges(t *testing.T) {
 	ctx := context.Background()
 
 	// A → B → C (depends_on chain)
-	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Scope: "test", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}},
+	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}},
 		Labels: []string{"kind:task"},})
-	b, _ := p.CreateArtifact(ctx, CreateInput{Title: "B", Scope: "test", Priority: "medium", DependsOn: []string{a.ID}, Sections: []Section{{Name: "context", Text: "b"}},
+	b, _ := p.CreateArtifact(ctx, CreateInput{Title: "B", Priority: "medium", DependsOn: []string{a.ID}, Sections: []Section{{Name: "context", Text: "b"}},
 		Labels: []string{"kind:task"},})
-	c, _ := p.CreateArtifact(ctx, CreateInput{Title: "C", Scope: "test", Priority: "medium", DependsOn: []string{b.ID}, Sections: []Section{{Name: "context", Text: "c"}},
+	c, _ := p.CreateArtifact(ctx, CreateInput{Title: "C", Priority: "medium", DependsOn: []string{b.ID}, Sections: []Section{{Name: "context", Text: "c"}},
 		Labels: []string{"kind:task"},})
 
 	affected := p.Cascade(ctx, a.ID)
@@ -101,7 +101,7 @@ func TestQualityGate_BlockingPreventsCompletion(t *testing.T) {
 	p.RegisterGate(gate)
 
 	// Create and activate an artifact
-	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Scope: "test", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}},
+	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}},
 		Labels: []string{"kind:task"},})
 	// Walk through lifecycle to in_review so complete is a valid transition.
 	p.SetField(ctx, []string{a.ID}, "status", "active", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
@@ -156,7 +156,7 @@ func TestQualityGate_WarningAllowsCompletion(t *testing.T) {
 	})
 	p.RegisterGate(gate)
 
-	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Scope: "test", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}},
+	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}},
 		Labels: []string{"kind:task"},})
 	// Walk through lifecycle to in_review so complete is a valid transition.
 	p.SetField(ctx, []string{a.ID}, "status", "active", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding

@@ -81,7 +81,7 @@ func TestIntentLifecycle_Protocol(t *testing.T) {
 
 	// Create a need in draft.
 	art, err := p.CreateArtifact(ctx, CreateInput{Title: "We need better search",
-		Scope: "test",
+
 		Sections: []Section{
 			{Name: "problem", Text: "FTS5 misses semantic matches."},
 		},

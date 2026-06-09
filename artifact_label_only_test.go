@@ -103,7 +103,7 @@ func TestCreateArtifact_KindFromLabelIsCanonical(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Scope: "test", Title: "label canonical test",
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "label canonical test",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
 		Labels: []string{"kind:task"},})
 	if err != nil {

@@ -179,7 +179,7 @@ func TestV043_NewArtifactsGetUUIDs(t *testing.T) {
 
 	art, err := proto.CreateArtifact(ctx, CreateInput{
 		Title:    "New task after migration",
-		Scope:    "scribe",
+
 		Sections: []Section{{Name: "context", Text: "ctx"}},
 		Labels:   []string{"kind:task"},
 	})
@@ -218,7 +218,7 @@ func TestV043_ExplicitIDPreserved(t *testing.T) {
 	art, err := proto.CreateArtifact(ctx, CreateInput{
 		Title:      "Seeded with explicit ID",
 		ExplicitID: "SCR-TSK-999",
-		Scope:      "scribe",
+
 		Labels:     []string{"kind:task"},
 	})
 	if err != nil {

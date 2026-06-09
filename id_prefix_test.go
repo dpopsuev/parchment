@@ -23,7 +23,7 @@ func TestCheck_UUIDIDsNoViolation(t *testing.T) {
 
 	_, err = proto.CreateArtifact(ctx, parchment.CreateInput{
 		Title:  "uuid task",
-		Scope:  "scribe",
+
 		Labels: []string{"kind:task"},
 	})
 	if err != nil {

@@ -31,7 +31,7 @@ func TestCreateArtifact_PatchFillsSections(t *testing.T) {
 	proto := setupTemplateProto(t)
 
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "crash on nil input",
-		Scope: "test",
+
 		Patch: map[string]string{
 			"observed":     "nil pointer dereference on Foo(nil)",
 			"reproduction": "1. call Foo(nil)\n2. observe panic",
@@ -63,7 +63,7 @@ func TestCreateArtifact_PatchMergesWithExplicitSections(t *testing.T) {
 	proto := setupTemplateProto(t)
 
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "race condition",
-		Scope: "test",
+
 		Sections: []parchment.Section{
 			{Name: "observed", Text: "data race on map"},
 		},
@@ -94,7 +94,7 @@ func TestCreateArtifact_PatchOverridesExplicitSection(t *testing.T) {
 	proto := setupTemplateProto(t)
 
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "dup section",
-		Scope: "test",
+
 		Sections: []parchment.Section{
 			{Name: "observed", Text: "old observed"},
 			{Name: "reproduction", Text: "old reproduction"},
@@ -130,7 +130,7 @@ func TestPromoteStash_PatchFillsMissingSections(t *testing.T) {
 	// pre-built a stash from an older workflow, but the happy path no longer
 	// requires it.
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "stash test bug",
-		Scope: "test",
+
 		Labels: []string{"kind:bug"},})
 	if err != nil {
 		t.Fatalf("create without sections should succeed as draft: %v", err)

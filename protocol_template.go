@@ -54,13 +54,16 @@ func (p *Protocol) createHookArtifacts(ctx context.Context, parent *Artifact, ra
 			}
 		}
 
+		childLabels := []string{LabelPrefixKind + kind, "auto-generated"}
+		if sc := labelValue(parent.Labels, LabelPrefixScope); sc != "" {
+			childLabels = append(childLabels, LabelPrefixScope+sc)
+		}
 		child, err := p.CreateArtifact(ctx, CreateInput{
 			Title:     title,
 			Goal:      goal,
-			Scope:     labelValue(parent.Labels, LabelPrefixScope),
 			Parent:    parent.ID,
 			Priority:  priority,
-			Labels:    []string{LabelPrefixKind + kind, "auto-generated"},
+			Labels:    childLabels,
 			Sections:  sections,
 			SkipHooks: true,
 		})

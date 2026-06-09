@@ -87,7 +87,6 @@ func (p *Protocol) PromoteStash(ctx context.Context, stashID string, patch Creat
 
 type CreateInput struct {
 	Title      string              `json:"title"`
-	Scope      string              `json:"scope,omitempty"`
 	Goal       string              `json:"goal,omitempty"`
 	Parent     string              `json:"parent,omitempty"`
 	Priority   string              `json:"priority,omitempty"`
@@ -124,7 +123,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 			return nil, fmt.Errorf("parent_of cycle detected: %s", strings.Join(path, " → ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 		}
 	}
-	scope, err := p.inferScope(ctx, in.Scope, in.Parent, kind)
+	scope, err := p.inferScope(ctx, labelValue(in.Labels, LabelPrefixScope), in.Parent, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +338,6 @@ func (p *Protocol) DeleteArtifact(ctx context.Context, id string, force bool) er
 
 type ListInput struct {
 	Family         string   `json:"family,omitempty"` // filter by kind family: intent, effort, knowledge, support
-	Scope          string   `json:"scope,omitempty"`
 	Parent         string   `json:"parent,omitempty"`
 	Sprint         string   `json:"sprint,omitempty"`
 	IDPrefix       string   `json:"id_prefix,omitempty"`
@@ -362,9 +360,9 @@ type ListInput struct {
 
 func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact, error) { //nolint:gocritic // hugeParam: value semantics intentional, changing to pointer would require updating all callers including MCP handlers
 	// Apply sticky filter defaults from config artifacts
-	if in.Scope == "" {
+	if labelValue(in.Labels, LabelPrefixScope) == "" {
 		if v := p.GetConfig(ctx, configKeyDefaultScope, ""); v != "" {
-			in.Scope = v
+			in.Labels = append(in.Labels, LabelPrefixScope+v)
 		}
 	}
 	if v := p.GetConfig(ctx, configKeyDefaultExcludeStatus, ""); v != "" {
@@ -393,10 +391,12 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 	if in.Sprint != "" {
 		f.Labels = append(f.Labels, LabelPrefixSprint+in.Sprint)
 	}
-	if in.Scope != "" {
-		f.Labels = append(f.Labels, LabelPrefixScope+in.Scope)
-	} else if len(p.scopes) > 0 {
-		f.Scopes = p.scopes
+	if labelValue(f.Labels, LabelPrefixScope) == "" && len(p.scopeLabels) > 0 {
+		rawScopes := make([]string, len(p.scopeLabels))
+		for i, sl := range p.scopeLabels {
+			rawScopes[i] = strings.TrimPrefix(sl, LabelPrefixScope)
+		}
+		f.ScopesOr = rawScopes
 	}
 	p.populateFamilyKinds(&f)
 	arts, err := p.store.List(ctx, f)
@@ -411,9 +411,9 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 // returns all artifacts in one page (backward-compatible with ListArtifacts).
 func (p *Protocol) ListPage(ctx context.Context, in ListInput) (Page, error) { //nolint:gocritic // hugeParam: value semantics match ListArtifacts
 	// Apply sticky filter defaults.
-	if in.Scope == "" {
+	if labelValue(in.Labels, LabelPrefixScope) == "" {
 		if v := p.GetConfig(ctx, configKeyDefaultScope, ""); v != "" {
-			in.Scope = v
+			in.Labels = append(in.Labels, LabelPrefixScope+v)
 		}
 	}
 
@@ -436,10 +436,12 @@ func (p *Protocol) ListPage(ctx context.Context, in ListInput) (Page, error) { /
 	if in.Sprint != "" {
 		f.Labels = append(f.Labels, LabelPrefixSprint+in.Sprint)
 	}
-	if in.Scope != "" {
-		f.Labels = append(f.Labels, LabelPrefixScope+in.Scope)
-	} else if len(p.scopes) > 0 {
-		f.Scopes = p.scopes
+	if labelValue(f.Labels, LabelPrefixScope) == "" && len(p.scopeLabels) > 0 {
+		rawScopes := make([]string, len(p.scopeLabels))
+		for i, sl := range p.scopeLabels {
+			rawScopes[i] = strings.TrimPrefix(sl, LabelPrefixScope)
+		}
+		f.ScopesOr = rawScopes
 	}
 	p.populateFamilyKinds(&f)
 	page, err := p.store.ListPage(ctx, f)
@@ -493,10 +495,12 @@ func (p *Protocol) SearchArtifacts(ctx context.Context, query string, in ListInp
 	ftsIDs, ftsErr := p.store.Search(ctx, query)
 	if ftsErr == nil && len(ftsIDs) > 0 { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity
 		scopeFilter := Filter{Labels: in.Labels}
-		if in.Scope != "" {
-			scopeFilter.Labels = append(scopeFilter.Labels, LabelPrefixScope+in.Scope)
-		} else if len(p.scopes) > 0 {
-			scopeFilter.Scopes = p.scopes
+		if labelValue(scopeFilter.Labels, LabelPrefixScope) == "" && len(p.scopeLabels) > 0 {
+			rawScopes := make([]string, len(p.scopeLabels))
+			for i, sl := range p.scopeLabels {
+				rawScopes[i] = strings.TrimPrefix(sl, LabelPrefixScope)
+			}
+			scopeFilter.ScopesOr = rawScopes
 		}
 		var matched []*Artifact
 		for _, id := range ftsIDs {
@@ -514,10 +518,12 @@ func (p *Protocol) SearchArtifacts(ctx context.Context, query string, in ListInp
 
 	// Fallback: in-memory substring scan
 	f := Filter{Labels: in.Labels}
-	if in.Scope != "" {
-		f.Labels = append(f.Labels, LabelPrefixScope+in.Scope)
-	} else if len(p.scopes) > 0 {
-		f.Scopes = p.scopes
+	if labelValue(f.Labels, LabelPrefixScope) == "" && len(p.scopeLabels) > 0 {
+		rawScopes := make([]string, len(p.scopeLabels))
+		for i, sl := range p.scopeLabels {
+			rawScopes[i] = strings.TrimPrefix(sl, LabelPrefixScope)
+		}
+		f.ScopesOr = rawScopes
 	}
 	arts, err := p.store.List(ctx, f)
 	if err != nil {
@@ -662,15 +668,19 @@ func (p *Protocol) inferScope(ctx context.Context, explicit, parentID, kind stri
 			return labelValue(parent.Labels, LabelPrefixScope), nil
 		}
 	}
-	if len(p.scopes) == 1 {
-		return p.scopes[0], nil
+	if len(p.scopeLabels) == 1 {
+		return strings.TrimPrefix(p.scopeLabels[0], LabelPrefixScope), nil
 	}
-	if len(p.scopes) == 0 {
+	if len(p.scopeLabels) == 0 {
 		// No scopes configured — accept unscoped artifacts rather than refusing.
 		// Occurs when scribe.yaml has no scope_configs and no --scope flag was given.
 		return "", nil
 	}
-	return "", fmt.Errorf("scope is required (available scopes: %s)", strings.Join(p.scopes, ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
+	scopeVals := make([]string, len(p.scopeLabels))
+	for i, sl := range p.scopeLabels {
+		scopeVals[i] = strings.TrimPrefix(sl, LabelPrefixScope)
+	}
+	return "", fmt.Errorf("scope is required (available scopes: %s)", strings.Join(scopeVals, ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 }
 
 
@@ -868,12 +878,13 @@ func (p *Protocol) SearchSemantic(ctx context.Context, query string, in ListInpu
 		return nil, fmt.Errorf("semantic search: %w", err)
 	}
 	var results []ScoredArtifact
+	scopeLabelFilter := labelValue(in.Labels, LabelPrefixScope)
 	for _, hit := range hits {
 		art, err := p.store.Get(ctx, hit.ID)
 		if err != nil {
 			continue
 		}
-		if in.Scope != "" && labelValue(art.Labels, LabelPrefixScope) != in.Scope {
+		if scopeLabelFilter != "" && labelValue(art.Labels, LabelPrefixScope) != scopeLabelFilter {
 			continue
 		}
 		results = append(results, ScoredArtifact{Artifact: art, Score: hit.Score})

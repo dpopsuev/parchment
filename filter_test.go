@@ -64,12 +64,12 @@ func TestBulkSetField_UpdatesAllMatching(t *testing.T) {
 	proto := parchment.New(store, parchment.KnowledgeSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "a", Scope: "test",
+	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "a",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
-	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "b", Scope: "test",
+	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "b",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
-	result, err := proto.BulkSetField(ctx, parchment.BulkMutationInput{Scope: "test",
+	result, err := proto.BulkSetField(ctx, parchment.BulkMutationInput{
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},}, "priority", "high")
 	if err != nil {
 		t.Fatal(err)
@@ -94,10 +94,10 @@ func TestBulkSetField_DryRun_NoMutation(t *testing.T) {
 	proto := parchment.New(store, parchment.KnowledgeSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "c", Scope: "test",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "c",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
 
-	result, err := proto.BulkSetField(ctx, parchment.BulkMutationInput{Scope: "test", DryRun: true,
+	result, err := proto.BulkSetField(ctx, parchment.BulkMutationInput{DryRun: true,
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},}, "priority", "critical")
 	if err != nil {
 		t.Fatal(err)
@@ -146,22 +146,22 @@ func TestFilter_LabelsOr(t *testing.T) {
 	s := parchment.NewMemoryStore()
 	p := parchment.New(s, parchment.DefaultSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "task", Scope: "test", Priority: "none", Sections: []parchment.Section{{Name: "context", Text: "x"}},
+	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "task", Priority: "none", Sections: []parchment.Section{{Name: "context", Text: "x"}},
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "bug", Scope: "test", Sections: []parchment.Section{{Name: "context", Text: "x"}},
+	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "bug", Sections: []parchment.Section{{Name: "context", Text: "x"}},
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindBug},}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "spec", Scope: "test",
+	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "spec",
 		Labels: []string{parchment.LabelPrefixKind + parchment.KindSpec},}); err != nil {
 		t.Fatal(err)
 	}
 
 	arts, err := p.ListArtifacts(ctx, parchment.ListInput{
 		LabelsOr: []string{"kind:" + parchment.KindTask, "kind:" + parchment.KindBug},
-		Scope:    "test",
+
 	})
 	if err != nil {
 		t.Fatalf("list: %v", err)

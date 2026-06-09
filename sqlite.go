@@ -965,9 +965,9 @@ func buildWhereClause(f Filter) ([]string, []any) { //nolint:cyclop,gocyclo,gocr
 			args = append(args, k)
 		}
 	}
-	if len(f.Scopes) > 0 {
-		ph := make([]string, len(f.Scopes))
-		for i, sc := range f.Scopes {
+	if len(f.ScopesOr) > 0 {
+		ph := make([]string, len(f.ScopesOr))
+		for i, sc := range f.ScopesOr {
 			ph[i] = "?"
 			args = append(args, sc)
 		}

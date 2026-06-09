@@ -122,7 +122,7 @@ func TestProtocol_RuleArtifact_BlocksTransition(t *testing.T) {
 
 	proto := parchment.New(s, parchment.KnowledgeSchema(), []string{"forbidden-scope"}, nil, parchment.ProtocolConfig{})
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Labels: []string{"kind:note"}, Title: "test", Scope: "forbidden-scope",
+		Labels: []string{"kind:note"}, Title: "test",
 	})
 
 	// BypassGuards so only rule artifacts can block
@@ -169,7 +169,7 @@ func TestProtocol_RuleArtifact_AllowsWhenNotMatching(t *testing.T) {
 	// Use scope=allowed-scope — rule should NOT fire
 	proto := parchment.New(s, parchment.KnowledgeSchema(), []string{"allowed-scope"}, nil, parchment.ProtocolConfig{})
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Labels: []string{"kind:note"}, Title: "test", Scope: "allowed-scope",
+		Labels: []string{"kind:note"}, Title: "test",
 	})
 
 	results, err := proto.SetField(ctx, []string{art.ID}, "status", "active",

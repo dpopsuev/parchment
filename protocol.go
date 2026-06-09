@@ -78,7 +78,7 @@ type Protocol struct {
 	traits           *TraitStore              // deprecated: use registry.Traits()
 	labelTraits      map[string]LabelTrait    // deprecated: use registry.Traits().LabelMap()
 	edgeTypeTraits   map[string]EdgeTypeTrait // deprecated: use registry.Traits().EdgeMap()
-	scopes           []string
+	scopeLabels      []string
 	vocab            []string
 	mutableCreatedAt bool
 	defaults         DefaultsProvider
@@ -105,7 +105,11 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 	if len(vocab) == 0 {
 		vocab = schema.KindNames()
 	}
-	p := &Protocol{store: s, schema: schema, scopes: scopes, vocab: vocab}
+	scopeLabels := make([]string, len(scopes))
+	for i, sc := range scopes {
+		scopeLabels[i] = LabelPrefixScope + sc
+	}
+	p := &Protocol{store: s, schema: schema, scopeLabels: scopeLabels, vocab: vocab}
 	if s != nil {
 		SeedLabelTraits(context.Background(), s)
 		SeedEdgeTypeTraits(context.Background(), s)

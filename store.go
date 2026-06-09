@@ -73,22 +73,34 @@ type SearchResult struct {
 	Score float32
 }
 
+// ScopeCount is one row from ScopeGraph — a scope and its artifact count.
+type ScopeCount struct {
+	Scope string
+	Count int
+}
+
+// ScopeEdgeWeight is one aggregated cross-scope edge from ScopeGraph.
+type ScopeEdgeWeight struct {
+	FromScope string
+	ToScope   string
+	Weight    int
+}
+
 // GraphStore handles explicit edge operations and traversal.
 type GraphStore interface {
 	AddEdge(ctx context.Context, e Edge) error
-	// BulkAddEdge inserts multiple edges in a single transaction.
-	// INSERT OR IGNORE semantics: existing edges are silently skipped.
-	// Returns the first error encountered; partial writes may have occurred.
 	BulkAddEdge(ctx context.Context, edges []Edge) error
 	RemoveEdge(ctx context.Context, e Edge) error
-	// UpdateEdgeWeight sets the weight on an existing edge. The edge must
-	// already exist. Callers pass 0.0 to reset to boolean-existence semantics.
 	UpdateEdgeWeight(ctx context.Context, from, to, relation string, weight float64) error
 	Neighbors(ctx context.Context, id, rel string, dir Direction) ([]Edge, error)
 	Walk(ctx context.Context, root string, rel string, dir Direction, maxDepth int, fn WalkFn) error
-	// ListEdges returns all edges where both endpoints are in the given set of
-	// artifact IDs. Pass nil relations to return all relation types.
 	ListEdges(ctx context.Context, ids, relations []string) ([]Edge, error)
+	// ScopeGraph returns artifact counts per scope and cross-scope edge weights.
+	// Used by the graph UI — computed in SQL, not assembled in Go.
+	ScopeGraph(ctx context.Context) ([]ScopeCount, []ScopeEdgeWeight, error)
+	// KindGraph returns artifact counts per kind within a scope, and cross-kind
+	// edge weights, optionally filtered by status labels and relation types.
+	KindGraph(ctx context.Context, scope string, statusLabels, relations []string) ([]ScopeCount, []ScopeEdgeWeight, error)
 }
 
 // ScopeStore handles scope label registry.

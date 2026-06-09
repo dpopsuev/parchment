@@ -324,22 +324,17 @@ func (p *Protocol) ArtifactTree(ctx context.Context, in TreeInput) (*TreeNode, e
 // of the root artifact, ordered by depends_on edges (Kahn's algorithm).
 // Artifacts with no dependencies come first. Returns error if a cycle is detected.
 func (p *Protocol) TopoSort(ctx context.Context, rootID string) ([]TopoEntry, error) {
-	// Collect all descendants via parent_of (flatten tree).
-	children, err := p.store.Children(ctx, rootID)
-	if err != nil {
+	arts := make(map[string]*Artifact)
+	if err := p.store.Walk(ctx, rootID, RelParentOf, Outgoing, 0, func(_ int, e Edge) bool {
+		if art, err := p.store.Get(ctx, e.To); err == nil {
+			arts[art.ID] = art
+		}
+		return true
+	}); err != nil {
 		return nil, err
 	}
-	if len(children) == 0 {
+	if len(arts) == 0 {
 		return nil, nil
-	}
-
-	arts := make(map[string]*Artifact, len(children))
-	for _, ch := range children {
-		arts[ch.ID] = ch
-		gc, _ := p.store.Children(ctx, ch.ID)
-		for _, g := range gc {
-			arts[g.ID] = g
-		}
 	}
 
 	// Build graph using dominikbraun/graph.

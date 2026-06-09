@@ -254,6 +254,96 @@ func (m *MemoryStore) Neighbors(_ context.Context, id, rel string, dir Direction
 	return result, nil
 }
 
+func (m *MemoryStore) ScopeGraph(ctx context.Context) ([]ScopeCount, []ScopeEdgeWeight, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	counts := make(map[string]int)
+	for _, art := range m.artifacts {
+		if labelValue(art.Labels, LabelPrefixScope) != SchemaScope {
+			counts[labelValue(art.Labels, LabelPrefixScope)]++
+		}
+	}
+	var sc []ScopeCount
+	for scope, n := range counts {
+		if scope != "" {
+			sc = append(sc, ScopeCount{Scope: scope, Count: n})
+		}
+	}
+	scopeOf := make(map[string]string, len(m.artifacts))
+	for _, art := range m.artifacts {
+		scopeOf[art.ID] = labelValue(art.Labels, LabelPrefixScope)
+	}
+	wm := make(map[[2]string]int)
+	for _, e := range m.edges {
+		fs, ts := scopeOf[e.From], scopeOf[e.To]
+		if fs != "" && ts != "" && fs != ts {
+			wm[[2]string{fs, ts}]++
+		}
+	}
+	ew := make([]ScopeEdgeWeight, 0, len(wm))
+	for k, w := range wm {
+		ew = append(ew, ScopeEdgeWeight{FromScope: k[0], ToScope: k[1], Weight: w})
+	}
+	return sc, ew, nil
+}
+
+func (m *MemoryStore) KindGraph(ctx context.Context, scope string, statusLabels, relations []string) ([]ScopeCount, []ScopeEdgeWeight, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	counts := make(map[string]int)
+	relSet := make(map[string]bool, len(relations))
+	for _, r := range relations {
+		relSet[r] = true
+	}
+	for _, art := range m.artifacts {
+		if labelValue(art.Labels, LabelPrefixScope) != scope {
+			continue
+		}
+		match := true
+		for _, sl := range statusLabels {
+			found := false
+			for _, l := range art.Labels {
+				if l == sl {
+					found = true
+					break
+				}
+			}
+			if !found {
+				match = false
+				break
+			}
+		}
+		if match {
+			counts[labelValue(art.Labels, LabelPrefixKind)]++
+		}
+	}
+	var sc []ScopeCount
+	for kind, n := range counts {
+		if kind != "" {
+			sc = append(sc, ScopeCount{Scope: kind, Count: n})
+		}
+	}
+	kindOf := make(map[string]string, len(m.artifacts))
+	for _, art := range m.artifacts {
+		kindOf[art.ID] = labelValue(art.Labels, LabelPrefixKind)
+	}
+	wm := make(map[[2]string]int)
+	for _, e := range m.edges {
+		if len(relSet) > 0 && !relSet[e.Relation] {
+			continue
+		}
+		fk, tk := kindOf[e.From], kindOf[e.To]
+		if fk != "" && tk != "" && fk != tk {
+			wm[[2]string{fk, tk}]++
+		}
+	}
+	ew := make([]ScopeEdgeWeight, 0, len(wm))
+	for k, w := range wm {
+		ew = append(ew, ScopeEdgeWeight{FromScope: k[0], ToScope: k[1], Weight: w})
+	}
+	return sc, ew, nil
+}
+
 func (m *MemoryStore) ListEdges(_ context.Context, ids, relations []string) ([]Edge, error) {
 	if len(ids) == 0 {
 		return nil, nil

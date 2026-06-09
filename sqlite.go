@@ -832,7 +832,7 @@ func (s *SQLiteStore) Search(ctx context.Context, query string) ([]string, error
 	if err != nil {
 		return nil, fmt.Errorf("fts5 search: %w", err)
 	}
-	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed //nolint:errcheck // rows.Close only fails when already closed
 	var ids []string
 	for rows.Next() {
 		var id string
@@ -887,7 +887,7 @@ func (s *SQLiteStore) cleanDanglingRefs(ctx context.Context, tx *sql.Tx, deleted
 	if err != nil {
 		return err
 	}
-	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed //nolint:errcheck // rows.Close only fails when already closed
 
 	type refUpdate struct {
 		id    string
@@ -1063,7 +1063,7 @@ func (s *SQLiteStore) List(ctx context.Context, f Filter) ([]*Artifact, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed //nolint:errcheck // rows.Close only fails when already closed
 
 	var results []*Artifact
 	for rows.Next() {
@@ -1299,7 +1299,7 @@ func (s *SQLiteStore) ListEdges(ctx context.Context, ids, relations []string) ([
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed //nolint:errcheck // rows.Close only fails when already closed
 	var edges []Edge
 	for rows.Next() {
 		var e Edge
@@ -1308,6 +1308,98 @@ func (s *SQLiteStore) ListEdges(ctx context.Context, ids, relations []string) ([
 		}
 	}
 	return edges, nil
+}
+
+func (s *SQLiteStore) ScopeGraph(ctx context.Context) ([]ScopeCount, []ScopeEdgeWeight, error) {
+	rows, err := s.reader.QueryContext(ctx,
+		`SELECT scope, COUNT(*) FROM artifacts
+		 WHERE scope != '' AND scope != ? GROUP BY scope`, SchemaScope)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
+	var counts []ScopeCount
+	for rows.Next() {
+		var sc ScopeCount
+		if err := rows.Scan(&sc.Scope, &sc.Count); err == nil {
+			counts = append(counts, sc)
+		}
+	}
+
+	erows, err := s.reader.QueryContext(ctx,
+		`SELECT a.scope, b.scope, COUNT(*) as weight
+		 FROM edges e
+		 JOIN artifacts a ON a.id = e.from_id
+		 JOIN artifacts b ON b.id = e.to_id
+		 WHERE a.scope != b.scope AND a.scope != '' AND b.scope != ''
+		   AND a.scope != ? AND b.scope != ?
+		 GROUP BY a.scope, b.scope`, SchemaScope, SchemaScope)
+	if err != nil {
+		return counts, nil, err
+	}
+	defer erows.Close() //nolint:errcheck // rows.Close only fails when already closed
+	var weights []ScopeEdgeWeight
+	for erows.Next() {
+		var w ScopeEdgeWeight
+		if err := erows.Scan(&w.FromScope, &w.ToScope, &w.Weight); err == nil {
+			weights = append(weights, w)
+		}
+	}
+	return counts, weights, nil
+}
+
+func (s *SQLiteStore) KindGraph(ctx context.Context, scope string, statusLabels, relations []string) ([]ScopeCount, []ScopeEdgeWeight, error) {
+	args := make([]any, 0, 1+len(statusLabels))
+	q := `SELECT kind, COUNT(*) FROM artifacts WHERE scope = ? AND kind != ''`
+	args = append(args, scope)
+	for _, sl := range statusLabels {
+		q += ` AND EXISTS (SELECT 1 FROM artifact_labels WHERE artifact_id=id AND label=?)`
+		args = append(args, sl)
+	}
+	q += ` GROUP BY kind`
+
+	rows, err := s.reader.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
+	var counts []ScopeCount
+	for rows.Next() {
+		var sc ScopeCount
+		if err := rows.Scan(&sc.Scope, &sc.Count); err == nil {
+			counts = append(counts, sc)
+		}
+	}
+
+	relFilter := ""
+	var eargs []any
+	if len(relations) > 0 {
+		ph := strings.Repeat("?,", len(relations))
+		relFilter = " AND e.relation IN (" + ph[:len(ph)-1] + ")"
+		for _, r := range relations {
+			eargs = append(eargs, r)
+		}
+	}
+	eargs = append([]any{scope, scope}, eargs...)
+	erows, err := s.reader.QueryContext(ctx,
+		`SELECT a.kind, b.kind, COUNT(*) as w
+		 FROM edges e
+		 JOIN artifacts a ON a.id = e.from_id
+		 JOIN artifacts b ON b.id = e.to_id
+		 WHERE a.scope = ? AND b.scope = ? AND a.kind != b.kind`+relFilter+`
+		 GROUP BY a.kind, b.kind`, eargs...)
+	if err != nil {
+		return counts, nil, err
+	}
+	defer erows.Close() //nolint:errcheck // rows.Close only fails when already closed
+	var weights []ScopeEdgeWeight
+	for erows.Next() {
+		var w ScopeEdgeWeight
+		if err := erows.Scan(&w.FromScope, &w.ToScope, &w.Weight); err == nil {
+			weights = append(weights, w)
+		}
+	}
+	return counts, weights, nil
 }
 
 func (s *SQLiteStore) Walk(ctx context.Context, root, rel string, dir Direction, maxDepth int, fn WalkFn) error {
@@ -1386,7 +1478,7 @@ func (s *SQLiteStore) ScopesByLabel(ctx context.Context, label string) ([]string
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed //nolint:errcheck // rows.Close only fails when already closed
 	var scopes []string
 	for rows.Next() {
 		var scope string
@@ -1409,7 +1501,7 @@ func (s *SQLiteStore) ListScopeInfo(ctx context.Context) ([]ScopeInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed //nolint:errcheck // rows.Close only fails when already closed
 	var result []ScopeInfo
 	for rows.Next() {
 		var scope, key, csv string
@@ -1704,7 +1796,7 @@ func (s *SQLiteStore) SearchSemantic(ctx context.Context, model string, query []
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() //nolint:errcheck // best-effort close on read-only query
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed //nolint:errcheck // best-effort close on read-only query
 
 	var results []SearchResult
 	for rows.Next() {

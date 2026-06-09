@@ -153,3 +153,54 @@ func containsString(slice []string, s string) bool {
 	}
 	return false
 }
+
+// =============================================================================
+// BUG-TopoSort-Depth: TopoSort only walked 2 levels, making subtasks invisible.
+// Campaign → Goal → Task → Subtask: subtask was silently dropped from results.
+// =============================================================================
+
+func TestTopoSort_CollectsArbitraryDepth(t *testing.T) {
+	// Given: a 4-level parent_of chain via the store (bypassing schema child rules)
+	// When:  TopoSort is called on the root
+	// Then:  all 4 descendants appear — the old 2-level loop would miss L4
+	t.Parallel()
+	proto, _ := newProto(t)
+	ctx := context.Background()
+
+	put := func(id, parent string) {
+		t.Helper()
+		if err := proto.Store().Put(ctx, &parchment.Artifact{
+			ID: id, Labels: []string{"kind:task", "status:draft", "scope:test"}, Title: id,
+		}); err != nil {
+			t.Fatalf("put %s: %v", id, err)
+		}
+		if parent != "" {
+			if err := proto.Store().AddEdge(ctx, parchment.Edge{
+				From: parent, To: id, Relation: parchment.RelParentOf,
+			}); err != nil {
+				t.Fatalf("edge %s→%s: %v", parent, id, err)
+			}
+		}
+	}
+	put("ROOT", "")
+	put("L1", "ROOT")
+	put("L2", "L1")
+	put("L3", "L2")
+	put("L4", "L3")
+
+	entries, err := proto.TopoSort(ctx, "ROOT")
+	if err != nil {
+		t.Fatalf("TopoSort: %v", err)
+	}
+
+	found := make(map[string]bool)
+	for _, e := range entries {
+		found[e.ID] = true
+	}
+	for _, id := range []string{"L1", "L2", "L3", "L4"} {
+		if !found[id] {
+			t.Errorf("TopoSort depth bug: %s missing (got %d entries: %v)", id, len(entries), entries)
+		}
+	}
+}
+

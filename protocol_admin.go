@@ -79,7 +79,7 @@ func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force boo
 		slog.String(LogKeyScope, scope),
 		slog.Bool(LogKeyForce, force))
 	maxAge := time.Duration(days) * 24 * time.Hour
-	f := Filter{Labels: []string{LabelPrefixStatus + StatusArchived}}
+	f := Filter{Labels: []string{LabelPrefixStatus + "archived"}}
 	if scope != "" {
 		f.Labels = append(f.Labels, LabelPrefixScope+scope)
 	}
@@ -93,9 +93,9 @@ func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force boo
 		if !art.UpdatedAt.Before(cutoff) {
 			continue
 		}
-		if labelValue(art.Labels, LabelPrefixStatus) == StatusRetired {
-			continue
-		}
+	if statusFromLabels(art.Labels) == "retired" {
+		continue
+	}
 		// Label trait protection overrides kind-level Vacuumable.
 		if ResolveTrait(p.labelTraits, art.Labels).EvictionPolicy == "protected" {
 			continue
@@ -179,7 +179,7 @@ func (p *Protocol) DetectOverlaps(ctx context.Context, in OverlapInput) (*Overla
 		slog.String(LogKeyProject, in.Project))
 	labels := in.Labels
 	if len(labels) == 0 {
-		labels = []string{LabelPrefixKind + KindTask, LabelPrefixStatus + StatusActive}
+		labels = []string{LabelPrefixKind + KindTask, "work.active"}
 	}
 
 	f := Filter{Labels: labels}
@@ -425,7 +425,7 @@ func (p *Protocol) Import(ctx context.Context, r io.Reader) (int, error) {
 // scoped config > global config > empty string.
 // Config artifacts use sections as key-value pairs (section name = key, text = value).
 func (p *Protocol) GetConfig(ctx context.Context, key, scope string) string {
-	kindStatusLabels := []string{LabelPrefixKind + KindConfig, LabelPrefixStatus + StatusActive}
+	kindStatusLabels := []string{LabelPrefixKind + KindConfig, "work.active"}
 	// 1. Try scoped config
 	if scope != "" {
 		scopedLabels := append(kindStatusLabels, LabelPrefixScope+scope) //nolint:gocritic // intentional append to new slice; kindStatusLabels is a local literal
@@ -556,7 +556,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		}
 
 		for _, reqRel := range kd.Relations.RequiredOutgoing {
-			if p.IsTerminal(labelValue(art.Labels, LabelPrefixStatus)) {
+			if p.IsTerminal(statusFromLabels(art.Labels)) {
 				continue
 			}
 			edges, err := p.store.Neighbors(ctx, art.ID, reqRel, Outgoing)
@@ -617,7 +617,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 	// Stale drafts (non-terminal, not updated in 7+ days)
 	staleCutoff := time.Now().Add(-7 * 24 * time.Hour)
 	for _, art := range arts {
-		if p.IsTerminal(labelValue(art.Labels, LabelPrefixStatus)) {
+		if p.IsTerminal(statusFromLabels(art.Labels)) {
 			continue
 		}
 		if !art.UpdatedAt.IsZero() && art.UpdatedAt.Before(staleCutoff) {
@@ -631,7 +631,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 
 	// Blocked campaigns/goals: all children terminal but parent not terminal
 	for _, art := range arts {
-		if p.IsTerminal(labelValue(art.Labels, LabelPrefixStatus)) {
+		if p.IsTerminal(statusFromLabels(art.Labels)) {
 			continue
 		}
 		if !p.IsContainerKind(labelValue(art.Labels, LabelPrefixKind)) {
@@ -643,7 +643,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		}
 		allTerminal := true
 		for _, ch := range children {
-			if !p.IsTerminal(labelValue(ch.Labels, LabelPrefixStatus)) {
+			if !p.IsTerminal(statusFromLabels(ch.Labels)) {
 				allTerminal = false
 				break
 			}
@@ -652,14 +652,14 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 			report.Violations = append(report.Violations, CheckViolation{
 				ID: art.ID, Labels: art.Labels, Title: art.Title,
 				Category: "completable",
-				Detail:   fmt.Sprintf("all %d children are terminal but %s is %s", len(children), art.ID, labelValue(art.Labels, LabelPrefixStatus)),
+				Detail:   fmt.Sprintf("all %d children are terminal but %s is %s", len(children), art.ID, statusFromLabels(art.Labels)),
 			})
 		}
 	}
 
 	// Spec/task mismatch
 	for _, art := range arts {
-		if p.IsTerminal(labelValue(art.Labels, LabelPrefixStatus)) {
+		if p.IsTerminal(statusFromLabels(art.Labels)) {
 			continue
 		}
 		if p.RequiresImplementation(labelValue(art.Labels, LabelPrefixKind)) {
@@ -700,7 +700,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 
 	// Empty artifacts
 	for _, art := range arts {
-		if labelValue(art.Labels, LabelPrefixStatus) != StatusDraft {
+		if statusFromLabels(art.Labels) != "work.draft" { //nolint:goconst // status literals are vocabulary data, not compiled constants
 			continue
 		}
 		if p.SkipEmptyCheck(labelValue(art.Labels, LabelPrefixKind)) {

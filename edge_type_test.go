@@ -60,7 +60,7 @@ func TestBond_RejectsWhenMaxOutgoingExceeded(t *testing.T) {
 	now := time.Now().UTC()
 	if err := s.Put(ctx, &parchment.Artifact{
 		ID:     "EDT-owns",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope},
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, "work.active", parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  "owns",
 		Extra:  map[string]any{"max_outgoing": float64(1)},
 		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
@@ -96,7 +96,7 @@ func TestValidRelation_AcceptsRegisteredEdgeType(t *testing.T) {
 	now := time.Now().UTC()
 	if err := s.Put(ctx, &parchment.Artifact{
 		ID:     "EDT-mentors",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope},
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, "work.active", parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  "mentors",
 		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	}); err != nil {
@@ -125,7 +125,7 @@ func TestLinkArtifacts_ErrorListsRegisteredRelations(t *testing.T) {
 	now := time.Now().UTC()
 	if err := s.Put(ctx, &parchment.Artifact{
 		ID:     "EDT-sponsors",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope},
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, "work.active", parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  "sponsors",
 		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	}); err != nil {
@@ -153,7 +153,7 @@ func TestProtocol_RegisteredRelations_IncludesTraits(t *testing.T) {
 	now := time.Now().UTC()
 	if err := s.Put(ctx, &parchment.Artifact{
 		ID:     "EDT-coaches",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope},
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, "work.active", parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  "coaches",
 		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
 	}); err != nil {

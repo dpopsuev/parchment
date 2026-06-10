@@ -3,7 +3,7 @@ prefix: JRN
 code: "j"
 family: knowledge
 lifecycle:
-  default_status: active
+  default_status: work.active
 sections:
   should: [body]
 relations:

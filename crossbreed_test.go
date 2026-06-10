@@ -103,15 +103,11 @@ func TestQualityGate_BlockingPreventsCompletion(t *testing.T) {
 	// Create and activate an artifact
 	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Sections: []Section{{Name: "context", Text: "a"}},
 		Labels: []string{"kind:task", "priority:medium"},})
-	// Walk through lifecycle to in_review so complete is a valid transition.
-	p.SetField(ctx, []string{a.ID}, "status", "active", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
-	p.SetField(ctx, []string{a.ID}, "status", "mature", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
-	p.SetField(ctx, []string{a.ID}, "status", "allocated", SetFieldOptions{Force: true})   //nolint:errcheck // test seeding
-	p.SetField(ctx, []string{a.ID}, "status", "in_progress", SetFieldOptions{Force: true}) //nolint:errcheck // test seeding
-	p.SetField(ctx, []string{a.ID}, "status", "in_review", SetFieldOptions{Force: true})   //nolint:errcheck // test seeding
+	// Walk through lifecycle to work.active so work.complete is a valid transition.
+	p.SetField(ctx, []string{a.ID}, "status", "work.active", SetFieldOptions{Force: true}) //nolint:errcheck // test seeding
 
 	// Try to complete — should fail due to blocking gate
-	results, err := p.SetField(ctx, []string{a.ID}, "status", "complete", SetFieldOptions{})
+	results, err := p.SetField(ctx, []string{a.ID}, "status", "work.complete", SetFieldOptions{})
 	if err != nil {
 		t.Fatalf("SetField returned error: %v", err)
 	}
@@ -130,10 +126,10 @@ func TestQualityGate_BlockingPreventsCompletion(t *testing.T) {
 		t.Fatal("gate was not called")
 	}
 
-	// Artifact should still be in_review
+	// Artifact should still be work.active
 	art, _ := s.Get(ctx, a.ID)
-	if labelValue(art.Labels, LabelPrefixStatus) != "in_review" {
-		t.Errorf("status = %q, want in_review (gate blocked)", labelValue(art.Labels, LabelPrefixStatus))
+	if statusFromLabels(art.Labels) != "work.active" {
+		t.Errorf("status = %q, want work.active (gate blocked)", statusFromLabels(art.Labels))
 	}
 }
 
@@ -158,15 +154,11 @@ func TestQualityGate_WarningAllowsCompletion(t *testing.T) {
 
 	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Sections: []Section{{Name: "context", Text: "a"}},
 		Labels: []string{"kind:task", "priority:medium"},})
-	// Walk through lifecycle to in_review so complete is a valid transition.
-	p.SetField(ctx, []string{a.ID}, "status", "active", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
-	p.SetField(ctx, []string{a.ID}, "status", "mature", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
-	p.SetField(ctx, []string{a.ID}, "status", "allocated", SetFieldOptions{Force: true})   //nolint:errcheck // test seeding
-	p.SetField(ctx, []string{a.ID}, "status", "in_progress", SetFieldOptions{Force: true}) //nolint:errcheck // test seeding
-	p.SetField(ctx, []string{a.ID}, "status", "in_review", SetFieldOptions{Force: true})   //nolint:errcheck // test seeding
+	// Walk to work.active so work.complete is a valid transition.
+	p.SetField(ctx, []string{a.ID}, "status", "work.active", SetFieldOptions{Force: true}) //nolint:errcheck // test seeding
 
 	// Complete should succeed despite warning
-	results, err := p.SetField(ctx, []string{a.ID}, "status", "complete", SetFieldOptions{})
+	results, err := p.SetField(ctx, []string{a.ID}, "status", "work.complete", SetFieldOptions{})
 	if err != nil {
 		t.Fatalf("SetField returned error: %v", err)
 	}
@@ -178,10 +170,10 @@ func TestQualityGate_WarningAllowsCompletion(t *testing.T) {
 		t.Fatalf("warning gate should not block completion: %s", errMsg)
 	}
 
-	// Artifact should be complete
+	// Artifact should be work.complete
 	art, _ := s.Get(ctx, a.ID)
-	if labelValue(art.Labels, LabelPrefixStatus) != "complete" {
-		t.Errorf("status = %q, want complete", labelValue(art.Labels, LabelPrefixStatus))
+	if statusFromLabels(art.Labels) != "work.complete" {
+		t.Errorf("status = %q, want work.complete", statusFromLabels(art.Labels))
 	}
 }
 

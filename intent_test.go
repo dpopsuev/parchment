@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestIntentStatuses verifies proposed/accepted/rejected/deferred are registered.
+// TestIntentStatuses verifies domain decision statuses are registered.
 func TestIntentStatuses(t *testing.T) {
 	s := DefaultSchema()
 
@@ -15,7 +15,7 @@ func TestIntentStatuses(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		StatusProposed, StatusAccepted, StatusRejected, StatusDeferred,
+		"decision.proposed", "decision.accepted", "decision.rejected", "decision.deferred",
 	} {
 		if !statusSet[want] {
 			t.Errorf("intent status %q missing from DefaultSchema.Statuses", want)
@@ -23,41 +23,41 @@ func TestIntentStatuses(t *testing.T) {
 	}
 }
 
-// TestIntentLifecycle_Need verifies need follows the intent lifecycle.
+// TestIntentLifecycle_Need verifies need follows the decision lifecycle.
 func TestIntentLifecycle_Need(t *testing.T) {
 	s := DefaultSchema()
 
 	// proposed → accepted (happy path)
-	if reason, ok := s.ValidTransition("need", StatusProposed, StatusAccepted); !ok {
-		t.Errorf("need: proposed→accepted blocked: %s", reason)
+	if reason, ok := s.ValidTransition("need", "decision.proposed", "decision.accepted"); !ok {
+		t.Errorf("need: decision.proposed→decision.accepted blocked: %s", reason)
 	}
 	// proposed → rejected
-	if reason, ok := s.ValidTransition("need", StatusProposed, StatusRejected); !ok {
-		t.Errorf("need: proposed→rejected blocked: %s", reason)
+	if reason, ok := s.ValidTransition("need", "decision.proposed", "decision.rejected"); !ok {
+		t.Errorf("need: decision.proposed→decision.rejected blocked: %s", reason)
 	}
 	// proposed → deferred
-	if reason, ok := s.ValidTransition("need", StatusProposed, StatusDeferred); !ok {
-		t.Errorf("need: proposed→deferred blocked: %s", reason)
+	if reason, ok := s.ValidTransition("need", "decision.proposed", "decision.deferred"); !ok {
+		t.Errorf("need: decision.proposed→decision.deferred blocked: %s", reason)
 	}
 	// accepted → archived (terminal)
-	if reason, ok := s.ValidTransition("need", StatusAccepted, StatusArchived); !ok {
-		t.Errorf("need: accepted→archived blocked: %s", reason)
+	if reason, ok := s.ValidTransition("need", "decision.accepted", "archived"); !ok {
+		t.Errorf("need: decision.accepted→archived blocked: %s", reason)
 	}
 }
 
-// TestIntentLifecycle_AcceptedIsReadonly verifies accepted intents cannot be
+// TestIntentLifecycle_AcceptedIsReadonly verifies accepted decisions cannot be
 // mutated — they are immutable once accepted (decision is final).
 func TestIntentLifecycle_AcceptedIsReadonly(t *testing.T) {
-	s := DefaultSchema()
+	p := New(NewMemoryStore(), nil, []string{"test"}, nil, ProtocolConfig{})
 
-	if !s.IsReadonly(StatusAccepted) {
-		t.Error("accepted status must be readonly — intent decisions are immutable once accepted")
+	if !p.IsReadonly("decision.accepted") {
+		t.Error("decision.accepted status must be readonly — intent decisions are immutable once accepted")
 	}
-	if !s.IsTerminal(StatusAccepted) {
-		t.Error("accepted must be terminal")
+	if !p.IsTerminal("decision.accepted") {
+		t.Error("decision.accepted must be terminal")
 	}
-	if !s.IsTerminal(StatusRejected) {
-		t.Error("rejected must be terminal")
+	if !p.IsTerminal("decision.rejected") {
+		t.Error("decision.rejected must be terminal")
 	}
 }
 
@@ -67,8 +67,8 @@ func TestIntentLifecycle_DraftToProposed(t *testing.T) {
 	s := DefaultSchema()
 
 	for _, kind := range []string{"need", KindSpec, KindBug, "decision"} {
-		if reason, ok := s.ValidTransition(kind, StatusDraft, StatusProposed); !ok {
-			t.Errorf("%s: draft→proposed blocked: %s", kind, reason)
+		if reason, ok := s.ValidTransition(kind, "work.draft", "decision.proposed"); !ok {
+			t.Errorf("%s: work.draft→decision.proposed blocked: %s", kind, reason)
 		}
 	}
 }
@@ -79,9 +79,8 @@ func TestIntentLifecycle_Protocol(t *testing.T) {
 	s := NewMemoryStore()
 	p := New(s, nil, []string{"test"}, nil, ProtocolConfig{})
 
-	// Create a need in draft.
+	// Create a need in work.draft.
 	art, err := p.CreateArtifact(ctx, CreateInput{Title: "We need better search",
-
 		Sections: []Section{
 			{Name: "problem", Text: "FTS5 misses semantic matches."},
 		},
@@ -89,20 +88,19 @@ func TestIntentLifecycle_Protocol(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create need: %v", err)
 	}
-	if labelValue(art.Labels, LabelPrefixStatus) != StatusDraft {
-		t.Fatalf("expected draft, got %s", labelValue(art.Labels, LabelPrefixStatus))
+	if statusFromLabels(art.Labels) != "work.draft" {
+		t.Fatalf("expected work.draft, got %s", statusFromLabels(art.Labels))
 	}
 
 	// Propose it.
-	results, err := p.SetField(ctx, []string{art.ID}, FieldStatus, StatusProposed)
+	results, err := p.SetField(ctx, []string{art.ID}, FieldStatus, "decision.proposed")
 	if err != nil || !results[0].OK {
-		t.Fatalf("draft→proposed failed: %v %v", err, results)
+		t.Fatalf("work.draft→decision.proposed failed: %v %v", err, results)
 	}
 
 	// Accept it.
-	results, err = p.SetField(ctx, []string{art.ID}, FieldStatus, StatusAccepted)
+	results, err = p.SetField(ctx, []string{art.ID}, FieldStatus, "decision.accepted")
 	if err != nil || !results[0].OK {
-		t.Fatalf("proposed→accepted failed: %v %v", err, results)
+		t.Fatalf("decision.proposed→decision.accepted failed: %v %v", err, results)
 	}
-
 }

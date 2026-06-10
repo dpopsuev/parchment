@@ -4,17 +4,15 @@ code: TSK
 family: effort
 vacuumable: true
 lifecycle:
-  trigger_status: complete
+  default_status: work.draft
+  trigger_status: work.complete
   activation_requires_sections: true
   transitions:
-    draft: [active, cancelled]
-    active: [mature, draft, cancelled]
-    mature: [allocated, active, cancelled]
-    allocated: [in_progress, mature, cancelled]
-    in_progress: [in_review, allocated, cancelled]
-    in_review: [complete, in_progress, cancelled]
-    complete: [retired, archived]
-    cancelled: [draft, retired, archived]
+    work.draft: [work.active, cancelled]
+    work.active: [work.complete, work.draft, cancelled]
+    work.blocked: [work.active, work.draft, cancelled]
+    work.complete: [retired, archived]
+    cancelled: [work.draft, retired, archived]
     retired: []
 sections:
   must: [context]

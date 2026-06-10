@@ -1,6 +1,6 @@
 name: depends_on_complete
 trigger: status_changed
-when: to=complete
+when: to=work.complete
 action: block
 forceable: true
 check: depends_on_complete

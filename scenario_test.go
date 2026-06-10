@@ -62,7 +62,7 @@ func sgetStatus(t *testing.T, proto *parchment.Protocol, id string) string {
 	if err != nil {
 		t.Fatalf("get %s: %v", id, err)
 	}
-	return parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus)
+	return parchment.StatusFromLabels(art.Labels)
 }
 
 // seedEdgeType stores an edge_type_definition artifact directly in the store
@@ -136,14 +136,14 @@ func TestScenario_A_Hierarchy(t *testing.T) {
 
 	// CompletionRollup: completing all tasks auto-completes the goal.
 	// Use force to bypass intermediate lifecycle steps (mature) — testing rollup, not lifecycle.
-	ssetStatusForce(t, proto, task1.ID, parchment.StatusActive)
-	ssetStatusForce(t, proto, task1.ID, parchment.StatusComplete)
-	if sgetStatus(t, proto, goal.ID) == parchment.StatusComplete {
+	ssetStatusForce(t, proto, task1.ID, "work.active")
+	ssetStatusForce(t, proto, task1.ID, "work.complete")
+	if sgetStatus(t, proto, goal.ID) == "work.complete" {
 		t.Error("goal should not be complete while task2 is still pending")
 	}
-	ssetStatusForce(t, proto, task2.ID, parchment.StatusActive)
-	ssetStatusForce(t, proto, task2.ID, parchment.StatusComplete)
-	if sgetStatus(t, proto, goal.ID) != parchment.StatusComplete {
+	ssetStatusForce(t, proto, task2.ID, "work.active")
+	ssetStatusForce(t, proto, task2.ID, "work.complete")
+	if sgetStatus(t, proto, goal.ID) != "work.complete" {
 		t.Errorf("goal should be auto-completed via CompletionRollup; status=%s", sgetStatus(t, proto, goal.ID))
 	}
 

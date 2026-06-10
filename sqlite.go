@@ -415,7 +415,7 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 
 	kind := labelValue(art.Labels, LabelPrefixKind)
 	scope := labelValue(art.Labels, LabelPrefixScope)
-	status := labelValue(art.Labels, LabelPrefixStatus)
+	status := statusFromLabels(art.Labels)
 	priority := labelValue(art.Labels, LabelPrefixPriority)
 	sprint := labelValue(art.Labels, LabelPrefixSprint)
 	dependsOn, _ := json.Marshal(art.DependsOn)
@@ -529,7 +529,7 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 
 		kind := labelValue(art.Labels, LabelPrefixKind)
 		scope := labelValue(art.Labels, LabelPrefixScope)
-		status := labelValue(art.Labels, LabelPrefixStatus)
+		status := statusFromLabels(art.Labels)
 		priority := labelValue(art.Labels, LabelPrefixPriority)
 		sprint := labelValue(art.Labels, LabelPrefixSprint)
 		dependsOn, _ := json.Marshal(art.DependsOn)
@@ -611,7 +611,7 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 
 	kind := labelValue(art.Labels, LabelPrefixKind)
 	scope := labelValue(art.Labels, LabelPrefixScope)
-	status := labelValue(art.Labels, LabelPrefixStatus)
+	status := statusFromLabels(art.Labels)
 	priority := labelValue(art.Labels, LabelPrefixPriority)
 	sprint := labelValue(art.Labels, LabelPrefixSprint)
 	dependsOn, _ := json.Marshal(art.DependsOn)
@@ -1004,14 +1004,16 @@ func buildWhereClause(f Filter) ([]string, []any) { //nolint:cyclop,gocyclo,gocr
 
 	// SQL-side label filtering: system labels map to indexed columns for performance;
 	// all others use the artifact_labels junction table.
+	// Domain status labels (work.draft, note.fleeting, etc.) go through artifact_labels.
+	// Only status:retired uses the SQL status column optimization.
 	for _, label := range f.Labels {
 		switch {
 		case strings.HasPrefix(label, LabelPrefixKind):
 			clauses = append(clauses, "kind = ?")
 			args = append(args, strings.TrimPrefix(label, LabelPrefixKind))
-		case strings.HasPrefix(label, LabelPrefixStatus):
+		case label == LabelPrefixStatus+"retired":
 			clauses = append(clauses, "status = ?")
-			args = append(args, strings.TrimPrefix(label, LabelPrefixStatus))
+			args = append(args, "retired")
 		case strings.HasPrefix(label, LabelPrefixScope):
 			scopeVal := strings.TrimPrefix(label, LabelPrefixScope)
 			if f.ScopePrefix {
@@ -1592,8 +1594,14 @@ func scanRow(s rowScanner) (*Artifact, error) {
 	if kindCol != "" && !hasLabelPrefix(art.Labels, LabelPrefixKind) {
 		art.Labels = append(art.Labels, LabelPrefixKind+kindCol)
 	}
-	if statusCol != "" && !hasLabelPrefix(art.Labels, LabelPrefixStatus) {
-		art.Labels = append(art.Labels, LabelPrefixStatus+statusCol)
+	if statusCol != "" && !hasAnyStatusLabel(art.Labels) {
+		// Domain statuses (work.draft, note.fleeting, etc.) stored as raw labels;
+		// system statuses (retired, archived) stored as status:X.
+		if isDomainStatusLabel(statusCol) {
+			art.Labels = append(art.Labels, statusCol)
+		} else {
+			art.Labels = append(art.Labels, LabelPrefixStatus+statusCol)
+		}
 	}
 	if scopeCol != "" && !hasLabelPrefix(art.Labels, LabelPrefixScope) {
 		art.Labels = append(art.Labels, LabelPrefixScope+scopeCol)

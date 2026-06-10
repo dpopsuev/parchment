@@ -4,13 +4,14 @@ code: SPC
 family: intent
 protected: true
 lifecycle:
+  default_status: work.draft
   activation_requires_sections: true
   transitions:
-    draft: [proposed, cancelled]
-    proposed: [accepted, rejected, deferred, draft]
-    accepted: [archived]
-    rejected: []
-    deferred: [draft]
+    work.draft: [decision.proposed, cancelled]
+    decision.proposed: [decision.accepted, decision.rejected, decision.deferred, work.draft]
+    decision.accepted: [archived]
+    decision.rejected: []
+    decision.deferred: [work.draft]
     cancelled: []
 sections:
   must: [problem]
@@ -27,7 +28,7 @@ when_to_create: |
   the "what" must be agreed before the "how" begins.
 agent_note: |
   Specs are intent artifacts (desired state). Tasks implement specs. A spec
-  without implementing tasks is unowned work. Lifecycle: draft → proposed →
-  accepted (immutable). Once accepted, content is authoritative.
+  without implementing tasks is unowned work. Lifecycle: work.draft → decision.proposed →
+  decision.accepted (immutable). Once accepted, content is authoritative.
 
 children: []

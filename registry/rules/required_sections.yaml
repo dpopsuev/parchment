@@ -1,6 +1,6 @@
 name: required_sections
 trigger: status_changed
-when: to=active
+when: to=work.active
 action: block
 forceable: true
 check: activation_sections

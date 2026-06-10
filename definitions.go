@@ -68,7 +68,7 @@ func SeedDefinitions(ctx context.Context, s Store) {
 		art := &Artifact{
 			ID:         id,
 			Title:      name,
-			Labels:     []string{LabelPrefixKind + KindLabelDefinition, LabelPrefixStatus + StatusActive, LabelPrefixScope + SchemaScope}, // collapsed: kind_definition → label_definition
+			Labels:     []string{LabelPrefixKind + KindLabelDefinition, "work.active", LabelPrefixScope + SchemaScope}, // collapsed: kind_definition → label_definition
 			Extra:      extra,
 			CreatedAt:  now,
 			UpdatedAt:  now,

@@ -1,7 +1,10 @@
+# stamps_required — formerly triggered on to=in_review AND kind=task.
+# The in_review status was removed in the work.draft/work.active/work.complete lifecycle migration.
+# This rule is inactive (status _never_ does not exist).
 name: stamps_required
 trigger: status_changed
-when: to=in_review AND kind=task
+when: to=_never_
 action: block
 forceable: true
 check: stamps_required
-message: "stamps section required before in_review — attach stamps section with verification evidence"
+message: "stamps section required — attach stamps section with verification evidence"

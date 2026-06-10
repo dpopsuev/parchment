@@ -3,7 +3,7 @@ prefix: SRC
 code: "s"
 family: knowledge
 lifecycle:
-  default_status: active
+  default_status: work.active
 sections:
   must: [summary]
   should: [key-insights, provenance]

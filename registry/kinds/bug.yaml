@@ -5,13 +5,14 @@ family: intent
 protected: true
 vacuumable: true
 lifecycle:
+  default_status: work.draft
   transitions:
-    draft: [active, proposed, cancelled]
-    active: [accepted, rejected, deferred, draft]
-    proposed: [accepted, rejected, deferred, draft]
-    accepted: [archived]
-    rejected: []
-    deferred: [draft]
+    work.draft: [work.active, decision.proposed, cancelled]
+    work.active: [decision.accepted, decision.rejected, decision.deferred, work.draft]
+    decision.proposed: [decision.accepted, decision.rejected, decision.deferred, work.draft]
+    decision.accepted: [archived]
+    decision.rejected: []
+    decision.deferred: [work.draft]
     cancelled: []
 sections:
   must: [observed]

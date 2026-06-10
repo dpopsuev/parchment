@@ -118,27 +118,27 @@ func (v ValueTensor) Label() EvictionLabel {
 
 // statusToQuality maps lifecycle status strings to quality scores.
 var statusToQuality = map[string]float64{
-	StatusEvergreen: 1.0,
-	StatusRetired:   0.8,
-	"mature":        0.7,
-	StatusActive:    0.5,
-	"current":       0.5,
-	"complete":      0.6,
-	"accepted":      0.7,
-	StatusDraft:     0.3,
-	StatusFleeting:  0.2,
-	StatusArchived:  0.1,
-	"canceled":      0.1,
-	"rejected":      0.1,
+	"note.evergreen":    1.0,
+	"retired":           0.8,
+	"note.mature":       0.7,
+	"decision.accepted": 0.7,
+	"work.complete":     0.6,
+	"work.active":       0.5,
+	"work.draft":        0.3,
+	"work.blocked":      0.3,
+	"note.fleeting":     0.2,
+	"archived":          0.1,
+	"cancelled":         0.1, //nolint:misspell // British spelling; changing the value would break stored status strings
+	"decision.rejected": 0.1,
 }
 
 // StatusToQuality returns the quality score for a status string.
-// Unknown statuses return 0.3 (draft-level).
+// Unknown statuses return 0.5 (neutral).
 func StatusToQuality(status string) float64 {
 	if q, ok := statusToQuality[status]; ok {
 		return q
 	}
-	return 0.3
+	return 0.5
 }
 
 // halfLifeDays is the half-life for access heat decay (30 days).
@@ -193,7 +193,7 @@ func ComputeTensor(art *Artifact, metrics ArtifactMetrics, incomingEdges, recenc
 	return ValueTensor{
 		AccessHeat:     ComputeAccessHeat(metrics.AccessCount, metrics.LastAccessed),
 		StructuralHeat: structuralHeatFromCount(incomingEdges),
-		QualityScore:   StatusToQuality(labelValue(art.Labels, LabelPrefixStatus)),
+		QualityScore:   StatusToQuality(statusFromLabels(art.Labels)),
 		Recency:        ComputeRecency(art.UpdatedAt, recencyWindowDays),
 		ComputedAt:     time.Now().UTC(),
 	}

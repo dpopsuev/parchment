@@ -233,7 +233,7 @@ func seedKindsFromRegistry(ctx context.Context, s Store) {
 		}
 		art := &Artifact{
 			ID:         id,
-			Labels:     []string{LabelPrefixKind + KindLabelDefinition, LabelPrefixStatus + StatusActive, LabelPrefixScope + SchemaScope}, // collapsed: kind_definition → label_definition
+			Labels:     []string{LabelPrefixKind + KindLabelDefinition, "work.active", LabelPrefixScope + SchemaScope}, // collapsed: kind_definition → label_definition
 			Title:      k.Name,
 			Extra:      extra,
 			CreatedAt:  now,
@@ -276,7 +276,7 @@ func seedEdgeTypesFromRegistry(ctx context.Context, s Store) {
 		}
 		art := &Artifact{
 			ID:     id,
-			Labels: []string{LabelPrefixKind + KindEdgeTypeDefinition, LabelPrefixStatus + StatusActive, LabelPrefixScope + SchemaScope},
+			Labels: []string{LabelPrefixKind + KindEdgeTypeDefinition, "work.active", LabelPrefixScope + SchemaScope},
 			Title:  et.Name,
 			Extra:      edgeTypeTraitToExtra(trait),
 			CreatedAt:  now,
@@ -316,7 +316,7 @@ func seedLabelsFromRegistry(ctx context.Context, s Store) {
 		_ = json.Unmarshal(b, &extra)
 		art := &Artifact{
 			ID:         id,
-			Labels:     []string{LabelPrefixKind + KindLabelDefinition, LabelPrefixStatus + StatusActive, LabelPrefixScope + SchemaScope},
+			Labels:     []string{LabelPrefixKind + KindLabelDefinition, "work.active", LabelPrefixScope + SchemaScope},
 			Title:      l.Name,
 			Extra:      extra,
 			CreatedAt:  now,

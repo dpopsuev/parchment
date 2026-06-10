@@ -89,7 +89,7 @@ func TestRule_LoadedByProtocol(t *testing.T) {
 	now := time.Now().UTC()
 	_ = s.Put(ctx, &parchment.Artifact{
 		ID:     "RULE-test",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindRule, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope},
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindRule, parchment.LabelPrefixStatus + "work.active", parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  "test_rule",
 		Sections: []parchment.Section{
 			{Name: "trigger", Text: "status_changed"},

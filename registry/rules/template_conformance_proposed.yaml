@@ -1,6 +1,6 @@
 name: template_conformance_proposed
 trigger: status_changed
-when: to=proposed
+when: to=decision.proposed
 action: block
 forceable: true
 check: template_conformance_promote

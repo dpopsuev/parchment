@@ -3,7 +3,7 @@ prefix: SEC
 code: SEC
 family: support
 lifecycle:
-  default_status: active
+  default_status: work.active
 children: ["*"]
 when_to_create: |
   Section artifacts are synthetic — derived from artifact sections via the

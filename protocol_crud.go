@@ -152,7 +152,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	} else {
 		id = GenerateUUID()
 	}
-	status := labelValue(in.Labels, LabelPrefixStatus)
+	status := statusFromLabels(in.Labels)
 	if status == "" {
 		status = p.DefaultStatus(kind)
 	}
@@ -162,6 +162,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	for _, l := range in.Labels {
 		if !strings.HasPrefix(l, LabelPrefixScope) &&
 			!strings.HasPrefix(l, LabelPrefixKind) &&
+			!isDomainStatusLabel(l) &&
 			!strings.HasPrefix(l, LabelPrefixStatus) &&
 			!strings.HasPrefix(l, LabelPrefixPriority) &&
 			!strings.HasPrefix(l, LabelPrefixSprint) {
@@ -175,7 +176,11 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		seedLabels = append(seedLabels, LabelPrefixKind+kind)
 	}
 	if status != "" {
-		seedLabels = append(seedLabels, LabelPrefixStatus+status)
+		if isDomainStatusLabel(status) {
+			seedLabels = append(seedLabels, status)
+		} else {
+			seedLabels = append(seedLabels, LabelPrefixStatus+status)
+		}
 	}
 	if priority != "" {
 		seedLabels = append(seedLabels, LabelPrefixPriority+priority)
@@ -246,7 +251,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		// When the caller explicitly requests draft, skip conformance —
 		// draft is intentional "work in progress"; sections come later.
 		// When status defaults to draft, still warn so agents know what's missing.
-		explicitDraft := labelValue(in.Labels, LabelPrefixStatus) == StatusDraft
+		explicitDraft := statusFromLabels(in.Labels) == "work.draft"
 		if !explicitDraft {
 			if err := p.checkTemplateConformance(ctx, art, true); err != nil {
 				slog.WarnContext(ctx, "partial create: template sections missing",
@@ -258,7 +263,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		// Duplicate awareness: warn if similar non-terminal artifact exists
 		if existing, _ := p.store.List(ctx, Filter{Labels: []string{LabelPrefixKind + labelValue(art.Labels, LabelPrefixKind), LabelPrefixScope + labelValue(art.Labels, LabelPrefixScope)}}); len(existing) > 0 {
 			for _, e := range existing {
-				if !p.IsTerminal(labelValue(e.Labels, LabelPrefixStatus)) && e.Title == art.Title {
+				if !p.IsTerminal(statusFromLabels(e.Labels)) && e.Title == art.Title {
 					slog.WarnContext(ctx, "duplicate title detected on create",
 						slog.String("new_id", art.ID), slog.String("existing_id", e.ID), slog.String("title", art.Title)) //nolint:sloglint // new_id/existing_id have no LogKey constants
 				}
@@ -358,7 +363,11 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 		}
 	}
 	if v := p.GetConfig(ctx, configKeyDefaultExcludeStatus, ""); v != "" {
-		in.ExcludeLabels = append(in.ExcludeLabels, LabelPrefixStatus+v)
+		if isDomainStatusLabel(v) {
+			in.ExcludeLabels = append(in.ExcludeLabels, v)
+		} else {
+			in.ExcludeLabels = append(in.ExcludeLabels, LabelPrefixStatus+v)
+		}
 	}
 	if in.Sort == "" {
 		if v := p.GetConfig(ctx, configKeyDefaultSort, ""); v != "" {
@@ -706,11 +715,11 @@ func (p *Protocol) retireSingle(ctx context.Context, id string, cascade bool) er
 	if err != nil {
 		return err
 	}
-	if labelValue(art.Labels, LabelPrefixStatus) == StatusRetired {
+	if statusFromLabels(art.Labels) == "retired" {
 		return nil // idempotent
 	}
-	if p.IsReadonly(labelValue(art.Labels, LabelPrefixStatus)) {
-		return fmt.Errorf("%s is %s (readonly) — de-archive before retiring", id, labelValue(art.Labels, LabelPrefixStatus)) //nolint:err113 // domain error
+	if p.IsReadonly(statusFromLabels(art.Labels)) {
+		return fmt.Errorf("%s is %s (readonly) — de-archive before retiring", id, statusFromLabels(art.Labels)) //nolint:err113 // domain error
 	}
 	children, err := p.store.Children(ctx, id)
 	if err != nil {
@@ -721,11 +730,11 @@ func (p *Protocol) retireSingle(ctx context.Context, id string, cascade bool) er
 			if err := p.retireSingle(ctx, ch.ID, true); err != nil {
 				return fmt.Errorf("cascade retire %s: %w", ch.ID, err)
 			}
-		} else if !p.IsTerminal(labelValue(ch.Labels, LabelPrefixStatus)) {
-			return fmt.Errorf("cannot retire %s: child %s is %s (use cascade to retire the whole tree)", id, ch.ID, labelValue(ch.Labels, LabelPrefixStatus)) //nolint:err113 // domain error
+		} else if !p.IsTerminal(statusFromLabels(ch.Labels)) {
+			return fmt.Errorf("cannot retire %s: child %s is %s (use cascade to retire the whole tree)", id, ch.ID, statusFromLabels(ch.Labels)) //nolint:err113 // domain error
 		}
 	}
-	art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, StatusRetired)
+	art.Labels = setStatusLabel(art.Labels, "retired")
 	slog.InfoContext(ctx, "retired",
 		slog.String(LogKeyID, id),
 		slog.String(LogKeyKind, labelValue(art.Labels, LabelPrefixKind)))

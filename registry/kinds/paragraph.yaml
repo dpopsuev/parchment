@@ -3,7 +3,7 @@ prefix: PAR
 code: PAR
 family: support
 lifecycle:
-  default_status: active
+  default_status: work.active
 children: []
 when_to_create: |
   Paragraph artifacts are sub-section units. Not used in current Scribe

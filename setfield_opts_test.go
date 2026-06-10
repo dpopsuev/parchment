@@ -19,7 +19,7 @@ func TestSetFieldOptions_BypassGuards_ArchivesWithoutGuards(t *testing.T) {
 	task := mustCreate(t, proto, parchment.CreateInput{Title: "T",
 		Labels: []string{"kind:task"},})
 
-	results, err := proto.SetField(ctx, []string{task.ID}, "status", parchment.StatusArchived,
+	results, err := proto.SetField(ctx, []string{task.ID}, "status", "archived",
 		parchment.SetFieldOptions{BypassGuards: true})
 	if err != nil {
 		t.Fatal(err)
@@ -28,7 +28,7 @@ func TestSetFieldOptions_BypassGuards_ArchivesWithoutGuards(t *testing.T) {
 		t.Fatalf("expected OK with BypassGuards, got: %s", results[0].Error)
 	}
 	art, _ := proto.GetArtifact(ctx, task.ID)
-	if parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus) != parchment.StatusArchived {
+	if parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus) != "archived" {
 		t.Errorf("status = %q, want archived", parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus))
 	}
 }
@@ -47,7 +47,7 @@ func TestSetFieldOptions_Cascade_TransitionsChildren(t *testing.T) {
 	b := mustCreate(t, proto, parchment.CreateInput{Title: "B", Parent: goal.ID,
 		Labels: []string{"kind:task"},})
 
-	results, err := proto.SetField(ctx, []string{goal.ID}, "status", parchment.StatusArchived,
+	results, err := proto.SetField(ctx, []string{goal.ID}, "status", "archived",
 		parchment.SetFieldOptions{BypassGuards: true, Cascade: true})
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestSetFieldOptions_Cascade_TransitionsChildren(t *testing.T) {
 
 	for _, id := range []string{a.ID, b.ID} {
 		art, _ := proto.GetArtifact(ctx, id)
-		if parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus) != parchment.StatusArchived {
+		if parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus) != "archived" {
 			t.Errorf("child %s status = %q, want archived", id, parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus))
 		}
 	}
@@ -75,7 +75,7 @@ func TestSetFieldOptions_DryRun_NoMutation(t *testing.T) {
 		Labels: []string{"kind:task"},})
 	original := task.Label(parchment.LabelPrefixStatus)
 
-	results, err := proto.SetField(ctx, []string{task.ID}, "status", parchment.StatusArchived,
+	results, err := proto.SetField(ctx, []string{task.ID}, "status", "archived",
 		parchment.SetFieldOptions{BypassGuards: true, DryRun: true})
 	if err != nil {
 		t.Fatal(err)

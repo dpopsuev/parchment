@@ -21,7 +21,7 @@ func (p *Protocol) RegisterQueryAlias(ctx context.Context, name string, f Filter
 	}
 	art := &Artifact{
 		ID:     "QALIAS-" + name,
-		Labels: []string{LabelPrefixKind + KindQueryAlias, LabelPrefixStatus + StatusActive, LabelPrefixScope + SchemaScope},
+		Labels: []string{LabelPrefixKind + KindQueryAlias, "work.active", LabelPrefixScope + SchemaScope},
 		Title:  name,
 		Extra:  extra,
 	}

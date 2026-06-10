@@ -3,8 +3,14 @@ package parchment
 import "sort"
 
 // IsTerminal reports whether status is a terminal state.
-// Consults label traits first; falls back to schema.
+// Checks domain status traits (work.draft, note.evergreen, etc.) first,
+// then status:-prefixed system traits (status:retired), then schema fallback.
 func (p *Protocol) IsTerminal(status string) bool {
+	// Domain statuses are stored as raw labels in labelTraits.
+	if lt, ok := p.labelTraits[status]; ok {
+		return lt.Terminal
+	}
+	// System statuses (retired, archived) are stored as status:X in labelTraits.
 	if lt, ok := p.labelTraits["status:"+status]; ok {
 		return lt.Terminal
 	}
@@ -12,8 +18,11 @@ func (p *Protocol) IsTerminal(status string) bool {
 }
 
 // IsReadonly reports whether status prohibits mutation.
-// Consults label traits first; falls back to schema.
+// Checks domain status traits first, then status:-prefixed system traits, then schema.
 func (p *Protocol) IsReadonly(status string) bool {
+	if lt, ok := p.labelTraits[status]; ok {
+		return lt.Readonly
+	}
 	if lt, ok := p.labelTraits["status:"+status]; ok {
 		return lt.Readonly
 	}

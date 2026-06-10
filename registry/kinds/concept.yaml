@@ -3,7 +3,7 @@ prefix: CON
 code: "c"
 family: knowledge
 lifecycle:
-  default_status: active
+  default_status: work.active
 sections:
   should: [definition, examples]
 when_to_create: |

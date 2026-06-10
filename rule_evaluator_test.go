@@ -109,7 +109,7 @@ func TestProtocol_RuleArtifact_BlocksTransition(t *testing.T) {
 	// No Go guard covers this — only the RuleEvaluator can fire it.
 	_ = s.Put(ctx, &parchment.Artifact{
 		ID:     "RULE-scope-block",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindRule, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope},
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindRule, parchment.LabelPrefixStatus + "work.active", parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  "scope_block",
 		Sections: []parchment.Section{
 			{Name: "trigger", Text: "status_changed"},
@@ -155,7 +155,7 @@ func TestProtocol_RuleArtifact_AllowsWhenNotMatching(t *testing.T) {
 	now := time.Now().UTC()
 	_ = s.Put(ctx, &parchment.Artifact{
 		ID:     "RULE-scope-block2",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindRule, parchment.LabelPrefixStatus + parchment.StatusActive, parchment.LabelPrefixScope + parchment.SchemaScope},
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindRule, parchment.LabelPrefixStatus + "work.active", parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  "scope_block2",
 		Sections: []parchment.Section{
 			{Name: "trigger", Text: "status_changed"},

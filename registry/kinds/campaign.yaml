@@ -4,7 +4,8 @@ code: CMP
 family: effort
 protected: true
 lifecycle:
-  active_status: active
+  default_status: work.draft
+  active_status: work.active
   track_in_brief: true
 sections:
   must: [mission]

@@ -14,7 +14,7 @@ func setupTemplateProto(t *testing.T) *parchment.Protocol {
 	ctx := context.Background()
 
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
-		ID: "TPL-1", Labels: []string{"kind:template", "status:active", "scope:test"}, Title: "Bug Template",
+		ID: "TPL-1", Labels: []string{"kind:template", "work.active", "scope:test"}, Title: "Bug Template",
 		Sections: []parchment.Section{
 			{Name: "content", Text: "raw markdown"},
 			{Name: "observed", Text: "Observed vs expected behavior"},
@@ -146,7 +146,7 @@ func TestPromoteStash_PatchFillsMissingSections(t *testing.T) {
 	}
 
 	// Now promote to active — should succeed (required section is present).
-	results, err := proto.SetField(ctx, []string{art.ID}, parchment.FieldStatus, parchment.StatusActive)
+	results, err := proto.SetField(ctx, []string{art.ID}, parchment.FieldStatus, "work.active")
 	if err != nil {
 		t.Fatalf("promote: %v", err)
 	}

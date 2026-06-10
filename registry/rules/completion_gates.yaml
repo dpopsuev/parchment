@@ -1,6 +1,6 @@
 name: completion_gates
 trigger: status_changed
-when: to=complete
+when: to=work.complete
 action: block
 forceable: true
 check: completion_gates

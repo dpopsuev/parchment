@@ -105,7 +105,7 @@ func (p *Protocol) findTemplateForKind(ctx context.Context, kind, scope string) 
 		return ""
 	}
 
-	tplLabels := []string{LabelPrefixKind + KindTemplate, LabelPrefixStatus + StatusActive}
+	tplLabels := []string{LabelPrefixKind + KindTemplate, "work.active"}
 	if scope != "" {
 		scopedLabels := append(tplLabels, LabelPrefixScope+scope) //nolint:gocritic // intentional append to new slice; tplLabels is a local literal
 		templates, err := p.store.List(ctx, Filter{Labels: scopedLabels})

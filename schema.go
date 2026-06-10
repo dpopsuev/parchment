@@ -161,12 +161,13 @@ func (s *Schema) IsReadonly(status string) bool {
 	return false
 }
 
-// DefaultStatus returns the default status for a kind, falling back to "draft".
+// DefaultStatus returns the default status for a kind.
+// Returns "" when no default is defined — callers must handle the empty case.
 func (s *Schema) DefaultStatus(kind string) string {
 	if kd, ok := s.Kinds[kind]; ok && kd.DefaultStatus != "" {
 		return kd.DefaultStatus
 	}
-	return "draft"
+	return ""
 }
 
 // GetExpectedSections returns the expected section names for a kind.
@@ -298,12 +299,12 @@ func (s *Schema) BriefKinds() map[string]KindDef {
 }
 
 // TriggerStatusFor returns the status that triggers side effects (auto-archive,
-// auto-activate-next). Defaults to "complete" if not set on the kind.
+// auto-activate-next). Returns "" when no trigger is defined for the kind.
 func (s *Schema) TriggerStatusFor(kind string) string {
 	if kd, ok := s.Kinds[kind]; ok && kd.TriggerStatus != "" {
 		return kd.TriggerStatus
 	}
-	return "complete"
+	return ""
 }
 
 // ActivationRequiresSections reports whether the kind requires all expected
@@ -599,17 +600,21 @@ func (s *Schema) MergeDefaults(defaults *Schema) {
 func DefaultSchema() *Schema {
 	return &Schema{
 		Statuses: []string{
-			StatusDraft, StatusActive, StatusCurrent, StatusOpen,
-			StatusMature, StatusAllocated, StatusInProgress, StatusInReview,
-			StatusComplete, "cancelled", "dismissed", "promoted", //nolint:misspell // British spelling; changing the value would break stored status strings
-			StatusRetired, StatusArchived,
-			StatusProposed, StatusAccepted, StatusRejected, StatusDeferred,
+			// Work lifecycle.
+			"work.draft", "work.active", "work.blocked", "work.complete",
+			// Knowledge lifecycle.
+			"note.fleeting", "note.mature", "note.evergreen",
+			// Decision lifecycle.
+			"decision.proposed", "decision.accepted", "decision.rejected", "decision.deferred",
+			// Context lifecycle.
+			"ctx.ephemeral", "ctx.promoted", "ctx.permanent",
+			// Code lifecycle.
+			"code.indexed", "code.current", "code.stale", "code.outdated",
+			// Universal terminals and legacy cross-domain statuses.
+			"retired", "archived", "cancelled", "dismissed", "promoted", //nolint:misspell // British spelling; changing the value would break stored status strings
 		},
-		TerminalStatuses: []string{
-			StatusComplete, "cancelled", "dismissed", "retired", StatusArchived, //nolint:misspell // British spelling; changing the value would break stored status strings
-			StatusAccepted, StatusRejected,
-		},
-		ReadonlyStatuses: []string{StatusArchived, StatusAccepted}, //nolint:gocritic // commentedOutCode false positive: this is a regular comment, not commented-out code
+		TerminalStatuses: []string{},
+		ReadonlyStatuses: []string{},
 		Relations: []string{
 			RelParentOf, RelDependsOn, RelFollows, RelJustifies,
 			RelImplements, RelDocuments, RelSatisfies,
@@ -617,9 +622,9 @@ func DefaultSchema() *Schema {
 			RelCites, RelElaborates, RelContradicts, RelSynthesises, RelRemembers,
 		},
 		Guards: Guards{
-			CompletionRequiresChildrenComplete:   true,
-			CompletionRequiresDependsOnComplete:  true,
-			AutoCompleteParentOnChildrenTerminal:  true,
+			CompletionRequiresChildrenComplete:  true,
+			CompletionRequiresDependsOnComplete: true,
+			AutoCompleteParentOnChildrenTerminal: true,
 		},
 		Priorities:      []string{"critical", "high", "medium", "low", "none"},
 		DefaultPriority: "medium",
@@ -631,15 +636,6 @@ func DefaultSchema() *Schema {
 // Additive — all work kinds from the registry are preserved.
 // Passing nil to Protocol.New is equivalent and preferred.
 func KnowledgeSchema() *Schema {
-	base := DefaultSchema()
-
-	// Knowledge lifecycle statuses.
-	base.Statuses = append(base.Statuses, StatusFleeting, StatusEvergreen)
-
-	// Knowledge relations.
-	base.Relations = append(base.Relations,
-		RelCites, RelElaborates, RelContradicts, RelSynthesises, RelRemembers,
-	)
-
-	return base
+	// DefaultSchema already includes all domain status sets including knowledge.
+	return DefaultSchema()
 }

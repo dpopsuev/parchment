@@ -12,24 +12,22 @@ import (
 
 func TestRetired_IsTerminalNotReadonly(t *testing.T) {
 	proto, _ := newProto(t)
-	schema := proto.Schema()
 
-	if !schema.IsTerminal(parchment.StatusRetired) {
+	if !proto.IsTerminal("retired") {
 		t.Error("retired must be terminal — recall() should find it")
 	}
-	if schema.IsReadonly(parchment.StatusRetired) {
+	if proto.IsReadonly("retired") {
 		t.Error("retired must NOT be readonly — post-mortems should be writable")
 	}
 }
 
 func TestArchived_IsTerminalAndReadonly(t *testing.T) {
 	proto, _ := newProto(t)
-	schema := proto.Schema()
 
-	if !schema.IsTerminal(parchment.StatusArchived) {
+	if !proto.IsTerminal("archived") {
 		t.Error("archived must be terminal")
 	}
-	if !schema.IsReadonly(parchment.StatusArchived) {
+	if !proto.IsReadonly("archived") {
 		t.Error("archived must be readonly — frozen artifacts")
 	}
 }
@@ -63,7 +61,7 @@ func TestRetireArtifact_TaskFromComplete(t *testing.T) {
 	}
 
 	art, _ := proto.GetArtifact(ctx, task.ID)
-	if parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus) != parchment.StatusRetired {
+	if parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus) != "retired" {
 		t.Errorf("expected status=retired, got %s", parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus))
 	}
 }
@@ -100,7 +98,7 @@ func TestVacuum_SkipsRetired(t *testing.T) {
 	old := time.Now().Add(-100 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
 		ID:     "TSK-RETIRED-1",
-		Labels: []string{"kind:task", parchment.LabelPrefixStatus + parchment.StatusRetired, "scope:test"},
+		Labels: []string{"kind:task", parchment.LabelPrefixStatus + "retired", "scope:test"},
 		Title:  "old retired",
 		UpdatedAt: old,
 	})
@@ -123,7 +121,7 @@ func TestVacuum_DeletesOldArchived(t *testing.T) {
 	old := time.Now().Add(-100 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
 		ID:     "TSK-ARCH-1",
-		Labels: []string{"kind:task", parchment.LabelPrefixStatus + parchment.StatusArchived, "scope:test"},
+		Labels: []string{"kind:task", "status:archived", "scope:test"},
 		Title:  "old archived",
 		UpdatedAt: old,
 	})
@@ -153,7 +151,7 @@ func TestVacuum_SkipsNonVacuumableKind(t *testing.T) {
 	old := time.Now().Add(-100 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
 		ID:     "NOT-1",
-		Labels: []string{"kind:note", parchment.LabelPrefixStatus + parchment.StatusArchived, "scope:test"},
+		Labels: []string{"kind:note", "status:archived", "scope:test"},
 		Title:  "old note",
 		UpdatedAt: old,
 	})
@@ -178,7 +176,7 @@ func TestVacuum_SkipsProtectedLabelTrait(t *testing.T) {
 	old := time.Now().Add(-100 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
 		ID:     "RUL-OLD-1",
-		Labels: []string{"kind:rule", parchment.LabelPrefixStatus + parchment.StatusArchived, "rule", "scope:global"},
+		Labels: []string{"kind:rule", "status:archived", "rule", "scope:global"},
 		Title:  "old rule",
 		UpdatedAt: old,
 	})

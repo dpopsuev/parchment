@@ -25,7 +25,7 @@ func TestRetireArtifact_CascadeStillWorks(t *testing.T) {
 	}
 
 	got, _ := proto.GetArtifact(ctx, child.ID)
-	if got.Label(parchment.LabelPrefixStatus) != parchment.StatusRetired {
+	if got.Label(parchment.LabelPrefixStatus) != "retired" {
 		t.Errorf("RetireArtifact cascade: child should be retired, got %s", got.Label(parchment.LabelPrefixStatus))
 	}
 }

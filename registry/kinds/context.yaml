@@ -4,7 +4,7 @@ code: "x"
 family: knowledge
 protected: true
 lifecycle:
-  default_status: active
+  default_status: work.active
 sections:
   should: [content, scope, confidence]
 relations:

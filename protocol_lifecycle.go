@@ -15,7 +15,7 @@ func (p *Protocol) RegisterGate(g QualityGate) { p.gates = append(p.gates, g) }
 // Components: checklist items, child completion, section coverage.
 func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 { //nolint:gocyclo // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
 	// Terminal artifacts are 100% complete by definition
-	if p.IsTerminal(labelValue(art.Labels, LabelPrefixStatus)) {
+	if p.IsTerminal(statusFromLabels(art.Labels)) {
 		return 1.0
 	}
 
@@ -47,7 +47,7 @@ func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 {
 	if err == nil && len(children) > 0 {
 		done := 0
 		for _, ch := range children {
-			if p.IsTerminal(labelValue(ch.Labels, LabelPrefixStatus)) {
+			if p.IsTerminal(statusFromLabels(ch.Labels)) {
 				done++
 			}
 		}
@@ -248,7 +248,7 @@ func (p *Protocol) setStatus(ctx context.Context, art *Artifact, status string) 
 
 
 func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status string, force bool) Result { //nolint:gocyclo,funlen // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol.go
-	reason, valid := p.schema.ValidTransition(labelValue(art.Labels, LabelPrefixKind), labelValue(art.Labels, LabelPrefixStatus), status)
+	reason, valid := p.schema.ValidTransition(labelValue(art.Labels, LabelPrefixKind), statusFromLabels(art.Labels), status)
 	if !valid {
 		if !force {
 			return Result{ID: art.ID, Error: reason}
@@ -256,7 +256,7 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 		slog.WarnContext(ctx, "forced status transition bypasses lifecycle model",
 			slog.String(LogKeyID, art.ID),
 			slog.String(LogKeyKind, labelValue(art.Labels, LabelPrefixKind)),
-			slog.String(LogKeyFrom, labelValue(art.Labels, LabelPrefixStatus)),
+			slog.String(LogKeyFrom, statusFromLabels(art.Labels)),
 			slog.String(LogKeyTo, status),
 			slog.String(LogKeyReason, reason))
 	}
@@ -299,21 +299,21 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 
 	// Soft warning: check if followed artifacts are incomplete
 	var followsWarnings []string
-	if status == StatusActive {
+	if status == "work.active" {
 		edges, _ := p.store.Neighbors(ctx, art.ID, RelFollows, Outgoing)
 		for _, e := range edges {
 			preceded, err := p.store.Get(ctx, e.To)
 			if err != nil {
 				continue
 			}
-			if !p.IsTerminal(labelValue(preceded.Labels, LabelPrefixStatus)) {
-				followsWarnings = append(followsWarnings, fmt.Sprintf("%s is %s", preceded.ID, labelValue(preceded.Labels, LabelPrefixStatus)))
+			if !p.IsTerminal(statusFromLabels(preceded.Labels)) {
+				followsWarnings = append(followsWarnings, fmt.Sprintf("%s is %s", preceded.ID, statusFromLabels(preceded.Labels)))
 			}
 		}
 	}
 
-	oldStatus := labelValue(art.Labels, LabelPrefixStatus)
-	art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, status)
+	oldStatus := statusFromLabels(art.Labels)
+	art.Labels = setStatusLabel(art.Labels, status)
 	if err := p.store.Put(ctx, art); err != nil {
 		return Result{ID: art.ID, Error: err.Error()}
 	}
@@ -341,7 +341,7 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 		}
 	}
 	// Auto-enrichment: on task completion, update implementing spec
-	if labelValue(art.Labels, LabelPrefixKind) == KindTask && status == StatusComplete { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
+	if labelValue(art.Labels, LabelPrefixKind) == KindTask && status == "work.complete" { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
 		if targets, ok := art.Links[RelImplements]; ok {
 			for _, specID := range targets {
 				spec, err := p.store.Get(ctx, specID)
@@ -386,8 +386,8 @@ func (p *Protocol) guardDependsOnComplete(ctx context.Context, art *Artifact) er
 		if err != nil {
 			continue // dangling edge, not a blocker
 		}
-		if !p.IsTerminal(labelValue(dep.Labels, LabelPrefixStatus)) {
-			incomplete = append(incomplete, fmt.Sprintf("%s [%s]", dep.ID, labelValue(dep.Labels, LabelPrefixStatus)))
+		if !p.IsTerminal(statusFromLabels(dep.Labels)) {
+			incomplete = append(incomplete, fmt.Sprintf("%s [%s]", dep.ID, statusFromLabels(dep.Labels)))
 		}
 	}
 	if len(incomplete) > 0 {
@@ -404,8 +404,8 @@ func (p *Protocol) guardChildrenComplete(ctx context.Context, art *Artifact) err
 	}
 	var incomplete []string
 	for _, ch := range children {
-		if !p.IsTerminal(labelValue(ch.Labels, LabelPrefixStatus)) {
-			incomplete = append(incomplete, fmt.Sprintf("%s [%s]", ch.ID, labelValue(ch.Labels, LabelPrefixStatus)))
+		if !p.IsTerminal(statusFromLabels(ch.Labels)) {
+			incomplete = append(incomplete, fmt.Sprintf("%s [%s]", ch.ID, statusFromLabels(ch.Labels)))
 		}
 	}
 	if len(incomplete) > 0 {
@@ -427,20 +427,20 @@ func (p *Protocol) completionRollup(ctx context.Context, art *Artifact) string {
 		sources, _ := p.store.Neighbors(ctx, art.ID, relation, Incoming)
 		for _, e := range sources {
 			source, err := p.store.Get(ctx, e.From)
-			if err != nil || p.IsTerminal(labelValue(source.Labels, LabelPrefixStatus)) {
+			if err != nil || p.IsTerminal(statusFromLabels(source.Labels)) {
 				continue
 			}
 			targets, _ := p.store.Neighbors(ctx, source.ID, relation, Outgoing)
 			allDone := true
 			for _, t := range targets {
 				child, err := p.store.Get(ctx, t.To)
-				if err != nil || !p.IsTerminal(labelValue(child.Labels, LabelPrefixStatus)) {
+				if err != nil || !p.IsTerminal(statusFromLabels(child.Labels)) {
 					allDone = false
 					break
 				}
 			}
 			if allDone && len(targets) > 0 {
-				r := p.setStatus(ctx, source, StatusComplete)
+				r := p.setStatus(ctx, source, "work.complete")
 				if r.OK {
 					msgs = append(msgs, fmt.Sprintf("auto-completed %s: %s", source.ID, source.Title))
 				}
@@ -455,7 +455,7 @@ func (p *Protocol) autoCompleteParent(ctx context.Context, art *Artifact) string
 		return ""
 	}
 	parent, err := p.store.Get(ctx, art.Parent)
-	if err != nil || p.IsTerminal(labelValue(parent.Labels, LabelPrefixStatus)) {
+	if err != nil || p.IsTerminal(statusFromLabels(parent.Labels)) {
 		return ""
 	}
 	children, err := p.store.Children(ctx, parent.ID)
@@ -463,11 +463,11 @@ func (p *Protocol) autoCompleteParent(ctx context.Context, art *Artifact) string
 		return ""
 	}
 	for _, ch := range children {
-		if !p.IsTerminal(labelValue(ch.Labels, LabelPrefixStatus)) {
+		if !p.IsTerminal(statusFromLabels(ch.Labels)) {
 			return ""
 		}
 	}
-	r := p.setStatus(ctx, parent, StatusComplete)
+	r := p.setStatus(ctx, parent, "work.complete")
 	if r.OK {
 		msg := fmt.Sprintf("auto-completed %s: %s", parent.ID, parent.Title)
 		if r.Error != "" {

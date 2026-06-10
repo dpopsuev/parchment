@@ -4,12 +4,13 @@ code: NED
 family: intent
 protected: true
 lifecycle:
+  default_status: work.draft
   transitions:
-    draft: [proposed, cancelled]
-    proposed: [accepted, rejected, deferred, draft]
-    accepted: [archived]
-    rejected: []
-    deferred: [draft]
+    work.draft: [decision.proposed, cancelled]
+    decision.proposed: [decision.accepted, decision.rejected, decision.deferred, work.draft]
+    decision.accepted: [archived]
+    decision.rejected: []
+    decision.deferred: [work.draft]
     cancelled: []
 sections:
   must: [problem]

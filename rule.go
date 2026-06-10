@@ -106,7 +106,7 @@ func seedRulesFromRegistry(ctx context.Context, s Store) {
 		}
 		art := &Artifact{
 			ID:     id,
-			Labels: []string{LabelPrefixKind + KindRule, LabelPrefixStatus + StatusActive, LabelPrefixScope + SchemaScope},
+			Labels: []string{LabelPrefixKind + KindRule, "work.active", LabelPrefixScope + SchemaScope},
 			Title:  r.Name,
 			CreatedAt:  now,
 			UpdatedAt:  now,

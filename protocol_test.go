@@ -119,23 +119,23 @@ func TestListArtifacts_FilterByStatus(t *testing.T) {
 	ctx := context.Background()
 
 	task := createTask(t, proto, "a task")
-	// task starts in "draft" status
-	if task.Label(parchment.LabelPrefixStatus) != "draft" {
-		t.Fatalf("expected draft, got %s", task.Label(parchment.LabelPrefixStatus))
+	// task starts in "work.draft" status
+	if parchment.StatusFromLabels(task.Labels) != "work.draft" {
+		t.Fatalf("expected work.draft, got %s", parchment.StatusFromLabels(task.Labels))
 	}
 
-	// Create a goal (starts in "current" status for goal kind)
+	// Create a goal
 	goal := createGoal(t, proto, "a goal")
 	_ = goal
 	_ = store
 
-	arts, err := proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{"status:draft"}})
+	arts, err := proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{"work.draft"}})
 	if err != nil {
 		t.Fatalf("ListArtifacts: %v", err)
 	}
 	for _, a := range arts {
-		if parchment.LabelValue(a.Labels, parchment.LabelPrefixStatus) != "draft" {
-			t.Errorf("expected status=draft, got %s for %s", parchment.LabelValue(a.Labels, parchment.LabelPrefixStatus), a.ID)
+		if parchment.StatusFromLabels(a.Labels) != "work.draft" {
+			t.Errorf("expected status=work.draft, got %s for %s", parchment.StatusFromLabels(a.Labels), a.ID)
 		}
 	}
 }
@@ -173,8 +173,8 @@ func TestListArtifacts_MultipleFilters(t *testing.T) {
 	createTask(t, proto, "task B")
 	createGoal(t, proto, "goal A")
 
-	// Filter by kind=task and status=draft
-	arts, err := proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{"kind:task", "status:draft"}})
+	// Filter by kind=task and status=work.draft
+	arts, err := proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{"kind:task", "work.draft"}})
 	if err != nil {
 		t.Fatalf("ListArtifacts: %v", err)
 	}
@@ -182,8 +182,8 @@ func TestListArtifacts_MultipleFilters(t *testing.T) {
 		t.Errorf("expected 2, got %d", len(arts))
 	}
 
-	// Filter by kind=goal — goal default status is "draft" (ActiveStatus "current" is for Motd tracking, not creation default)
-	arts, err = proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{"kind:goal", "status:draft"}})
+	// Filter by kind=goal — goal default status is work.draft
+	arts, err = proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{"kind:goal", "work.draft"}})
 	if err != nil {
 		t.Fatalf("ListArtifacts: %v", err)
 	}
@@ -510,7 +510,7 @@ func TestDetachSection_TemplateRequiredBlocked(t *testing.T) {
 	// Create a template with a required section
 	tpl := &parchment.Artifact{
 		ID:     "tpl-task-1",
-		Labels: []string{"kind:template", "status:active"},
+		Labels: []string{"kind:template", "work.active"},
 		Title:  "Task Template",
 		Sections: []parchment.Section{
 			{Name: "content", Text: "template content"},
@@ -580,7 +580,7 @@ func TestCompletionScore_TerminalArtifact(t *testing.T) {
 
 	task := createTask(t, proto, "completed task")
 	art, _ := store.Get(ctx, task.ID)
-	art.Labels = parchment.MirrorLabel(art.Labels, parchment.LabelPrefixStatus, "complete")
+	art.Labels = parchment.SetStatusLabel(art.Labels, "work.complete")
 	store.Put(ctx, art)
 
 	got, _ := proto.GetArtifact(ctx, task.ID)
@@ -605,7 +605,7 @@ func TestCompletionScore_ChildCompletion(t *testing.T) {
 
 	// Complete one child
 	c1, _ := store.Get(ctx, child1.ID)
-	c1.Labels = parchment.MirrorLabel(c1.Labels, parchment.LabelPrefixStatus, "complete")
+	c1.Labels = parchment.SetStatusLabel(c1.Labels, "work.complete")
 	store.Put(ctx, c1)
 
 	got, _ := proto.GetArtifact(ctx, parent.ID)
@@ -1313,7 +1313,7 @@ func TestCheck_DetectsEmptyArtifact(t *testing.T) {
 	// Insert a draft task with no goal, no sections, no parent, no edges
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "EMPTY-001",
-		Labels: []string{"kind:task", "status:draft", "scope:test"},
+		Labels: []string{"kind:task", "work.draft", "scope:test"},
 		Title:  "empty task",
 	})
 
@@ -1361,15 +1361,15 @@ func TestCheck_DetectsCompletableCampaign(t *testing.T) {
 	ctx := context.Background()
 
 	campaign := createCampaign(t, proto, "completable campaign")
-	// Set campaign to active
+	// Set campaign to work.active
 	art, _ := store.Get(ctx, campaign.ID)
-	art.Labels = parchment.MirrorLabel(art.Labels, parchment.LabelPrefixStatus, "active")
+	art.Labels = parchment.SetStatusLabel(art.Labels, "work.active")
 	store.Put(ctx, art)
 
 	child := createGoal(t, proto, "done child")
 	childArt, _ := store.Get(ctx, child.ID)
 	childArt.Parent = campaign.ID
-	childArt.Labels = parchment.MirrorLabel(childArt.Labels, parchment.LabelPrefixStatus, "complete")
+	childArt.Labels = parchment.SetStatusLabel(childArt.Labels, "work.complete")
 	store.Put(ctx, childArt)
 
 	report, err := proto.Check(ctx, "")
@@ -1754,7 +1754,7 @@ func TestGetConfig_WithScopedConfig(t *testing.T) {
 	// Create a config artifact with a section acting as key=value
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "cfg-1",
-		Labels: []string{"kind:config", "status:active", "scope:test"},
+		Labels: []string{"kind:config", "work.active", "scope:test"},
 		Title:  "test config",
 		Sections: []parchment.Section{
 			{Name: "default_scope", Text: "test"},
@@ -1899,7 +1899,7 @@ func setupTemplateProtoForConformance(t *testing.T) *parchment.Protocol {
 	ctx := context.Background()
 
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
-		ID: "TPL-BUG-1", Labels: []string{"kind:template", "status:active", "scope:test"}, Title: "Bug Template",
+		ID: "TPL-BUG-1", Labels: []string{"kind:template", "work.active", "scope:test"}, Title: "Bug Template",
 		Sections: []parchment.Section{
 			{Name: "content", Text: "raw markdown"},
 			{Name: "observed", Text: "Observed vs expected behavior"},

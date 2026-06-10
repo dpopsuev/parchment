@@ -10,15 +10,15 @@ func TestKnowledgeSchema_HasKnowledgeKinds(t *testing.T) {
 	s := KnowledgeSchema()
 
 	cases := []struct {
-		kind          string
-		wantPrefix    string
-		wantDefault   string
+		kind        string
+		wantPrefix  string
+		wantDefault string
 	}{
-		{KindNote, "NOT", StatusFleeting},
-		{KindJournal, "JRN", StatusActive},
-		{KindSource, "SRC", StatusActive},
-		{KindConcept, "CON", StatusActive},
-		{KindContext, "CTX", StatusActive},
+		{KindNote, "NOT", "note.fleeting"},
+		{KindJournal, "JRN", "work.active"},
+		{KindSource, "SRC", "work.active"},
+		{KindConcept, "CON", "work.active"},
+		{KindContext, "CTX", "work.active"},
 	}
 
 	for _, tc := range cases {
@@ -50,7 +50,7 @@ func TestKnowledgeSchema_HasKnowledgeRelations(t *testing.T) {
 	}
 }
 
-// TestKnowledgeSchema_HasKnowledgeStatuses verifies fleeting and evergreen
+// TestKnowledgeSchema_HasKnowledgeStatuses verifies note.fleeting and note.evergreen
 // are registered statuses.
 func TestKnowledgeSchema_HasKnowledgeStatuses(t *testing.T) {
 	s := KnowledgeSchema()
@@ -60,7 +60,7 @@ func TestKnowledgeSchema_HasKnowledgeStatuses(t *testing.T) {
 		statusSet[st] = true
 	}
 
-	for _, want := range []string{StatusFleeting, StatusEvergreen} {
+	for _, want := range []string{"note.fleeting", "note.evergreen"} {
 		if !statusSet[want] {
 			t.Errorf("status %q missing from KnowledgeSchema.Statuses", want)
 		}
@@ -68,15 +68,15 @@ func TestKnowledgeSchema_HasKnowledgeStatuses(t *testing.T) {
 }
 
 // TestKnowledgeSchema_NoteLifecycle verifies the note kind has the expected
-// fleeting → evergreen transition path.
+// note.fleeting → note.evergreen transition path.
 func TestKnowledgeSchema_NoteLifecycle(t *testing.T) {
 	s := KnowledgeSchema()
 
 	transitions := []struct{ from, to string }{
-		{StatusFleeting, StatusActive},
-		{StatusFleeting, StatusEvergreen},
-		{StatusActive, StatusEvergreen},
-		{StatusEvergreen, StatusActive}, // demotion allowed
+		{"note.fleeting", "note.mature"},
+		{"note.fleeting", "note.evergreen"},
+		{"note.mature", "note.evergreen"},
+		{"note.evergreen", "note.mature"}, // demotion allowed
 	}
 
 	for _, tc := range transitions {
@@ -87,15 +87,15 @@ func TestKnowledgeSchema_NoteLifecycle(t *testing.T) {
 	}
 }
 
-// TestKnowledgeSchema_EvergreenNotReadonly verifies evergreen notes remain
+// TestKnowledgeSchema_EvergreenNotReadonly verifies note.evergreen notes remain
 // editable — they are mature, not frozen. Only archived is readonly.
 func TestKnowledgeSchema_EvergreenNotReadonly(t *testing.T) {
-	s := KnowledgeSchema()
+	p := New(NewMemoryStore(), KnowledgeSchema(), []string{"test"}, nil, ProtocolConfig{})
 
-	if s.IsReadonly(StatusEvergreen) {
-		t.Error("evergreen should not be readonly — permanent notes remain editable")
+	if p.IsReadonly("note.evergreen") {
+		t.Error("note.evergreen should not be readonly — permanent notes remain editable")
 	}
-	if !s.IsReadonly(StatusArchived) {
+	if !p.IsReadonly("archived") {
 		t.Error("archived must be readonly")
 	}
 }

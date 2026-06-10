@@ -5,7 +5,7 @@ family: support
 protected: true
 skip_guards: true
 lifecycle:
-  default_status: active
+  default_status: work.active
 sections:
   could: [context, guidance]
 when_to_create: |

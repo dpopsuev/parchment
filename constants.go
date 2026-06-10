@@ -10,27 +10,6 @@ var (
 	ErrArtifactIDRequired    = errors.New("artifact ID is required")
 )
 
-// Artifact statuses — work tracking.
-const (
-	StatusDraft      = "draft"
-	StatusActive     = "active"
-	StatusCurrent    = "current"
-	StatusOpen       = "open"
-	StatusComplete   = "complete"
-	StatusRetired    = "retired"
-	StatusArchived   = "archived"
-	StatusMature     = "mature"
-	StatusAllocated  = "allocated"
-	StatusInProgress = "in_progress"
-	StatusInReview   = "in_review"
-)
-
-// Artifact statuses — knowledge layer.
-const (
-	StatusFleeting  = "fleeting"  // quick capture, unprocessed; Zettelkasten: fleeting note
-	StatusEvergreen = "evergreen" // mature, permanent, well-connected; Zettelkasten: permanent note
-)
-
 // SchemaScope is the reserved scope for ArtifactDefinition artifacts.
 // Definition artifacts in this scope are loaded at startup to populate the
 // runtime schema. They are excluded from all regular queries unless the caller
@@ -49,20 +28,6 @@ const (
 	KindConfig   = "config"
 )
 
-// Intent lifecycle statuses — for need, spec, bug, decision kinds.
-// Mirrors RFC/ADR review process: draft → proposed → accepted/rejected/deferred.
-const (
-	StatusProposed = "proposed" // submitted for review
-	StatusAccepted = "accepted" // approved, immutable — decision is final
-	StatusRejected = "rejected" // declined, terminal
-	StatusDeferred = "deferred" // postponed, may be re-proposed
-)
-
-// Artifact kind families — three-family model.
-// Every kind belongs to exactly one family. Scribe uses families for
-// cross-family traceability checks and brief grouping.
-const (
-)
 
 
 // Artifact kinds — knowledge layer.

@@ -179,6 +179,80 @@ func labelValue(labels []string, prefix string) string {
 	return ""
 }
 
+// domainStatusPrefixes lists the dot-notation status domain prefixes.
+// Labels with these prefixes are lifecycle statuses stored as raw labels
+// (no status: wrapper), unlike system statuses (status:retired, status:archived).
+var domainStatusPrefixes = []string{"work.", "note.", "decision.", "ctx.", "code."}
+
+// isDomainStatusLabel reports whether a label is a domain-namespaced lifecycle status.
+func isDomainStatusLabel(label string) bool {
+	for _, prefix := range domainStatusPrefixes {
+		if strings.HasPrefix(label, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// statusFromLabels returns the current lifecycle status from an artifact's labels.
+// Domain statuses (work.draft, note.fleeting, decision.proposed, etc.) are returned as-is.
+// System statuses (status:retired, status:archived) return the bare value without prefix.
+// Returns "" when no status label is present.
+func statusFromLabels(labels []string) string {
+	for _, l := range labels {
+		if isDomainStatusLabel(l) {
+			return l
+		}
+	}
+	for _, l := range labels {
+		if strings.HasPrefix(l, LabelPrefixStatus) {
+			return strings.TrimPrefix(l, LabelPrefixStatus)
+		}
+	}
+	return ""
+}
+
+// StatusFromLabels is the exported accessor for statusFromLabels.
+func StatusFromLabels(labels []string) string { return statusFromLabels(labels) }
+
+// SetStatusLabel is the exported accessor for setStatusLabel.
+func SetStatusLabel(labels []string, status string) []string { return setStatusLabel(labels, status) }
+
+// IsDomainStatusLabel is the exported accessor for isDomainStatusLabel.
+func IsDomainStatusLabel(label string) bool { return isDomainStatusLabel(label) }
+
+// setStatusLabel replaces any existing status label with the new status.
+// Domain statuses are stored as raw labels; system statuses (retired, archived)
+// are stored under the status: prefix.
+func setStatusLabel(labels []string, status string) []string {
+	out := make([]string, 0, len(labels)+1)
+	for _, l := range labels {
+		if !isDomainStatusLabel(l) && !strings.HasPrefix(l, LabelPrefixStatus) {
+			out = append(out, l)
+		}
+	}
+	if status == "" {
+		return out
+	}
+	if isDomainStatusLabel(status) {
+		out = append(out, status)
+	} else {
+		out = append(out, LabelPrefixStatus+status)
+	}
+	return out
+}
+
+// hasAnyStatusLabel reports whether labels contains any status label
+// (either a domain status or a status: prefixed system status).
+func hasAnyStatusLabel(labels []string) bool {
+	for _, l := range labels {
+		if isDomainStatusLabel(l) || strings.HasPrefix(l, LabelPrefixStatus) {
+			return true
+		}
+	}
+	return false
+}
+
 func (f Filter) Matches(art *Artifact) bool { //nolint:gocritic // hugeParam: Filter is read-only in all callers; pointer would complicate call sites
 	if f.Family != "" && len(f.FamilyKinds) > 0 {
 		if !f.FamilyKinds[labelValue(art.Labels, LabelPrefixKind)] {

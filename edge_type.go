@@ -206,7 +206,7 @@ func SeedEdgeTypeTraits(ctx context.Context, s Store) {
 		}
 		art := &Artifact{
 			ID:     id,
-			Labels: []string{LabelPrefixKind + KindEdgeTypeDefinition, LabelPrefixStatus + StatusActive, LabelPrefixScope + SchemaScope},
+			Labels: []string{LabelPrefixKind + KindEdgeTypeDefinition, "work.active", LabelPrefixScope + SchemaScope},
 			Title:  et.name,
 			Extra:      edgeTypeTraitToExtra(et.trait),
 			CreatedAt:  now,

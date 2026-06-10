@@ -288,31 +288,50 @@ var defaultLabelTraits = []struct {
 		"Apply 'decision' to notes created via admin(action=decision) — cached answers to recurring questions. Not the same as kind=decision (ADR); this is a lightweight key-value cache.",
 		"Protected from eviction. Queryable via admin(action=decision, snapshot_action=check, check=<key>)."},
 
-	// Status lifecycle traits.
-	{"status:draft", LabelTrait{Terminal: false, Readonly: false}, "", ""},
-	{"status:active", LabelTrait{Terminal: false, Readonly: false}, "", ""},
-	{"status:complete", LabelTrait{Terminal: true, Readonly: false}, "", ""},
-	{"status:archived", LabelTrait{Terminal: true, Readonly: true}, "", ""},
+	// System terminal statuses — universal, not domain-specific.
 	{"status:retired", LabelTrait{Terminal: true, Readonly: false}, "", ""},
-	{"status:open", LabelTrait{Terminal: false, Readonly: false}, "", ""},
-	{"status:in_progress", LabelTrait{Terminal: false, Readonly: false}, "", ""},
-	{"status:in_review", LabelTrait{Terminal: false, Readonly: false}, "", ""},
-	{"status:mature", LabelTrait{Terminal: true, Readonly: false}, "", ""},
-	{"status:fleeting", LabelTrait{Terminal: false, Readonly: false}, "", ""},
-	{"status:evergreen", LabelTrait{Terminal: true, Readonly: false}, "", ""},
+	{"status:archived", LabelTrait{Terminal: true, Readonly: true}, "", ""},
+
+	// Work lifecycle traits.
+	{"work.draft", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"work.active", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"work.blocked", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"work.complete", LabelTrait{Terminal: true, Readonly: false}, "", ""},
+
+	// Knowledge lifecycle traits.
+	{"note.fleeting", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"note.mature", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"note.evergreen", LabelTrait{Terminal: true, Readonly: false}, "", ""},
+
+	// Decision lifecycle traits.
+	{"decision.proposed", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"decision.accepted", LabelTrait{Terminal: true, Readonly: true}, "", ""},
+	{"decision.rejected", LabelTrait{Terminal: true, Readonly: false}, "", ""},
+	{"decision.deferred", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+
+	// Context window lifecycle traits.
+	{"ctx.ephemeral", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"ctx.promoted", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"ctx.permanent", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+
+	// Code intelligence lifecycle traits.
+	{"code.indexed", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"code.current", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"code.stale", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"code.outdated", LabelTrait{Terminal: false, Readonly: false}, "", ""},
 
 	// Kind lifecycle traits.
-	{"kind:task", LabelTrait{Family: "work", DefaultStatus: "draft", Vacuumable: true}, "", ""},
-	{"kind:spec", LabelTrait{Family: "work", DefaultStatus: "draft", RequiresImplementation: true, Vacuumable: true}, "", ""},
-	{"kind:bug", LabelTrait{Family: "work", DefaultStatus: "draft", RequiresImplementation: true, Vacuumable: true}, "", ""},
-	{"kind:goal", LabelTrait{Family: "work", DefaultStatus: "draft", IsContainerKind: true, SkipEmptyCheck: true, Vacuumable: true}, "", ""},
-	{"kind:campaign", LabelTrait{Family: "work", DefaultStatus: "draft", IsContainerKind: true, SkipEmptyCheck: true, Vacuumable: true}, "", ""},
-	{"kind:note", LabelTrait{Family: "knowledge", DefaultStatus: "fleeting", Vacuumable: true}, "", ""},
-	{"kind:concept", LabelTrait{Family: "knowledge", DefaultStatus: "active", Vacuumable: true}, "", ""},
-	{"kind:source", LabelTrait{Family: "knowledge", DefaultStatus: "active", Vacuumable: true}, "", ""},
-	{"kind:template", LabelTrait{Family: "support", DefaultStatus: "active", SkipEmptyCheck: true}, "", ""},
-	{"kind:decision", LabelTrait{Family: "support", DefaultStatus: "proposed"}, "", ""},
-	{"kind:config", LabelTrait{Family: "support", DefaultStatus: "active", SkipEmptyCheck: true}, "", ""},
+	{"kind:task", LabelTrait{Family: "work", DefaultStatus: "work.draft", Vacuumable: true}, "", ""},
+	{"kind:spec", LabelTrait{Family: "work", DefaultStatus: "work.draft", RequiresImplementation: true, Vacuumable: true}, "", ""},
+	{"kind:bug", LabelTrait{Family: "work", DefaultStatus: "work.draft", RequiresImplementation: true, Vacuumable: true}, "", ""},
+	{"kind:goal", LabelTrait{Family: "work", DefaultStatus: "work.draft", IsContainerKind: true, SkipEmptyCheck: true, Vacuumable: true}, "", ""},
+	{"kind:campaign", LabelTrait{Family: "work", DefaultStatus: "work.draft", IsContainerKind: true, SkipEmptyCheck: true, Vacuumable: true}, "", ""},
+	{"kind:note", LabelTrait{Family: "knowledge", DefaultStatus: "note.fleeting", Vacuumable: true}, "", ""},
+	{"kind:concept", LabelTrait{Family: "knowledge", DefaultStatus: "work.active", Vacuumable: true}, "", ""},
+	{"kind:source", LabelTrait{Family: "knowledge", DefaultStatus: "work.active", Vacuumable: true}, "", ""},
+	{"kind:template", LabelTrait{Family: "support", DefaultStatus: "work.active", SkipEmptyCheck: true}, "", ""},
+	{"kind:decision", LabelTrait{Family: "support", DefaultStatus: "decision.proposed"}, "", ""},
+	{"kind:config", LabelTrait{Family: "support", DefaultStatus: "work.active", SkipEmptyCheck: true}, "", ""},
 }
 
 // SeedLabelTraits writes default label_definition artifacts into SchemaScope.
@@ -340,7 +359,7 @@ func SeedLabelTraits(ctx context.Context, s Store) {
 		}
 		art := &Artifact{
 			ID:     id,
-			Labels: []string{LabelPrefixKind + KindLabelDefinition, LabelPrefixStatus + StatusActive, LabelPrefixScope + SchemaScope},
+			Labels: []string{LabelPrefixKind + KindLabelDefinition, "work.active", LabelPrefixScope + SchemaScope},
 			Title:  entry.label,
 			Extra:  extra,
 		}

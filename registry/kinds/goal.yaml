@@ -6,7 +6,8 @@ protected: true
 vacuumable: true
 lifecycle:
   is_goal_kind: true
-  active_status: current
+  default_status: work.draft
+  active_status: work.active
   track_in_brief: true
   auto_archive_on_justify_complete: true
 children: [task, spec, bug, need, ref, doc, decision]

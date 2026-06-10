@@ -7,7 +7,7 @@ import (
 	"github.com/dpopsuev/parchment"
 )
 
-func TestTransition_ActiveToMature(t *testing.T) {
+func TestTransition_DraftToActive(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
@@ -25,22 +25,17 @@ func TestTransition_ActiveToMature(t *testing.T) {
 		t.Fatalf("create: %v", err)
 	}
 
-	if _, err := proto.SetField(ctx, []string{art.ID}, "status", "active", parchment.SetFieldOptions{Force: true}); err != nil {
-		t.Fatalf("set active: %v", err)
-	}
-
-	// Transition to mature — should succeed (new status).
-	if _, err := proto.SetField(ctx, []string{art.ID}, "status", "mature"); err != nil {
-		t.Fatalf("set mature: %v", err)
+	if _, err := proto.SetField(ctx, []string{art.ID}, "status", "work.active", parchment.SetFieldOptions{Force: true}); err != nil {
+		t.Fatalf("set work.active: %v", err)
 	}
 
 	got, _ := store.Get(ctx, art.ID)
-	if got.Label(parchment.LabelPrefixStatus) != "mature" {
-		t.Errorf("status = %q, want mature", got.Label(parchment.LabelPrefixStatus))
+	if parchment.StatusFromLabels(got.Labels) != "work.active" {
+		t.Errorf("status = %q, want work.active", parchment.StatusFromLabels(got.Labels))
 	}
 }
 
-func TestTransition_MatureToAllocated(t *testing.T) {
+func TestTransition_ActiveToComplete(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
@@ -58,17 +53,15 @@ func TestTransition_MatureToAllocated(t *testing.T) {
 		t.Fatalf("create: %v", err)
 	}
 
-	// Activate → mature → allocated.
-	proto.SetField(ctx, []string{art.ID}, "status", "active", parchment.SetFieldOptions{Force: true})
-	proto.SetField(ctx, []string{art.ID}, "status", "mature", parchment.SetFieldOptions{Force: true})
+	proto.SetField(ctx, []string{art.ID}, "status", "work.active", parchment.SetFieldOptions{Force: true})
 
-	if _, err := proto.SetField(ctx, []string{art.ID}, "status", "allocated", parchment.SetFieldOptions{Force: true}); err != nil {
-		t.Fatalf("set allocated: %v", err)
+	if _, err := proto.SetField(ctx, []string{art.ID}, "status", "work.complete", parchment.SetFieldOptions{Force: true}); err != nil {
+		t.Fatalf("set work.complete: %v", err)
 	}
 
 	got, _ := store.Get(ctx, art.ID)
-	if got.Label(parchment.LabelPrefixStatus) != "allocated" {
-		t.Errorf("status = %q, want allocated", got.Label(parchment.LabelPrefixStatus))
+	if parchment.StatusFromLabels(got.Labels) != "work.complete" {
+		t.Errorf("status = %q, want work.complete", parchment.StatusFromLabels(got.Labels))
 	}
 }
 
@@ -90,14 +83,14 @@ func TestTransition_FullLifecycle(t *testing.T) {
 		t.Fatalf("create: %v", err)
 	}
 
-	transitions := []string{"active", "mature", "allocated", "in_progress", "in_review", "complete"}
+	transitions := []string{"work.active", "work.complete"}
 	for _, status := range transitions {
 		if _, err := proto.SetField(ctx, []string{art.ID}, "status", status, parchment.SetFieldOptions{Force: true}); err != nil {
 			t.Fatalf("transition to %s: %v", status, err)
 		}
 		got, _ := store.Get(ctx, art.ID)
-		if got.Label(parchment.LabelPrefixStatus) != status {
-			t.Errorf("after transition: status = %q, want %q", got.Label(parchment.LabelPrefixStatus), status)
+		if parchment.StatusFromLabels(got.Labels) != status {
+			t.Errorf("after transition: status = %q, want %q", parchment.StatusFromLabels(got.Labels), status)
 		}
 	}
 }
@@ -112,91 +105,67 @@ func TestTransition_InvalidTransitionBlocked(t *testing.T) {
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "blocked",
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
 		Labels: []string{"kind:task", "priority:medium"},})
-	proto.SetField(ctx, []string{art.ID}, "status", "active", parchment.SetFieldOptions{Force: true})
 
-	// active → complete should be blocked (must go through lifecycle).
-	results, err := proto.SetField(ctx, []string{art.ID}, "status", "complete", parchment.SetFieldOptions{})
+	// work.draft → work.complete should be blocked (must go through work.active).
+	results, err := proto.SetField(ctx, []string{art.ID}, "status", "work.complete", parchment.SetFieldOptions{})
 	if err != nil {
 		t.Fatalf("SetField error: %v", err)
 	}
 	if len(results) == 0 || results[0].OK {
-		t.Fatal("expected active→complete to be blocked by transition map")
+		t.Fatal("expected work.draft→work.complete to be blocked by transition map")
 	}
 
 	got, _ := store.Get(ctx, art.ID)
-	if got.Label(parchment.LabelPrefixStatus) != "active" {
-		t.Errorf("status = %q, want active (unchanged)", got.Label(parchment.LabelPrefixStatus))
+	if parchment.StatusFromLabels(got.Labels) != "work.draft" {
+		t.Errorf("status = %q, want work.draft (unchanged)", parchment.StatusFromLabels(got.Labels))
 	}
 }
 
 func TestTransition_WorkerIDRequiredForAllocation(t *testing.T) {
 	t.Parallel()
+	// In the new simplified lifecycle there is no allocation step.
+	// Force-set to work.active and verify.
 	ctx := context.Background()
 
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "needs worker",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "simple task",
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
 		Labels: []string{"kind:task", "priority:medium"},})
-	proto.SetField(ctx, []string{art.ID}, "status", "active", parchment.SetFieldOptions{Force: true})
-	proto.SetField(ctx, []string{art.ID}, "status", "mature", parchment.SetFieldOptions{Force: true})
 
-	// Allocate without worker_id — should be blocked (guard is forceable).
-	results, _ := proto.SetField(ctx, []string{art.ID}, "status", "allocated", parchment.SetFieldOptions{})
-	if len(results) == 0 || results[0].OK {
-		t.Fatal("expected allocation without worker_id to be blocked")
+	results, err := proto.SetField(ctx, []string{art.ID}, "status", "work.active", parchment.SetFieldOptions{Force: true})
+	if err != nil || !results[0].OK {
+		t.Fatalf("set work.active failed: %v %v", err, results)
 	}
 
-	// Now set worker_id via Extra and retry.
 	got, _ := store.Get(ctx, art.ID)
-	if got.Extra == nil {
-		got.Extra = make(map[string]any)
-	}
-	got.Extra["worker_id"] = "agent-1"
-	store.Put(ctx, got)
-
-	results, _ = proto.SetField(ctx, []string{art.ID}, "status", "allocated", parchment.SetFieldOptions{})
-	if len(results) == 0 || !results[0].OK {
-		errMsg := ""
-		if len(results) > 0 {
-			errMsg = results[0].Error
-		}
-		t.Fatalf("allocation with worker_id should succeed: %s", errMsg)
+	if parchment.StatusFromLabels(got.Labels) != "work.active" {
+		t.Errorf("status = %q, want work.active", parchment.StatusFromLabels(got.Labels))
 	}
 }
 
 func TestTransition_StampsRequiredForReview(t *testing.T) {
 	t.Parallel()
+	// In the new lifecycle, in_review is removed. Verify work.active → work.complete transitions.
 	ctx := context.Background()
 
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "needs stamps",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "review task",
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
 		Labels: []string{"kind:task", "priority:medium"},})
-	// Walk to in_progress.
-	proto.SetField(ctx, []string{art.ID}, "status", "active", parchment.SetFieldOptions{Force: true})
-	proto.SetField(ctx, []string{art.ID}, "status", "mature", parchment.SetFieldOptions{Force: true})
-	proto.SetField(ctx, []string{art.ID}, "status", "allocated", parchment.SetFieldOptions{Force: true})
-	proto.SetField(ctx, []string{art.ID}, "status", "in_progress", parchment.SetFieldOptions{Force: true})
 
-	// in_progress → in_review without stamps — should be blocked.
-	results, _ := proto.SetField(ctx, []string{art.ID}, "status", "in_review", parchment.SetFieldOptions{})
-	if len(results) == 0 || results[0].OK {
-		t.Fatal("expected in_review without stamps section to be blocked")
+	proto.SetField(ctx, []string{art.ID}, "status", "work.active", parchment.SetFieldOptions{Force: true})
+
+	results, err := proto.SetField(ctx, []string{art.ID}, "status", "work.complete", parchment.SetFieldOptions{Force: true})
+	if err != nil || !results[0].OK {
+		t.Fatalf("work.active→work.complete should succeed: %v %v", err, results)
 	}
 
-	// Attach stamps section and retry.
-	proto.AttachSection(ctx, art.ID, "stamps", `[{"field":"title","status":"verified","evidence":"main.go:1"}]`)
-
-	results, _ = proto.SetField(ctx, []string{art.ID}, "status", "in_review", parchment.SetFieldOptions{})
-	if len(results) == 0 || !results[0].OK {
-		errMsg := ""
-		if len(results) > 0 {
-			errMsg = results[0].Error
-		}
-		t.Fatalf("in_review with stamps should succeed: %s", errMsg)
+	got, _ := store.Get(ctx, art.ID)
+	if parchment.StatusFromLabels(got.Labels) != "work.complete" {
+		t.Errorf("status = %q, want work.complete", parchment.StatusFromLabels(got.Labels))
 	}
 }

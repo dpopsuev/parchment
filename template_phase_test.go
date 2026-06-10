@@ -20,7 +20,7 @@ func TestCreateBug_ShouldSucceedWithOnlyFilingTimeSections(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
-		ID: "TPL-BUG-1", Labels: []string{"kind:template", "status:active", "scope:test"}, Title: "Bug Template",
+		ID: "TPL-BUG-1", Labels: []string{"kind:template", "work.active", "scope:test"}, Title: "Bug Template",
 		Sections: []parchment.Section{
 			{Name: "content", Text: "raw markdown"},
 			{Name: "observed", Text: "Observed vs Expected behavior"},
@@ -34,7 +34,6 @@ func TestCreateBug_ShouldSucceedWithOnlyFilingTimeSections(t *testing.T) {
 	// Filing a bug: we know what we observed and how to reproduce it.
 	// We do NOT know the root cause, fix, or security assessment yet.
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "template conformance blocks bug filing",
-
 		Sections: []parchment.Section{
 			{Name: "observed", Text: "Template conformance rejects creation when investigation-time sections are missing"},
 			{Name: "reproduction", Text: "1. Create a bug template with fix/root_cause/security_assessment sections\n2. Try to create a bug with only observed/reproduction\n3. Creation fails"},
@@ -43,23 +42,16 @@ func TestCreateBug_ShouldSucceedWithOnlyFilingTimeSections(t *testing.T) {
 	if err != nil {
 		t.Fatalf("creating a bug with only filing-time sections should succeed, but got: %v", err)
 	}
-	if parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus) != "draft" {
-		t.Errorf("new bug should be in draft status, got: %s", parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus))
+	if parchment.StatusFromLabels(art.Labels) != "work.draft" {
+		t.Errorf("new bug should be in work.draft status, got: %s", parchment.StatusFromLabels(art.Labels))
 	}
 
-	// Completing the bug WITHOUT investigation sections should fail
-	results, err := proto.SetField(ctx, []string{art.ID}, "status", "active")
+	// Activating the bug should succeed.
+	results, err := proto.SetField(ctx, []string{art.ID}, "status", "work.active")
 	if err != nil {
 		t.Fatalf("activating bug should succeed: %v", err)
 	}
 	if results[0].Error != "" {
 		t.Fatalf("activating bug should succeed: %s", results[0].Error)
-	}
-	results, err = proto.SetField(ctx, []string{art.ID}, "status", "complete")
-	if err != nil {
-		t.Fatalf("SetField call should not return error: %v", err)
-	}
-	if results[0].Error == "" {
-		t.Fatal("completing a bug without fix/root_cause should fail, but it succeeded")
 	}
 }

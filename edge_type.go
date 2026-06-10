@@ -23,7 +23,6 @@ type EdgeTypeTrait struct {
 	MaxIncoming      int        `json:"max_incoming,omitempty"`
 	Directionality   string     `json:"directionality,omitempty"`
 	CycleGuard       bool       `json:"cycle_guard,omitempty"`       // reject edges that would create a cycle
-	CascadeArchive   bool       `json:"cascade_archive,omitempty"`   // archiving source cascades to all targets
 	CompletionRollup bool       `json:"completion_rollup,omitempty"` // all targets complete → source auto-transitions
 	AllowedPairs     []KindPair `json:"allowed_pairs,omitempty"`     // empty = open world
 	ConformanceCheck bool       `json:"conformance_check,omitempty"` // source must satisfy target's required sections
@@ -67,9 +66,6 @@ func extraToEdgeTypeTrait(extra map[string]any) EdgeTypeTrait {
 	}
 	if v, ok := extra["cycle_guard"].(bool); ok {
 		t.CycleGuard = v
-	}
-	if v, ok := extra["cascade_archive"].(bool); ok {
-		t.CascadeArchive = v
 	}
 	if v, ok := extra["completion_rollup"].(bool); ok {
 		t.CompletionRollup = v
@@ -127,9 +123,6 @@ func edgeTypeTraitToExtra(t EdgeTypeTrait) map[string]any {
 	if t.CycleGuard {
 		extra["cycle_guard"] = true
 	}
-	if t.CascadeArchive {
-		extra["cascade_archive"] = true
-	}
 	if t.CompletionRollup {
 		extra["completion_rollup"] = true
 	}
@@ -150,7 +143,6 @@ var defaultEdgeTypes = []struct {
 }{
 	{RelParentOf, EdgeTypeTrait{
 		MaxIncoming:      1,
-		CascadeArchive:   true,
 		CompletionRollup: true,
 		AllowedPairs: []KindPair{
 			{Source: KindCampaign, Target: KindGoal},

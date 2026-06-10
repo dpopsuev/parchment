@@ -90,28 +90,6 @@ func TestRetireArtifact_RetiredIsWritable(t *testing.T) {
 	}
 }
 
-func TestRetireArtifact_ArchivedIsNotWritable(t *testing.T) {
-	ctx := context.Background()
-	proto, _ := newProto(t)
-
-	task := mustCreate(t, proto, parchment.CreateInput{Title:    "write pipes",
-		Sections: []parchment.Section{{Name: "context", Text: "original"}},
-		Labels: []string{"kind:task"},})
-	if _, err := proto.SetField(ctx, []string{task.ID}, "status", "complete",
-		parchment.SetFieldOptions{Force: true}); err != nil {
-		t.Fatalf("drive to complete: %v", err)
-	}
-	if _, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false); err != nil {
-		t.Fatalf("archive: %v", err)
-	}
-
-	// Archived is readonly — attach should fail.
-	_, err := proto.AttachSection(ctx, task.ID, "post_mortem", "should not work")
-	if err == nil {
-		t.Error("expected error attaching section to archived (readonly) artifact")
-	}
-}
-
 // --- Vacuum behavior ---
 
 func TestVacuum_SkipsRetired(t *testing.T) {

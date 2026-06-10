@@ -315,23 +315,6 @@ func TestGetArtifact_NotFound(t *testing.T) {
 
 // --- DeleteArtifact ---
 
-func TestDeleteArtifact_RequiresArchived(t *testing.T) {
-	t.Parallel()
-	proto, _ := newProto(t)
-	ctx := context.Background()
-
-	task := createTask(t, proto, "do not delete me")
-
-	// Default schema has DeleteRequiresArchived=true
-	err := proto.DeleteArtifact(ctx, task.ID, false)
-	if err == nil {
-		t.Fatal("expected error: delete should require archived status")
-	}
-	if !errors.Is(err, parchment.ErrNotArchived) {
-		t.Errorf("expected ErrNotArchived, got: %v", err)
-	}
-}
-
 func TestDeleteArtifact_ForceOverride(t *testing.T) {
 	t.Parallel()
 	proto, _ := newProto(t)
@@ -347,23 +330,6 @@ func TestDeleteArtifact_ForceOverride(t *testing.T) {
 	_, err = proto.GetArtifact(ctx, task.ID)
 	if !errors.Is(err, parchment.ErrArtifactNotFound) {
 		t.Errorf("expected artifact gone after force delete, got err: %v", err)
-	}
-}
-
-func TestDeleteArtifact_ArchivedAllowed(t *testing.T) {
-	t.Parallel()
-	proto, store := newProto(t)
-	ctx := context.Background()
-
-	task := createTask(t, proto, "archive then delete")
-	// Archive it
-	art, _ := store.Get(ctx, task.ID)
-	art.Labels = parchment.MirrorLabel(art.Labels, parchment.LabelPrefixStatus, "archived")
-	store.Put(ctx, art)
-
-	err := proto.DeleteArtifact(ctx, task.ID, false)
-	if err != nil {
-		t.Fatalf("DeleteArtifact: should succeed for archived artifact: %v", err)
 	}
 }
 
@@ -430,25 +396,6 @@ func TestAttachSection_ReplaceExisting(t *testing.T) {
 	text, _ := proto.GetSection(ctx, task.ID, "notes")
 	if text != "new notes" {
 		t.Errorf("expected 'new notes', got %q", text)
-	}
-}
-
-func TestAttachSection_ArchivedFails(t *testing.T) {
-	t.Parallel()
-	proto, store := newProto(t)
-	ctx := context.Background()
-
-	task := createTask(t, proto, "archived attach")
-	art, _ := store.Get(ctx, task.ID)
-	art.Labels = parchment.MirrorLabel(art.Labels, parchment.LabelPrefixStatus, "archived")
-	store.Put(ctx, art)
-
-	_, err := proto.AttachSection(ctx, task.ID, "notes", "should fail")
-	if err == nil {
-		t.Fatal("expected error when attaching to archived artifact")
-	}
-	if !errors.Is(err, parchment.ErrArchived) {
-		t.Errorf("expected ErrArchived, got: %v", err)
 	}
 }
 
@@ -555,27 +502,6 @@ func TestDetachSection_NonexistentSection(t *testing.T) {
 	}
 }
 
-func TestDetachSection_ArchivedFails(t *testing.T) {
-	t.Parallel()
-	proto, store := newProto(t)
-	ctx := context.Background()
-
-	task := createTask(t, proto, "archived detach")
-	proto.AttachSection(ctx, task.ID, "notes", "temp")
-
-	art, _ := store.Get(ctx, task.ID)
-	art.Labels = parchment.MirrorLabel(art.Labels, parchment.LabelPrefixStatus, "archived")
-	store.Put(ctx, art)
-
-	_, err := proto.DetachSection(ctx, task.ID, "notes")
-	if err == nil {
-		t.Fatal("expected error when detaching from archived artifact")
-	}
-	if !errors.Is(err, parchment.ErrArchived) {
-		t.Errorf("expected ErrArchived, got: %v", err)
-	}
-}
-
 func TestDetachSection_TemplateRequiredBlocked(t *testing.T) {
 	t.Parallel()
 	proto, store := newProto(t)
@@ -624,216 +550,6 @@ func TestDetachSection_EmptyParams(t *testing.T) {
 		t.Error("expected error for empty name")
 	}
 }
-
-// --- ArchiveArtifact ---
-
-func TestArchiveArtifact_Single(t *testing.T) {
-	t.Parallel()
-	proto, _ := newProto(t)
-	ctx := context.Background()
-
-	task := createTask(t, proto, "archive me")
-
-	results, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false)
-	if err != nil {
-		t.Fatalf("ArchiveArtifact: %v", err)
-	}
-	if len(results) != 1 || !results[0].OK {
-		t.Errorf("expected OK result, got %+v", results)
-	}
-
-	got, _ := proto.GetArtifact(ctx, task.ID)
-	if got.Label(parchment.LabelPrefixStatus) != "archived" {
-		t.Errorf("expected status=archived, got %s", got.Label(parchment.LabelPrefixStatus))
-	}
-}
-
-func TestArchiveArtifact_BlockedByNonTerminalChild(t *testing.T) {
-	// parent_of has CascadeArchive=true — archiving a goal cascades to its task children.
-	t.Parallel()
-	proto, _ := newProto(t)
-	ctx := context.Background()
-
-	parent := createGoal(t, proto, "parent goal")
-	child := mustCreate(t, proto, parchment.CreateInput{Title: "active child",
-Parent: parent.ID,
-		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{"kind:task"},})
-
-	results, err := proto.ArchiveArtifact(ctx, []string{parent.ID}, false)
-	if err != nil {
-		t.Fatalf("ArchiveArtifact: %v", err)
-	}
-	// CascadeArchive on parent_of archives the child first, then the parent.
-	if len(results) == 0 || !results[0].OK {
-		t.Errorf("expected archive to succeed via CascadeArchive; got: %v", results)
-	}
-	got, _ := proto.GetArtifact(ctx, child.ID)
-	if got.Label(parchment.LabelPrefixStatus) != parchment.StatusArchived {
-		t.Errorf("child should be archived by cascade; status = %s", got.Label(parchment.LabelPrefixStatus))
-	}
-}
-
-func TestArchiveArtifact_BlockedByActiveChild(t *testing.T) {
-	// parent_of has CascadeArchive=true: archiving a goal with an active task child
-	// succeeds by cascading the archive to the child first.
-	t.Parallel()
-	proto, _ := newProto(t)
-	ctx := context.Background()
-
-	parent := createGoal(t, proto, "parent with active child")
-	child := mustCreate(t, proto, parchment.CreateInput{Title:  "active child",
-
-		Parent: parent.ID,
-		Sections: []parchment.Section{
-			{Name: "context", Text: "ctx"},
-		},
-		Labels: []string{"kind:task"},})
-
-	results, err := proto.ArchiveArtifact(ctx, []string{parent.ID}, false)
-	if err != nil {
-		t.Fatalf("ArchiveArtifact: %v", err)
-	}
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(results))
-	}
-	if !results[0].OK {
-		t.Errorf("expected cascade archive to succeed; got error: %s", results[0].Error)
-	}
-	got, _ := proto.GetArtifact(ctx, child.ID)
-	if got.Label(parchment.LabelPrefixStatus) != parchment.StatusArchived {
-		t.Errorf("child should be archived by cascade; status = %s", got.Label(parchment.LabelPrefixStatus))
-	}
-}
-
-func TestArchiveArtifact_AlreadyArchived(t *testing.T) {
-	t.Parallel()
-	proto, store := newProto(t)
-	ctx := context.Background()
-
-	task := createTask(t, proto, "already archived")
-	art, _ := store.Get(ctx, task.ID)
-	art.Labels = parchment.MirrorLabel(art.Labels, parchment.LabelPrefixStatus, "archived")
-	store.Put(ctx, art)
-
-	// Archiving already-archived should succeed silently
-	results, err := proto.ArchiveArtifact(ctx, []string{task.ID}, false)
-	if err != nil {
-		t.Fatalf("ArchiveArtifact: %v", err)
-	}
-	if len(results) != 1 || !results[0].OK {
-		t.Errorf("expected OK for already-archived, got %+v", results)
-	}
-}
-
-func TestArchiveArtifact_EmptyIDs(t *testing.T) {
-	t.Parallel()
-	proto, _ := newProto(t)
-	ctx := context.Background()
-
-	_, err := proto.ArchiveArtifact(ctx, []string{}, false)
-	if err == nil {
-		t.Error("expected error for empty ids")
-	}
-}
-
-// --- DeArchive ---
-
-func TestDeArchive_Single(t *testing.T) {
-	t.Parallel()
-	proto, store := newProto(t)
-	ctx := context.Background()
-
-	task := createTask(t, proto, "dearchive me")
-	art, _ := store.Get(ctx, task.ID)
-	art.Labels = parchment.MirrorLabel(art.Labels, parchment.LabelPrefixStatus, "archived")
-	store.Put(ctx, art)
-
-	results, err := proto.DeArchive(ctx, []string{task.ID}, false)
-	if err != nil {
-		t.Fatalf("DeArchive: %v", err)
-	}
-	if len(results) != 1 || !results[0].OK {
-		t.Errorf("expected OK result, got %+v", results)
-	}
-
-	got, _ := proto.GetArtifact(ctx, task.ID)
-	if got.Label(parchment.LabelPrefixStatus) != "draft" {
-		t.Errorf("expected status=draft after dearchive, got %s", got.Label(parchment.LabelPrefixStatus))
-	}
-}
-
-func TestDeArchive_NotArchivedFails(t *testing.T) {
-	t.Parallel()
-	proto, _ := newProto(t)
-	ctx := context.Background()
-
-	task := createTask(t, proto, "not archived")
-
-	results, err := proto.DeArchive(ctx, []string{task.ID}, false)
-	if err != nil {
-		t.Fatalf("DeArchive: %v", err)
-	}
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(results))
-	}
-	if results[0].OK {
-		t.Error("expected failure when dearchiving non-archived artifact")
-	}
-}
-
-func TestDeArchive_Cascade(t *testing.T) {
-	t.Parallel()
-	proto, store := newProto(t)
-	ctx := context.Background()
-
-	parent := createGoal(t, proto, "parent to dearchive")
-	child := mustCreate(t, proto, parchment.CreateInput{Title:  "child to dearchive",
-
-		Parent: parent.ID,
-		Sections: []parchment.Section{
-			{Name: "context", Text: "ctx"},
-		},
-		Labels: []string{"kind:task"},})
-
-	// Archive both
-	for _, id := range []string{parent.ID, child.ID} {
-		a, _ := store.Get(ctx, id)
-		a.Labels = parchment.MirrorLabel(a.Labels, parchment.LabelPrefixStatus, "archived")
-		store.Put(ctx, a)
-	}
-
-	results, err := proto.DeArchive(ctx, []string{parent.ID}, true)
-	if err != nil {
-		t.Fatalf("DeArchive cascade: %v", err)
-	}
-	if len(results) == 0 || !results[0].OK {
-		t.Errorf("expected OK for parent, got %+v", results)
-	}
-
-	gotParent, _ := proto.GetArtifact(ctx, parent.ID)
-	if gotParent.Label(parchment.LabelPrefixStatus) != "draft" {
-		t.Errorf("parent status=%s, want draft", gotParent.Label(parchment.LabelPrefixStatus))
-	}
-	gotChild, _ := proto.GetArtifact(ctx, child.ID)
-	if gotChild.Label(parchment.LabelPrefixStatus) != "draft" {
-		t.Errorf("child status=%s, want draft", gotChild.Label(parchment.LabelPrefixStatus))
-	}
-}
-
-func TestDeArchive_EmptyIDs(t *testing.T) {
-	t.Parallel()
-	proto, _ := newProto(t)
-	ctx := context.Background()
-
-	_, err := proto.DeArchive(ctx, []string{}, false)
-	if err == nil {
-		t.Error("expected error for empty ids")
-	}
-}
-
-
-
 
 // --- CompletionScore ---
 
@@ -949,9 +665,8 @@ func TestCreateArtifact_InvalidPriority(t *testing.T) {
 
 	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title:    "bad priority",
 
-		Priority: "super-urgent",
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:task", "priority:super-urgent"},})
 	if err == nil {
 		t.Error("expected error for invalid priority")
 	}
@@ -1846,55 +1561,6 @@ func TestCheckFix_FixesInvalidParent(t *testing.T) {
 		t.Errorf("expected parent to be unset, got %q", fixed.Parent)
 	}
 	_ = report
-}
-
-// --- BulkArchive ---
-
-func TestBulkArchive_DryRun(t *testing.T) {
-	t.Parallel()
-	proto, _ := newProto(t)
-	ctx := context.Background()
-
-	createTask(t, proto, "bulk task 1")
-	createTask(t, proto, "bulk task 2")
-
-	result, err := proto.BulkArchive(ctx, parchment.BulkMutationInput{DryRun: true,
-		Labels: []string{"kind:task"},})
-	if err != nil {
-		t.Fatalf("BulkArchive: %v", err)
-	}
-	if !result.DryRun {
-		t.Error("expected dry_run=true")
-	}
-	if result.Count != 2 {
-		t.Errorf("expected 2 affected, got %d", result.Count)
-	}
-
-	// Verify nothing was actually archived
-	arts, _ := proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{"kind:task"}})
-	for _, a := range arts {
-		if parchment.LabelValue(a.Labels, parchment.LabelPrefixStatus) == "archived" {
-			t.Error("dry run should not archive anything")
-		}
-	}
-}
-
-func TestBulkArchive_Execute(t *testing.T) {
-	t.Parallel()
-	proto, _ := newProto(t)
-	ctx := context.Background()
-
-	createTask(t, proto, "to archive 1")
-	createTask(t, proto, "to archive 2")
-
-	result, err := proto.BulkArchive(ctx, parchment.BulkMutationInput{
-		Labels: []string{"kind:task"},})
-	if err != nil {
-		t.Fatalf("BulkArchive: %v", err)
-	}
-	if result.Count != 2 {
-		t.Errorf("expected 2 archived, got %d", result.Count)
-	}
 }
 
 // --- VocabList / VocabAdd / VocabRemove ---

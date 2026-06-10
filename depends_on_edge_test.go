@@ -21,8 +21,7 @@ func TestGuardDependsOnComplete_ReadsEdge(t *testing.T) {
 	// Create a task that depends on dep.
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "work", DependsOn: []string{dep.ID},
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-		Priority: "medium",
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:task", "priority:medium"},})
 
 	// Advance to in_review (prerequisite for complete).
 	for _, s := range []string{"active", "mature", "allocated", "in_progress", "in_review"} {

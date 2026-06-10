@@ -45,7 +45,6 @@ type KindLifecycle struct {
 	IsGoalKind                   bool                `json:"is_goal_kind,omitempty" yaml:"is_goal_kind,omitempty"`
 	TrackInBrief                 bool                `json:"track_in_brief,omitempty" yaml:"track_in_brief,omitempty"`
 	ActivationRequiresSections   bool                `json:"activation_requires_sections,omitempty" yaml:"activation_requires_sections,omitempty"`
-	AutoArchiveOnJustifyComplete bool                `json:"auto_archive_on_justify_complete,omitempty" yaml:"auto_archive_on_justify_complete,omitempty"`
 	Transitions                  map[string][]string `json:"transitions,omitempty" yaml:"transitions,omitempty"`
 	CompletionGates              []string            `json:"completion_gates,omitempty" yaml:"completion_gates,omitempty"`
 }
@@ -86,10 +85,8 @@ type Schema struct {
 
 // Guards defines global invariant guards that apply across all kinds.
 type Guards struct {
-	ArchivedReadonly                     bool `json:"archived_readonly" yaml:"archived_readonly"`
 	CompletionRequiresChildrenComplete   bool `json:"completion_requires_children_complete" yaml:"completion_requires_children_complete"`
 	CompletionRequiresDependsOnComplete  bool `json:"completion_requires_depends_on_complete" yaml:"completion_requires_depends_on_complete"`
-	DeleteRequiresArchived               bool `json:"delete_requires_archived" yaml:"delete_requires_archived"`
 	AutoCompleteParentOnChildrenTerminal bool `json:"auto_complete_parent_on_children_terminal" yaml:"auto_complete_parent_on_children_terminal"`
 }
 
@@ -314,15 +311,6 @@ func (s *Schema) TriggerStatusFor(kind string) string {
 func (s *Schema) ActivationRequiresSections(kind string) bool {
 	if kd, ok := s.Kinds[kind]; ok {
 		return kd.ActivationRequiresSections
-	}
-	return false
-}
-
-// AutoArchiveOnJustifyComplete reports whether the kind should auto-archive
-// when all its justifies targets reach a terminal status.
-func (s *Schema) AutoArchiveOnJustifyComplete(kind string) bool {
-	if kd, ok := s.Kinds[kind]; ok {
-		return kd.AutoArchiveOnJustifyComplete
 	}
 	return false
 }
@@ -629,10 +617,8 @@ func DefaultSchema() *Schema {
 			RelCites, RelElaborates, RelContradicts, RelSynthesises, RelRemembers,
 		},
 		Guards: Guards{
-			ArchivedReadonly:                     true,
 			CompletionRequiresChildrenComplete:   true,
 			CompletionRequiresDependsOnComplete:  true,
-			DeleteRequiresArchived:               true,
 			AutoCompleteParentOnChildrenTerminal:  true,
 		},
 		Priorities:      []string{"critical", "high", "medium", "low", "none"},

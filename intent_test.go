@@ -105,9 +105,4 @@ func TestIntentLifecycle_Protocol(t *testing.T) {
 		t.Fatalf("proposed→accepted failed: %v %v", err, results)
 	}
 
-	// Accepted is readonly — further mutation must be blocked.
-	results, _ = p.SetField(ctx, []string{art.ID}, FieldTitle, "Different title")
-	if results[0].OK {
-		t.Error("mutation of accepted intent should be blocked (readonly)")
-	}
 }

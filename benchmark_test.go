@@ -29,9 +29,8 @@ func seedArtifacts(b *testing.B, p *Protocol, n int) []string {
 	for i := range n {
 		art, err := p.CreateArtifact(ctx, CreateInput{Title:    fmt.Sprintf("bench-task-%d", i),
 
-			Priority: "medium",
 			Sections: []Section{{Name: "context", Text: fmt.Sprintf("benchmark task %d context", i)}},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:task", "priority:medium"},})
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -52,9 +51,8 @@ func BenchmarkCreateArtifact(b *testing.B) {
 	for i := range b.N {
 		_, err := p.CreateArtifact(ctx, CreateInput{Title:    fmt.Sprintf("bench-%d", i),
 
-			Priority: "medium",
 			Sections: []Section{{Name: "context", Text: "benchmark"}},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:task", "priority:medium"},})
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -100,9 +98,9 @@ func BenchmarkTopoSort(b *testing.B) {
 	var prevID string
 	for i := range 500 {
 		in := CreateInput{Title: fmt.Sprintf("task-%d", i),
-Parent: goal.ID, Priority: "medium",
+Parent: goal.ID,
 			Sections: []Section{{Name: "context", Text: "bench"}},
-		Labels: []string{"kind:task"},}
+		Labels: []string{"kind:task", "priority:medium"},}
 		if prevID != "" && i%5 == 0 { // every 5th task depends on the previous
 			in.DependsOn = []string{prevID}
 		}

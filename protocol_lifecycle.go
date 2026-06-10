@@ -144,10 +144,6 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		return Result{ID: id, Error: err.Error()}
 	}
 
-	if !opt.BypassGuards && p.schema.Guards.ArchivedReadonly && p.IsReadonly(labelValue(art.Labels, LabelPrefixStatus)) {
-		return Result{ID: id, Error: fmt.Sprintf("%s: %s", ErrArchived, id)}
-	}
-
 	switch field {
 	case FieldAlias:
 		art.Alias = value
@@ -329,16 +325,10 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 		slog.String(LogKeyFrom, oldStatus),
 		slog.String(LogKeyTo, status))
 
-	triggerStatus := p.schema.TriggerStatusFor(labelValue(art.Labels, LabelPrefixKind))
 	r := Result{ID: art.ID, OK: true}
 	var info []string
 	if len(followsWarnings) > 0 {
 		info = append(info, fmt.Sprintf("warning: activating before followed artifacts complete: %s", strings.Join(followsWarnings, ", ")))
-	}
-	if p.schema.AutoArchiveOnJustifyComplete(labelValue(art.Labels, LabelPrefixKind)) && status == triggerStatus {
-		if extra := p.autoArchiveGoal(ctx, art); extra != "" {
-			info = append(info, extra)
-		}
 	}
 	if p.schema.Guards.AutoCompleteParentOnChildrenTerminal && p.IsTerminal(status) {
 		if extra := p.autoCompleteParent(ctx, art); extra != "" {
@@ -423,33 +413,6 @@ func (p *Protocol) guardChildrenComplete(ctx context.Context, art *Artifact) err
 			art.ID, len(incomplete), strings.Join(incomplete, ", "))
 	}
 	return nil
-}
-
-func (p *Protocol) autoArchiveGoal(ctx context.Context, art *Artifact) string {
-	goalIDs := art.Links[RelJustifies]
-	if len(goalIDs) == 0 {
-		return ""
-	}
-	goalKind, goalDef := p.schema.GoalKind()
-	if goalKind == "" {
-		return ""
-	}
-	parts := make([]string, 0, len(goalIDs))
-	for _, gid := range goalIDs {
-		goal, err := p.store.Get(ctx, gid)
-		if err != nil {
-			continue
-		}
-		if !p.schema.Kinds[labelValue(goal.Labels, LabelPrefixKind)].IsGoalKind || labelValue(goal.Labels, LabelPrefixStatus) != goalDef.ActiveStatus {
-			continue
-		}
-		goal.Labels = mirrorLabel(goal.Labels, LabelPrefixStatus, p.schema.ReadonlyStatuses[0])
-		if err := p.store.Put(ctx, goal); err != nil {
-			continue
-		}
-		parts = append(parts, fmt.Sprintf("archived %s: %s", goal.ID, goal.Title))
-	}
-	return strings.Join(parts, "\n")
 }
 
 // completionRollup checks every incoming relation with CompletionRollup=true.

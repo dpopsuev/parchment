@@ -37,7 +37,6 @@ type kindYAML struct {
 		IsGoalKind                   bool                `yaml:"is_goal_kind"`
 		TrackInBrief                 bool                `yaml:"track_in_brief"`
 		ActivationRequiresSections   bool                `yaml:"activation_requires_sections"`
-		AutoArchiveOnJustifyComplete bool                `yaml:"auto_archive_on_justify_complete"`
 		Transitions                  map[string][]string `yaml:"transitions"`
 		CompletionGates              []string            `yaml:"completion_gates"`
 	} `yaml:"lifecycle"`
@@ -82,8 +81,7 @@ func (k *kindYAML) toKindDef() KindDef {
 			IsGoalKind:                   k.Lifecycle.IsGoalKind,
 			TrackInBrief:                 k.Lifecycle.TrackInBrief,
 			ActivationRequiresSections:   k.Lifecycle.ActivationRequiresSections,
-			AutoArchiveOnJustifyComplete: k.Lifecycle.AutoArchiveOnJustifyComplete,
-			Transitions:                  k.Lifecycle.Transitions,
+		Transitions:                  k.Lifecycle.Transitions,
 			CompletionGates:              k.Lifecycle.CompletionGates,
 		},
 		KindSections: KindSections{
@@ -111,7 +109,6 @@ type edgeTypeYAML struct {
 	MaxIncoming      int             `yaml:"max_incoming"`
 	Directionality   string          `yaml:"directionality"`
 	CycleGuard       bool            `yaml:"cycle_guard"`
-	CascadeArchive   bool            `yaml:"cascade_archive"`
 	CompletionRollup bool            `yaml:"completion_rollup"`
 	ConformanceCheck bool            `yaml:"conformance_check"`
 	AllowedPairs     []kindPairYAML  `yaml:"allowed_pairs"`
@@ -272,9 +269,8 @@ func seedEdgeTypesFromRegistry(ctx context.Context, s Store) {
 			MaxOutgoing:      et.MaxOutgoing,
 			MaxIncoming:      et.MaxIncoming,
 			Directionality:   et.Directionality,
-			CycleGuard:       et.CycleGuard,
-			CascadeArchive:   et.CascadeArchive,
-			CompletionRollup: et.CompletionRollup,
+		CycleGuard:       et.CycleGuard,
+		CompletionRollup: et.CompletionRollup,
 			ConformanceCheck: et.ConformanceCheck,
 			AllowedPairs:     pairs,
 		}

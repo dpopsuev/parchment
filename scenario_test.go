@@ -147,25 +147,6 @@ func TestScenario_A_Hierarchy(t *testing.T) {
 		t.Errorf("goal should be auto-completed via CompletionRollup; status=%s", sgetStatus(t, proto, goal.ID))
 	}
 
-	// CascadeArchive: archiving campaign cascades to non-terminal children.
-	campaign2 := mustCreate(t, proto, parchment.CreateInput{Title: "Q4 campaign",
-		Sections: []parchment.Section{{Name: "mission", Text: "plan"}},
-		Labels: []string{"kind:campaign"},})
-	goal2 := mustCreate(t, proto, parchment.CreateInput{Title: "new goal",
-		Labels: []string{"kind:goal"},})
-	slink(t, proto, campaign2.ID, parchment.RelParentOf, goal2.ID)
-
-	archiveResults, err := proto.ArchiveArtifact(ctx, []string{campaign2.ID}, false)
-	if err != nil {
-		t.Fatalf("archive campaign2: %v", err)
-	}
-	if len(archiveResults) == 0 || !archiveResults[0].OK {
-		t.Fatalf("archive campaign2 failed: %v", archiveResults)
-	}
-	if sgetStatus(t, proto, goal2.ID) != parchment.StatusArchived {
-		t.Errorf("goal2 should be cascade-archived; status=%s", sgetStatus(t, proto, goal2.ID))
-	}
-
 	// Tree traversal returns full campaign→goal hierarchy.
 	tree, err := proto.ArtifactTree(ctx, parchment.TreeInput{
 		ID: campaign.ID, Relation: parchment.RelParentOf, Direction: "outbound", Depth: 3,
@@ -517,23 +498,6 @@ func TestScenario_F_UnifiedGraph(t *testing.T) { //nolint:gocyclo // inherent co
 		if extSeen[a.ID] {
 			t.Errorf("agent-only query returned external artifact %s", a.ID)
 		}
-	}
-
-	// CascadeArchive on campaign cascades to goal and task; component is unaffected.
-	archiveResults, err := proto.ArchiveArtifact(ctx, []string{campaign.ID}, false)
-	if err != nil {
-		t.Fatalf("archive campaign: %v", err)
-	}
-	if len(archiveResults) == 0 || !archiveResults[0].OK {
-		t.Fatalf("archive campaign failed: %v", archiveResults)
-	}
-	for _, id := range []string{goal.ID, task.ID} {
-		if sgetStatus(t, proto, id) != parchment.StatusArchived {
-			t.Errorf("%s should be cascade-archived; status=%s", id, sgetStatus(t, proto, id))
-		}
-	}
-	if sgetStatus(t, proto, component.ID) == parchment.StatusArchived {
-		t.Error("component (different graph) should NOT be cascade-archived")
 	}
 
 	// Removing issue→symbol edge leaves symbol intact.

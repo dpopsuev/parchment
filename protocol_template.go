@@ -58,11 +58,13 @@ func (p *Protocol) createHookArtifacts(ctx context.Context, parent *Artifact, ra
 		if sc := labelValue(parent.Labels, LabelPrefixScope); sc != "" {
 			childLabels = append(childLabels, LabelPrefixScope+sc)
 		}
+		if priority != "" {
+			childLabels = append(childLabels, LabelPrefixPriority+priority)
+		}
 		child, err := p.CreateArtifact(ctx, CreateInput{
 			Title:     title,
 			Goal:      goal,
 			Parent:    parent.ID,
-			Priority:  priority,
 			Labels:    childLabels,
 			Sections:  sections,
 			SkipHooks: true,

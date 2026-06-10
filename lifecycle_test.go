@@ -109,9 +109,9 @@ func TestTransition_InvalidTransitionBlocked(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "blocked", Priority: "medium",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "blocked",
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:task", "priority:medium"},})
 	proto.SetField(ctx, []string{art.ID}, "status", "active", parchment.SetFieldOptions{Force: true})
 
 	// active → complete should be blocked (must go through lifecycle).
@@ -136,9 +136,9 @@ func TestTransition_WorkerIDRequiredForAllocation(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "needs worker", Priority: "medium",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "needs worker",
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:task", "priority:medium"},})
 	proto.SetField(ctx, []string{art.ID}, "status", "active", parchment.SetFieldOptions{Force: true})
 	proto.SetField(ctx, []string{art.ID}, "status", "mature", parchment.SetFieldOptions{Force: true})
 
@@ -173,9 +173,9 @@ func TestTransition_StampsRequiredForReview(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "needs stamps", Priority: "medium",
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "needs stamps",
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:task", "priority:medium"},})
 	// Walk to in_progress.
 	proto.SetField(ctx, []string{art.ID}, "status", "active", parchment.SetFieldOptions{Force: true})
 	proto.SetField(ctx, []string{art.ID}, "status", "mature", parchment.SetFieldOptions{Force: true})

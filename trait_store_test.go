@@ -52,7 +52,7 @@ func TestTraitStore_LabelMap_ReturnsAll(t *testing.T) {
 
 func TestTraitStore_EdgeMap_ReturnsAll(t *testing.T) {
 	ts := parchment.NewTraitStore()
-	ts.PutEdge("parent_of", parchment.EdgeTypeTrait{CascadeArchive: true})
+	ts.PutEdge("parent_of", parchment.EdgeTypeTrait{CompletionRollup: true})
 	ts.PutEdge("depends_on", parchment.EdgeTypeTrait{CycleGuard: true})
 	m := ts.EdgeMap()
 	if len(m) != 2 {

@@ -27,36 +27,6 @@ type BulkMutationResult struct {
 	DryRun      bool     `json:"dry_run"`
 }
 
-// BulkArchive archives all artifacts matching the filter.
-func (p *Protocol) BulkArchive(ctx context.Context, in BulkMutationInput) (*BulkMutationResult, error) {
-	slog.DebugContext(ctx, "bulk archive",
-		slog.Bool(LogKeyDryRun, in.DryRun))
-	li := ListInput{
-		Labels: in.Labels, IDPrefix: in.IDPrefix, ExcludeLabels: in.ExcludeLabels,
-	}
-	arts, err := p.ListArtifacts(ctx, li)
-	if err != nil {
-		return nil, err
-	}
-	result := &BulkMutationResult{DryRun: in.DryRun}
-	for _, art := range arts {
-		result.AffectedIDs = append(result.AffectedIDs, art.ID)
-	}
-	result.Count = len(result.AffectedIDs)
-	if in.DryRun {
-		slog.InfoContext(ctx, "bulk archive dry-run", slog.Int(LogKeyCount, result.Count))
-		return result, nil
-	}
-	if len(result.AffectedIDs) == 0 {
-		return result, nil
-	}
-	_, err = p.ArchiveArtifact(ctx, result.AffectedIDs, false)
-	if err == nil {
-		slog.InfoContext(ctx, "bulk archived", slog.Int(LogKeyCount, result.Count))
-	}
-	return result, err
-}
-
 // BulkSetField sets a field on all artifacts matching the filter.
 func (p *Protocol) BulkSetField(ctx context.Context, in BulkMutationInput, field, value string) (*BulkMutationResult, error) {
 	slog.DebugContext(ctx, "bulk set field",

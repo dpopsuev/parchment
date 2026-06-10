@@ -146,8 +146,8 @@ func TestFilter_LabelsOr(t *testing.T) {
 	s := parchment.NewMemoryStore()
 	p := parchment.New(s, parchment.DefaultSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "task", Priority: "none", Sections: []parchment.Section{{Name: "context", Text: "x"}},
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},}); err != nil {
+	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "task", Sections: []parchment.Section{{Name: "context", Text: "x"}},
+		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask, parchment.LabelPrefixPriority + "none"},}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "bug", Sections: []parchment.Section{{Name: "context", Text: "x"}},

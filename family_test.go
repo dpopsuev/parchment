@@ -127,9 +127,9 @@ func TestFilter_FamilyFilter_SQLite(t *testing.T) {
 		Labels: []string{LabelPrefixKind + KindNote},}); err != nil {
 		t.Fatalf("create note: %v", err)
 	}
-	if _, err := p.CreateArtifact(ctx, CreateInput{Title: "a task", Priority: "none",
+	if _, err := p.CreateArtifact(ctx, CreateInput{Title: "a task",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{LabelPrefixKind + KindTask},}); err != nil {
+		Labels: []string{LabelPrefixKind + KindTask, LabelPrefixPriority + "none"},}); err != nil {
 		t.Fatalf("create task: %v", err)
 	}
 
@@ -164,9 +164,8 @@ func TestFilter_FamilyFilter(t *testing.T) {
 		t.Fatalf("create note: %v", err)
 	}
 	_, err = p.CreateArtifact(ctx, CreateInput{Title: "A task",
-		Priority: "none",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{LabelPrefixKind + KindTask},})
+		Labels: []string{LabelPrefixKind + KindTask, LabelPrefixPriority + "none"},})
 	if err != nil {
 		t.Fatalf("create task: %v", err)
 	}

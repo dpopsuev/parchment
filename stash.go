@@ -113,9 +113,6 @@ func MergeInput(base CreateInput, patch CreateInput) CreateInput { //nolint:gocr
 	if patch.Goal != "" {
 		base.Goal = patch.Goal
 	}
-	if patch.Priority != "" {
-		base.Priority = patch.Priority
-	}
 	if patch.Parent != "" {
 		base.Parent = patch.Parent
 	}

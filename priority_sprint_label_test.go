@@ -11,8 +11,8 @@ import (
 func TestCreateArtifact_SeedsPriorityLabel(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{})
-	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{Title: "urgent work", Priority: "high",
-		Labels: []string{"kind:task"},})
+	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{Title: "urgent work",
+		Labels: []string{"kind:task", "priority:high"},})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -27,8 +27,8 @@ func TestCreateArtifact_SeedsPriorityLabel(t *testing.T) {
 func TestSetField_PriorityWritesLabel(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{})
-	art, _ := proto.CreateArtifact(t.Context(), parchment.CreateInput{Title: "t", Priority: "low",
-		Labels: []string{"kind:task"},})
+	art, _ := proto.CreateArtifact(t.Context(), parchment.CreateInput{Title: "t",
+		Labels: []string{"kind:task", "priority:low"},})
 	results, err := proto.SetField(t.Context(), []string{art.ID}, "priority", "high")
 	if err != nil || !results[0].OK {
 		t.Fatalf("SetField: %v / %v", err, results)

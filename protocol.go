@@ -2,12 +2,6 @@ package parchment
 
 import (
 	"context"
-	"errors"
-)
-
-var (
-	ErrArchived    = errors.New("artifact is archived and read-only")
-	ErrNotArchived = errors.New("only archived artifacts can be deleted; use force to override")
 )
 
 // ConformanceError is returned when an artifact fails template conformance

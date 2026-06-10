@@ -89,7 +89,6 @@ type CreateInput struct {
 	Title      string              `json:"title"`
 	Goal       string              `json:"goal,omitempty"`
 	Parent     string              `json:"parent,omitempty"`
-	Priority   string              `json:"priority,omitempty"`
 	DependsOn  []string            `json:"depends_on,omitempty"`
 	Labels     []string            `json:"labels,omitempty"`
 	Alias      string              `json:"alias,omitempty"`
@@ -110,8 +109,9 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	if err := ValidateKind(kind, p.vocab); err != nil {
 		return nil, err
 	}
-	if in.Priority != "" && !p.schema.ValidPriority(in.Priority) {
-		return nil, fmt.Errorf("invalid priority %q — valid: %s", in.Priority, strings.Join(p.schema.Priorities, ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
+	priority := labelValue(in.Labels, LabelPrefixPriority)
+	if priority != "" && !p.schema.ValidPriority(priority) {
+		return nil, fmt.Errorf("invalid priority %q — valid: %s", priority, strings.Join(p.schema.Priorities, ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 	if in.Parent != "" {
 		if parent, err := p.store.Get(ctx, in.Parent); err == nil {
@@ -132,15 +132,17 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		if len(policy.AllowedKinds) > 0 && !slices.Contains(policy.AllowedKinds, kind) {
 			return nil, fmt.Errorf("kind %q not allowed in scope %q (allowed: %s)", kind, scope, strings.Join(policy.AllowedKinds, ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 		}
-		if in.Priority == "" && policy.DefaultPriority != "" {
-			in.Priority = policy.DefaultPriority
+		if priority == "" && policy.DefaultPriority != "" {
+			priority = policy.DefaultPriority
+			in.Labels = mirrorLabel(in.Labels, LabelPrefixPriority, priority)
 		}
 	}
 	// Inherit defaults from parent
 	if in.Parent != "" {
 		if parent, err := p.store.Get(ctx, in.Parent); err == nil {
-			if in.Priority == "" && labelValue(parent.Labels, LabelPrefixPriority) != "" {
-				in.Priority = labelValue(parent.Labels, LabelPrefixPriority)
+			if priority == "" && labelValue(parent.Labels, LabelPrefixPriority) != "" {
+				priority = labelValue(parent.Labels, LabelPrefixPriority)
+				in.Labels = mirrorLabel(in.Labels, LabelPrefixPriority, priority)
 			}
 		}
 	}
@@ -175,8 +177,8 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	if status != "" {
 		seedLabels = append(seedLabels, LabelPrefixStatus+status)
 	}
-	if in.Priority != "" {
-		seedLabels = append(seedLabels, LabelPrefixPriority+in.Priority)
+	if priority != "" {
+		seedLabels = append(seedLabels, LabelPrefixPriority+priority)
 	}
 	art := &Artifact{
 		ID: id, Alias: in.Alias, Parent: in.Parent,
@@ -318,15 +320,6 @@ func (p *Protocol) recordAccess(ctx context.Context, id string) {
 }
 
 func (p *Protocol) DeleteArtifact(ctx context.Context, id string, force bool) error {
-	if p.schema.Guards.DeleteRequiresArchived && !force {
-		art, err := p.store.Get(ctx, id)
-		if err != nil {
-			return err
-		}
-		if !p.IsReadonly(labelValue(art.Labels, LabelPrefixStatus)) {
-			return fmt.Errorf("%w: %s (status: %s)", ErrNotArchived, id, labelValue(art.Labels, LabelPrefixStatus))
-		}
-	}
 	if err := p.store.Delete(ctx, id); err != nil {
 		return err
 	}
@@ -339,7 +332,6 @@ func (p *Protocol) DeleteArtifact(ctx context.Context, id string, force bool) er
 type ListInput struct {
 	Family         string   `json:"family,omitempty"` // filter by kind family: intent, effort, knowledge, support
 	Parent         string   `json:"parent,omitempty"`
-	Sprint         string   `json:"sprint,omitempty"`
 	IDPrefix       string   `json:"id_prefix,omitempty"`
 	Labels         []string `json:"labels,omitempty"`
 	LabelsOr       []string `json:"labels_or,omitempty"`
@@ -388,9 +380,6 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 		InsertedAfter:  in.InsertedAfter,
 		InsertedBefore: in.InsertedBefore,
 	}
-	if in.Sprint != "" {
-		f.Labels = append(f.Labels, LabelPrefixSprint+in.Sprint)
-	}
 	if labelValue(f.Labels, LabelPrefixScope) == "" && len(p.scopeLabels) > 0 {
 		rawScopes := make([]string, len(p.scopeLabels))
 		for i, sl := range p.scopeLabels {
@@ -432,9 +421,6 @@ func (p *Protocol) ListPage(ctx context.Context, in ListInput) (Page, error) { /
 		InsertedBefore: in.InsertedBefore,
 		Limit:          in.Limit,
 		Cursor:         in.Cursor,
-	}
-	if in.Sprint != "" {
-		f.Labels = append(f.Labels, LabelPrefixSprint+in.Sprint)
 	}
 	if labelValue(f.Labels, LabelPrefixScope) == "" && len(p.scopeLabels) > 0 {
 		rawScopes := make([]string, len(p.scopeLabels))
@@ -572,9 +558,6 @@ func (p *Protocol) AttachSection(ctx context.Context, id, name, text string) (bo
 	if err != nil {
 		return false, err
 	}
-	if p.schema.Guards.ArchivedReadonly && p.IsReadonly(labelValue(art.Labels, LabelPrefixStatus)) {
-		return false, fmt.Errorf("%w: %s", ErrArchived, art.ID)
-	}
 	replaced := false
 	for i, sec := range art.Sections {
 		if sec.Name == name {
@@ -620,9 +603,6 @@ func (p *Protocol) DetachSection(ctx context.Context, id, name string) (bool, er
 	art, err := p.store.Get(ctx, id)
 	if err != nil {
 		return false, err
-	}
-	if p.schema.Guards.ArchivedReadonly && p.IsReadonly(labelValue(art.Labels, LabelPrefixStatus)) {
-		return false, fmt.Errorf("%w: %s", ErrArchived, art.ID)
 	}
 	if tpl := p.resolveTemplate(ctx, art); tpl != nil {
 		expected := templateSections(tpl)
@@ -687,44 +667,6 @@ func (p *Protocol) inferScope(ctx context.Context, explicit, parentID, kind stri
 
 // --- Composite actions ---
 
-
-// ArchiveArtifact transitions ids to the archived status (readonly, vacuumable).
-// Archive is single-artifact only — no cascade. Cascading archive was the footgun
-// behind the 1342-artifact silent-archive incident (PRC-BUG-10). Use RetireArtifact
-// with cascade=true for whole-tree terminal operations; archive individual artifacts
-// explicitly. When dryRun is true the affected IDs are returned but no mutation occurs.
-// cascadeArchiveBefore archives all artifacts reachable via CascadeArchive relations
-// before the source is archived, so the children-terminal check in archiveSingle passes.
-func (p *Protocol) cascadeArchiveBefore(ctx context.Context, id string) {
-	for relation, trait := range p.edgeTypeTraits {
-		if !trait.CascadeArchive {
-			continue
-		}
-		targets, _ := p.store.Neighbors(ctx, id, relation, Outgoing)
-		for _, e := range targets {
-			p.cascadeArchiveBefore(ctx, e.To)
-			_ = p.archiveSingle(ctx, e.To)
-		}
-	}
-}
-
-func (p *Protocol) ArchiveArtifact(ctx context.Context, ids []string, dryRun bool) ([]Result, error) {
-	slog.InfoContext(ctx, "archive",
-		slog.Int(LogKeyCount, len(ids)),
-		slog.Bool(LogKeyDryRun, dryRun))
-	if dryRun {
-		results := make([]Result, len(ids))
-		for i, id := range ids {
-			results[i] = Result{ID: id, OK: true}
-		}
-		return results, nil
-	}
-	return p.applyToEach(ctx, ids, "archive", func(id string) error {
-		p.cascadeArchiveBefore(ctx, id)
-		return p.archiveSingle(ctx, id)
-	})
-}
-
 // RetireArtifact transitions artifacts to the retired status — terminal but
 // NOT readonly. Retired artifacts remain searchable and writable (for
 // post-mortems) and are never deleted by Vacuum. Use for completed or
@@ -787,67 +729,6 @@ func (p *Protocol) retireSingle(ctx context.Context, id string, cascade bool) er
 	slog.InfoContext(ctx, "retired",
 		slog.String(LogKeyID, id),
 		slog.String(LogKeyKind, labelValue(art.Labels, LabelPrefixKind)))
-	return p.store.Put(ctx, art)
-}
-
-// DeArchive restores archived artifacts to draft status, bypassing ArchivedReadonly guard.
-func (p *Protocol) DeArchive(ctx context.Context, ids []string, cascade bool) ([]Result, error) {
-	if len(ids) == 0 {
-		return nil, fmt.Errorf("ids is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
-	}
-	slog.InfoContext(ctx, "de-archive",
-		slog.Int(LogKeyCount, len(ids)),
-		slog.Bool(LogKeyCascade, cascade))
-	results := make([]Result, 0, len(ids))
-	for _, id := range ids {
-		art, err := p.store.Get(ctx, id)
-		if err != nil {
-			results = append(results, Result{ID: id, Error: err.Error()})
-			continue
-		}
-		if !p.IsReadonly(labelValue(art.Labels, LabelPrefixStatus)) {
-			results = append(results, Result{ID: id, Error: fmt.Sprintf("%s is not archived (status: %s)", id, labelValue(art.Labels, LabelPrefixStatus))})
-			continue
-		}
-		art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, StatusDraft)
-		if err := p.store.Put(ctx, art); err != nil {
-			results = append(results, Result{ID: id, Error: err.Error()})
-			continue
-		}
-		results = append(results, Result{ID: id, OK: true})
-		if cascade {
-			children, _ := p.store.Children(ctx, id)
-			for _, ch := range children {
-				if p.IsReadonly(labelValue(ch.Labels, LabelPrefixStatus)) {
-					ch.Labels = mirrorLabel(ch.Labels, LabelPrefixStatus, StatusDraft)
-					_ = p.store.Put(ctx, ch)
-				}
-			}
-		}
-	}
-	return results, nil
-}
-
-func (p *Protocol) archiveSingle(ctx context.Context, id string) error {
-	art, err := p.store.Get(ctx, id)
-	if err != nil {
-		return err
-	}
-	if p.IsReadonly(labelValue(art.Labels, LabelPrefixStatus)) {
-		return nil
-	}
-	// No cascade — archive is single-artifact only. Children must already be
-	// terminal for the parent to be archived; non-terminal children block it.
-	children, err := p.store.Children(ctx, id)
-	if err != nil {
-		return err
-	}
-	for _, ch := range children {
-		if !p.IsTerminal(labelValue(ch.Labels, LabelPrefixStatus)) {
-			return fmt.Errorf("cannot archive %s: child %s is %s — retire or complete children first", id, ch.ID, labelValue(ch.Labels, LabelPrefixStatus)) //nolint:err113 // domain error
-		}
-	}
-	art.Labels = mirrorLabel(art.Labels, LabelPrefixStatus, p.schema.ReadonlyStatuses[0])
 	return p.store.Put(ctx, art)
 }
 

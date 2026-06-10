@@ -54,12 +54,12 @@ func TestCascade_DependencyEdges(t *testing.T) {
 	ctx := context.Background()
 
 	// A → B → C (depends_on chain)
-	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}},
-		Labels: []string{"kind:task"},})
-	b, _ := p.CreateArtifact(ctx, CreateInput{Title: "B", Priority: "medium", DependsOn: []string{a.ID}, Sections: []Section{{Name: "context", Text: "b"}},
-		Labels: []string{"kind:task"},})
-	c, _ := p.CreateArtifact(ctx, CreateInput{Title: "C", Priority: "medium", DependsOn: []string{b.ID}, Sections: []Section{{Name: "context", Text: "c"}},
-		Labels: []string{"kind:task"},})
+	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Sections: []Section{{Name: "context", Text: "a"}},
+		Labels: []string{"kind:task", "priority:medium"},})
+	b, _ := p.CreateArtifact(ctx, CreateInput{Title: "B", DependsOn: []string{a.ID}, Sections: []Section{{Name: "context", Text: "b"}},
+		Labels: []string{"kind:task", "priority:medium"},})
+	c, _ := p.CreateArtifact(ctx, CreateInput{Title: "C", DependsOn: []string{b.ID}, Sections: []Section{{Name: "context", Text: "c"}},
+		Labels: []string{"kind:task", "priority:medium"},})
 
 	affected := p.Cascade(ctx, a.ID)
 	if len(affected) == 0 {
@@ -101,8 +101,8 @@ func TestQualityGate_BlockingPreventsCompletion(t *testing.T) {
 	p.RegisterGate(gate)
 
 	// Create and activate an artifact
-	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}},
-		Labels: []string{"kind:task"},})
+	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Sections: []Section{{Name: "context", Text: "a"}},
+		Labels: []string{"kind:task", "priority:medium"},})
 	// Walk through lifecycle to in_review so complete is a valid transition.
 	p.SetField(ctx, []string{a.ID}, "status", "active", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
 	p.SetField(ctx, []string{a.ID}, "status", "mature", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
@@ -156,8 +156,8 @@ func TestQualityGate_WarningAllowsCompletion(t *testing.T) {
 	})
 	p.RegisterGate(gate)
 
-	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Priority: "medium", Sections: []Section{{Name: "context", Text: "a"}},
-		Labels: []string{"kind:task"},})
+	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Sections: []Section{{Name: "context", Text: "a"}},
+		Labels: []string{"kind:task", "priority:medium"},})
 	// Walk through lifecycle to in_review so complete is a valid transition.
 	p.SetField(ctx, []string{a.ID}, "status", "active", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding
 	p.SetField(ctx, []string{a.ID}, "status", "mature", SetFieldOptions{Force: true})      //nolint:errcheck // test seeding

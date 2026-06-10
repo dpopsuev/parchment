@@ -146,7 +146,6 @@ const (
 	CheckChildrenComplete            = "children_complete"            // all children in terminal status
 	CheckDependsOnComplete           = "depends_on_complete"          // all depends_on artifacts in terminal status
 	CheckCompletionGates             = "completion_gates"             // schema.MissingCompletionGates
-	CheckChildrenReadonly            = "children_readonly"            // all children are readonly (archived)
 	CheckWorkerIDRequired            = "worker_id_required"           // extra["worker_id"] must be set
 	CheckStampsRequired              = "stamps_required"              // stamps section must be present
 )
@@ -263,16 +262,6 @@ func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResul
 		if missing := p.schema.MissingCompletionGates(art); len(missing) > 0 {
 			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock,
 				Message: rule.Message + " (" + strings.Join(missing, ", ") + ")"}
-		}
-	case CheckChildrenReadonly:
-		children, err := p.store.Children(context.Background(), art.ID)
-		if err == nil {
-			for _, ch := range children {
-			if !p.IsReadonly(labelValue(ch.Labels, LabelPrefixStatus)) {
-				return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock,
-					Message: rule.Message + ": child " + ch.ID + " is " + labelValue(ch.Labels, LabelPrefixStatus)}
-			}
-			}
 		}
 	case CheckWorkerIDRequired:
 		if art.Extra == nil {

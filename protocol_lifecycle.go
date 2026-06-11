@@ -191,7 +191,14 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 				return Result{ID: id, Error: fmt.Sprintf("parent_of cycle detected: %s", strings.Join(path, " → "))}
 			}
 		}
-		art.Parent = value
+		oldParentEdges, _ := p.store.Neighbors(ctx, id, RelParentOf, Incoming)
+		for _, e := range oldParentEdges {
+			_ = p.store.RemoveEdge(ctx, e)
+		}
+		if value != "" {
+			_ = p.store.AddEdge(ctx, Edge{From: value, To: id, Relation: RelParentOf})
+		}
+		return Result{ID: id, OK: true}
 	case FieldPriority:
 		if value != "" && !p.schema.ValidPriority(value) {
 			return Result{ID: id, Error: fmt.Sprintf("invalid priority %q — valid: %s", value, strings.Join(p.schema.Priorities, ", "))}
@@ -493,10 +500,11 @@ func (p *Protocol) completionRollup(ctx context.Context, art *Artifact) string {
 }
 
 func (p *Protocol) autoCompleteParent(ctx context.Context, art *Artifact) string {
-	if art.Parent == "" {
+	parentEdges, _ := p.store.Neighbors(ctx, art.ID, RelParentOf, Incoming)
+	if len(parentEdges) == 0 {
 		return ""
 	}
-	parent, err := p.store.Get(ctx, art.Parent)
+	parent, err := p.store.Get(ctx, parentEdges[0].From)
 	if err != nil || p.IsTerminal(statusFromLabels(parent.Labels)) {
 		return ""
 	}

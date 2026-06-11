@@ -17,9 +17,6 @@ func RenderMarkdown(art *Artifact) string { //nolint:gocyclo // display logic is
 	if labelValue(art.Labels, LabelPrefixScope) != "" {
 		renderWriteField(&b, "Scope", labelValue(art.Labels, LabelPrefixScope))
 	}
-	if art.Parent != "" {
-		renderWriteField(&b, "Parent", art.Parent)
-	}
 	if labelValue(art.Labels, LabelPrefixPriority) != "" {
 		renderWriteField(&b, "Priority", labelValue(art.Labels, LabelPrefixPriority))
 	}
@@ -55,32 +52,25 @@ func RenderTable(arts []*Artifact) string {
 	}
 
 	hasSprint := false
-	hasParent := false
 	for _, a := range arts {
 		if labelValue(a.Labels, LabelPrefixSprint) != "" {
 			hasSprint = true
 		}
-		if a.Parent != "" {
-			hasParent = true
-		}
 	}
 
 	var b strings.Builder
-	writeRow := func(id, kind, scope, status, sprint, parent, title string) {
+	writeRow := func(id, kind, scope, status, sprint, title string) {
 		fmt.Fprintf(&b, "%-16s %-12s %-10s %-10s", id, kind, scope, status)
 		if hasSprint {
 			fmt.Fprintf(&b, " %-14s", sprint)
 		}
-		if hasParent {
-			fmt.Fprintf(&b, " %-16s", parent)
-		}
 		fmt.Fprintf(&b, " %s\n", title)
 	}
 
-	writeRow("ID", "KIND", "SCOPE", "STATUS", "SPRINT", "PARENT", "TITLE")
-	writeRow("----", "----", "-----", "------", "------", "------", "-----")
+	writeRow("ID", "KIND", "SCOPE", "STATUS", "SPRINT", "TITLE")
+	writeRow("----", "----", "-----", "------", "------", "-----")
 	for _, a := range arts {
-		writeRow(a.ID, labelValue(a.Labels, LabelPrefixKind), labelValue(a.Labels, LabelPrefixScope), statusFromLabels(a.Labels), labelValue(a.Labels, LabelPrefixSprint), a.Parent, a.Title)
+		writeRow(a.ID, labelValue(a.Labels, LabelPrefixKind), labelValue(a.Labels, LabelPrefixScope), statusFromLabels(a.Labels), labelValue(a.Labels, LabelPrefixSprint), a.Title)
 	}
 
 	fmt.Fprintf(&b, "\n(%d artifacts)\n", len(arts))
@@ -141,15 +131,11 @@ func RenderGroupedTable(arts []*Artifact, field string, statusOrder ...[]string)
 		if labelValue(a.Labels, LabelPrefixScope) != "" {
 			scope = "[" + labelValue(a.Labels, LabelPrefixScope) + "] "
 		}
-		parent := ""
-		if a.Parent != "" {
-			parent = " (parent: " + a.Parent + ")"
-		}
 		sprint := ""
 		if labelValue(a.Labels, LabelPrefixSprint) != "" {
 			sprint = " (sprint: " + labelValue(a.Labels, LabelPrefixSprint) + ")"
 		}
-			fmt.Fprintf(&b, "  %-20s %-15s %s%s%s%s\n", a.ID, labelValue(a.Labels, LabelPrefixKind), scope, a.Title, parent, sprint)
+			fmt.Fprintf(&b, "  %-20s %-15s %s%s%s\n", a.ID, labelValue(a.Labels, LabelPrefixKind), scope, a.Title, sprint)
 		}
 	}
 	fmt.Fprintf(&b, "\n(%d artifacts)\n", total)

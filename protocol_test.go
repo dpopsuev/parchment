@@ -1292,8 +1292,8 @@ func TestCheck_DetectsInvalidParent(t *testing.T) {
 		ID:     "CHILD-001",
 		Labels: []string{"kind:task", "status:draft", "scope:test"},
 		Title:  "child task",
-		Parent: parentTask.ID,
 	})
+	store.AddEdge(ctx, parchment.Edge{From: parentTask.ID, To: "CHILD-001", Relation: parchment.RelParentOf}) //nolint:errcheck // test seeding
 
 	report, err := proto.Check(ctx, "")
 	if err != nil {
@@ -1373,9 +1373,9 @@ func TestCheck_DetectsCompletableCampaign(t *testing.T) {
 
 	child := createGoal(t, proto, "done child")
 	childArt, _ := store.Get(ctx, child.ID)
-	childArt.Parent = campaign.ID
 	childArt.Labels = parchment.SetStatusLabel(childArt.Labels, "work.complete")
 	store.Put(ctx, childArt)
+	store.AddEdge(ctx, parchment.Edge{From: campaign.ID, To: child.ID, Relation: parchment.RelParentOf})
 
 	report, err := proto.Check(ctx, "")
 	if err != nil {
@@ -1549,8 +1549,8 @@ func TestCheckFix_FixesInvalidParent(t *testing.T) {
 		ID:     "BAD-CHILD-1",
 		Labels: []string{"kind:task", "status:draft", "scope:test"},
 		Title:  "bad child",
-		Parent: parentTask.ID,
 	})
+	store.AddEdge(ctx, parchment.Edge{From: parentTask.ID, To: "BAD-CHILD-1", Relation: parchment.RelParentOf}) //nolint:errcheck // test seeding
 
 	report, fixes, err := proto.CheckFix(ctx, "")
 	if err != nil {
@@ -1560,10 +1560,10 @@ func TestCheckFix_FixesInvalidParent(t *testing.T) {
 		t.Error("expected at least one fix applied")
 	}
 
-	// Verify parent was unset
-	fixed, _ := store.Get(ctx, "BAD-CHILD-1")
-	if fixed.Parent != "" {
-		t.Errorf("expected parent to be unset, got %q", fixed.Parent)
+	// Verify parent edge was removed
+	fixedParentEdges, _ := store.Neighbors(ctx, "BAD-CHILD-1", parchment.RelParentOf, parchment.Incoming)
+	if len(fixedParentEdges) != 0 {
+		t.Errorf("expected parent edge to be removed, got %v", fixedParentEdges)
 	}
 	_ = report
 }

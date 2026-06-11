@@ -95,11 +95,6 @@ func (m *MemoryStore) Put(_ context.Context, art *Artifact) error {
 		m.aliases[art.Alias] = art.ID
 	}
 
-	// Reconcile parent edge.
-	if art.Parent != "" {
-		m.edges[edgeKey(art.Parent, RelParentOf, art.ID)] = Edge{From: art.Parent, To: art.ID, Relation: RelParentOf}
-	}
-
 	clone := *art
 	m.artifacts[art.ID] = &clone
 	return nil
@@ -153,10 +148,16 @@ func (m *MemoryStore) List(_ context.Context, f Filter) ([]*Artifact, error) { /
 	defer m.mu.RUnlock()
 	var result []*Artifact
 	for _, art := range m.artifacts {
-		if f.Matches(art) {
-			c := *art
-			result = append(result, &c)
+		if !f.Matches(art) {
+			continue
 		}
+		if f.Parent != "" {
+			if _, ok := m.edges[edgeKey(f.Parent, RelParentOf, art.ID)]; !ok {
+				continue
+			}
+		}
+		c := *art
+		result = append(result, &c)
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
 	return result, nil
@@ -166,10 +167,12 @@ func (m *MemoryStore) Children(_ context.Context, parentID string) ([]*Artifact,
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	var result []*Artifact
-	for _, art := range m.artifacts {
-		if art.Parent == parentID {
-			c := *art
-			result = append(result, &c)
+	for _, e := range m.edges {
+		if e.From == parentID && e.Relation == RelParentOf {
+			if art, ok := m.artifacts[e.To]; ok {
+				c := *art
+				result = append(result, &c)
+			}
 		}
 	}
 	return result, nil
@@ -665,10 +668,16 @@ func (m *MemoryStore) ListPage(_ context.Context, f Filter) (Page, error) { //no
 
 	var results []*Artifact
 	for _, art := range m.artifacts {
-		if f.Matches(art) {
-			cp := *art
-			results = append(results, &cp)
+		if !f.Matches(art) {
+			continue
 		}
+		if f.Parent != "" {
+			if _, ok := m.edges[edgeKey(f.Parent, RelParentOf, art.ID)]; !ok {
+				continue
+			}
+		}
+		cp := *art
+		results = append(results, &cp)
 	}
 
 	// Stable sort by (InsertedAt, ID) — mirrors SQLite ORDER BY inserted_at, id.
@@ -756,13 +765,6 @@ func (m *MemoryStore) RenameID(_ context.Context, oldID, newID string) error {
 		if changed {
 			delete(m.edges, key)
 			m.edges[edgeKey(e.From, e.Relation, e.To)] = e
-		}
-	}
-
-	// 3. Update parent fields.
-	for _, a := range m.artifacts {
-		if a.Parent == oldID {
-			a.Parent = newID
 		}
 	}
 

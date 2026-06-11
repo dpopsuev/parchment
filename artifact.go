@@ -9,7 +9,6 @@ import (
 type Artifact struct {
 	ID          string              `json:"id"`
 	Alias       string              `json:"alias,omitempty"`
-	Parent      string              `json:"parent,omitempty"`
 	Title       string              `json:"title"`
 	Labels      []string            `json:"labels,omitempty"`
 	Sections    []Section           `json:"sections,omitempty"`
@@ -280,9 +279,6 @@ func (f Filter) Matches(art *Artifact) bool { //nolint:gocritic // hugeParam: Fi
 		if !found {
 			return false
 		}
-	}
-	if f.Parent != "" && art.Parent != f.Parent {
-		return false
 	}
 	return f.MatchLabels(art)
 }

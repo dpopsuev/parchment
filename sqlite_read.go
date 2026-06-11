@@ -101,7 +101,7 @@ func buildWhereClause(f Filter) ([]string, []any) { //nolint:cyclop,gocyclo,gocr
 		clauses = append(clauses, "scope IN ("+strings.Join(ph, ",")+")")
 	}
 	if f.Parent != "" {
-		clauses = append(clauses, "parent = ?")
+		clauses = append(clauses, "EXISTS (SELECT 1 FROM edges WHERE from_id=? AND to_id=id AND relation='parent_of')")
 		args = append(args, f.Parent)
 	}
 	if f.CreatedAfter != "" {

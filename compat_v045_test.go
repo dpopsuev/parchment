@@ -27,12 +27,10 @@ func buildV044DB(t *testing.T, path string) {
 		},
 		{ID: "SCR-TSK-1", Labels: []string{"kind:task", "status:draft", "scope:scribe"},
 			Title:    "Task alpha",
-			Parent:   "SCR-CAM-1",
 			Sections: []Section{{Name: "context", Text: "do it"}},
 		},
 		{ID: "SCR-TSK-2", Labels: []string{"kind:task", "status:active", "scope:scribe"},
 			Title:    "Task beta",
-			Parent:   "SCR-CAM-1",
 			Sections: []Section{{Name: "context", Text: "after alpha"}},
 		},
 	}

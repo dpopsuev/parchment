@@ -186,7 +186,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		seedLabels = append(seedLabels, LabelPrefixPriority+priority)
 	}
 	art := &Artifact{
-		ID: id, Alias: in.Alias, Parent: in.Parent,
+		ID: id, Alias: in.Alias,
 		Title:    in.Title,
 		Labels:   seedLabels,
 		Extra:    in.Extra,
@@ -265,6 +265,9 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	p.stripEncodedIfStale(ctx, art)
 	if err := p.store.Put(ctx, art); err != nil {
 		return nil, err
+	}
+	if in.Parent != "" {
+		_ = p.store.AddEdge(ctx, Edge{From: in.Parent, To: art.ID, Relation: RelParentOf})
 	}
 	for _, dep := range in.DependsOn {
 		_ = p.store.AddEdge(ctx, Edge{From: art.ID, To: dep, Relation: RelDependsOn})
@@ -734,10 +737,6 @@ func (p *Protocol) UpsertArtifact(ctx context.Context, in CreateInput) (UpsertRe
 			existing.Sections = append([]Section{{Name: FieldGoal, Text: in.Goal}}, existing.Sections...)
 		}
 	}
-	if in.Parent != "" {
-		existing.Parent = in.Parent
-	}
-
 	// Labels: union — add new labels, keep existing ones.
 	labelSet := make(map[string]struct{}, len(existing.Labels))
 	for _, l := range existing.Labels {
@@ -776,6 +775,13 @@ func (p *Protocol) UpsertArtifact(ctx context.Context, in CreateInput) (UpsertRe
 	p.stripEncodedIfStale(ctx, existing)
 	if err := p.store.Put(ctx, existing); err != nil {
 		return UpsertResult{}, err
+	}
+	if in.Parent != "" {
+		oldParentEdges, _ := p.store.Neighbors(ctx, existing.ID, RelParentOf, Incoming)
+		for _, e := range oldParentEdges {
+			_ = p.store.RemoveEdge(ctx, e)
+		}
+		_ = p.store.AddEdge(ctx, Edge{From: in.Parent, To: existing.ID, Relation: RelParentOf})
 	}
 	for _, dep := range in.DependsOn {
 		_ = p.store.AddEdge(ctx, Edge{From: existing.ID, To: dep, Relation: RelDependsOn})

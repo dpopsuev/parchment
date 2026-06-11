@@ -34,15 +34,16 @@ func (p *Protocol) wouldCycleParent(ctx context.Context, parentID, childID strin
 	path := []string{childID, parentID}
 	cur := parentID
 	for {
-		art, err := p.store.Get(ctx, cur)
-		if err != nil || art.Parent == "" {
+		edges, err := p.store.Neighbors(ctx, cur, RelParentOf, Incoming)
+		if err != nil || len(edges) == 0 {
 			return false, nil
 		}
-		path = append(path, art.Parent)
-		if art.Parent == childID {
+		parentID := edges[0].From
+		path = append(path, parentID)
+		if parentID == childID {
 			return true, path
 		}
-		cur = art.Parent
+		cur = parentID
 	}
 }
 
@@ -318,9 +319,12 @@ func (p *Protocol) TopoSort(ctx context.Context, rootID string) ([]TopoEntry, er
 	// Propagate parent-level depends_on to children: if parent A depends on
 	// parent B, all children of A must come after all children of B.
 	parentChildren := make(map[string][]string)
-	for id, art := range arts {
-		if art.Parent != "" {
-			parentChildren[art.Parent] = append(parentChildren[art.Parent], id)
+	for id := range arts {
+		parentEdges, _ := p.store.Neighbors(ctx, id, RelParentOf, Incoming)
+		for _, e := range parentEdges {
+			if _, ok := arts[e.From]; ok {
+				parentChildren[e.From] = append(parentChildren[e.From], id)
+			}
 		}
 	}
 	for parentID, childIDs := range parentChildren {

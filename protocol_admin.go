@@ -531,8 +531,9 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 			continue
 		}
 
-		if art.Parent != "" {
-			parent, err := p.store.Get(ctx, art.Parent)
+		parentEdges, _ := p.store.Neighbors(ctx, art.ID, RelParentOf, Incoming)
+		if len(parentEdges) > 0 {
+			parent, err := p.store.Get(ctx, parentEdges[0].From)
 			if err == nil {
 				if reason, ok := p.ValidChild(labelValue(parent.Labels, LabelPrefixKind), labelValue(art.Labels, LabelPrefixKind)); !ok {
 					report.Violations = append(report.Violations, CheckViolation{
@@ -622,7 +623,11 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 	// Circular parent chains
 	for _, art := range arts {
 		visited := map[string]bool{art.ID: true}
-		cur := art.Parent
+		initEdges, _ := p.store.Neighbors(ctx, art.ID, RelParentOf, Incoming)
+		cur := ""
+		if len(initEdges) > 0 {
+			cur = initEdges[0].From
+		}
 		for cur != "" {
 			if visited[cur] {
 				report.Violations = append(report.Violations, CheckViolation{
@@ -633,11 +638,11 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 				break
 			}
 			visited[cur] = true
-			parent, err := p.store.Get(ctx, cur)
-			if err != nil {
+			nextEdges, _ := p.store.Neighbors(ctx, cur, RelParentOf, Incoming)
+			if len(nextEdges) == 0 {
 				break
 			}
-			cur = parent.Parent
+			cur = nextEdges[0].From
 		}
 	}
 
@@ -749,7 +754,8 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		if _, known := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]; !known {
 			continue // already flagged as unknown_kind
 		}
-		if art.Goal() == "" && len(art.Sections) == 0 && art.Parent == "" {
+		emptyParentEdges, _ := p.store.Neighbors(ctx, art.ID, RelParentOf, Incoming)
+		if art.Goal() == "" && len(art.Sections) == 0 && len(emptyParentEdges) == 0 {
 			if len(checkOutgoing[art.ID]) == 0 {
 				report.Violations = append(report.Violations, CheckViolation{
 					ID: art.ID, Labels: art.Labels, Title: art.Title,
@@ -813,12 +819,14 @@ func (p *Protocol) CheckFix(ctx context.Context, scope string) (*CheckReport, []
 			}
 
 		case "invalid_parent", "parent_cycle":
-			art, err := p.store.Get(ctx, v.ID)
-			if err != nil {
-				continue
+			parentEdges, _ := p.store.Neighbors(ctx, v.ID, RelParentOf, Incoming)
+			fixed := false
+			for _, e := range parentEdges {
+				if err := p.store.RemoveEdge(ctx, e); err == nil {
+					fixed = true
+				}
 			}
-			art.Parent = ""
-			if err := p.store.Put(ctx, art); err == nil {
+			if fixed {
 				fixes = append(fixes, fmt.Sprintf("unset parent of %s (%s)", v.ID, v.Category))
 			}
 		}

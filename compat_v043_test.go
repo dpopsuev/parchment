@@ -31,15 +31,13 @@ func buildV042DB(t *testing.T, path string) {
 			},
 		},
 		{ID: "SCR-TSK-1", Labels: []string{"kind:task", "status:draft", "scope:scribe"},
-			Title:  "Implement feature A",
-			Parent: "SCR-CAM-1",
+			Title: "Implement feature A",
 			Sections: []Section{
 				{Name: "context", Text: "needs doing"},
 			},
 		},
 		{ID: "SCR-TSK-2", Labels: []string{"kind:task", "status:active", "scope:scribe"},
-			Title:  "Implement feature B",
-			Parent: "SCR-CAM-1",
+			Title: "Implement feature B",
 			Sections: []Section{
 				{Name: "context", Text: "blocked on A"},
 			},
@@ -130,12 +128,12 @@ func TestV043_CrossRefsIntactAfterOpen(t *testing.T) {
 	defer s.Close() //nolint:errcheck // deferred close in test
 
 	// parent refs
-	tsk1, err := s.Get(ctx, "SCR-TSK-1")
+	tsk1ParentEdges, err := s.Neighbors(ctx, "SCR-TSK-1", RelParentOf, Incoming)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tsk1.Parent != "SCR-CAM-1" {
-		t.Errorf("SCR-TSK-1.Parent = %q, want SCR-CAM-1", tsk1.Parent)
+	if len(tsk1ParentEdges) == 0 || tsk1ParentEdges[0].From != "SCR-CAM-1" {
+		t.Errorf("SCR-TSK-1 parent edge = %v, want From:SCR-CAM-1", tsk1ParentEdges)
 	}
 
 	// depends_on edge

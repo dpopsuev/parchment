@@ -10,7 +10,7 @@ import (
 func TestMigrateID_RenamesArtifactAndEdges(t *testing.T) {
 	// Given: artifact A with an outgoing edge to B, and a child C
 	// When: MigrateID("A", "A-NEW")
-	// Then: A-NEW exists, A is gone, edge A-NEW→B exists, C.Parent = A-NEW
+	// Then: A-NEW exists, A is gone, edge A-NEW→B exists, parent_of edge points C→A-NEW
 	t.Parallel()
 	dir := t.TempDir()
 	s, err := parchment.OpenSQLite(dir + "/test.db")
@@ -59,13 +59,10 @@ func TestMigrateID_RenamesArtifactAndEdges(t *testing.T) {
 	if len(edges) == 0 {
 		t.Error("edge from migrated ID not found")
 	}
-	// Child C now points to new ID
-	child, cerr := proto.GetArtifact(ctx, c.ID)
-	if cerr != nil {
-		t.Fatalf("child %s not found after migration: %v", c.ID, cerr)
-	}
-	if child.Parent != "TST-MIGRATED" {
-		t.Errorf("child parent = %q, want TST-MIGRATED", child.Parent)
+	// Child C now points to new ID via parent_of edge
+	childParentEdges, _ := s.Neighbors(ctx, c.ID, parchment.RelParentOf, parchment.Incoming)
+	if len(childParentEdges) == 0 || childParentEdges[0].From != "TST-MIGRATED" {
+		t.Errorf("child parent edge = %v, want From:TST-MIGRATED", childParentEdges)
 	}
 }
 

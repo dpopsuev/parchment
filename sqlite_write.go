@@ -90,8 +90,8 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 		uid = generateUID()
 	}
 
-	var old *Artifact
-	old, _ = scanArtifact(tx.QueryRowContext(ctx, "SELECT "+artifactColumns+" FROM artifacts WHERE id = ?", art.ID))
+	old, _ := scanArtifact(tx.QueryRowContext(ctx, "SELECT "+artifactColumns+" FROM artifacts WHERE id = ?", art.ID))
+
 
 	kind := labelValue(art.Labels, LabelPrefixKind)
 	scope := labelValue(art.Labels, LabelPrefixScope)
@@ -106,18 +106,18 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	annotations, _ := json.Marshal(art.Annotations)
 
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO artifacts (uid, id, alias, kind, scope, status, parent, title, goal, depends_on, labels, priority, sprint, sections, features, criteria, links, extra, annotations, created_at, updated_at, inserted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO artifacts (uid, id, alias, kind, scope, status, title, goal, depends_on, labels, priority, sprint, sections, features, criteria, links, extra, annotations, created_at, updated_at, inserted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(uid) DO UPDATE SET
 			id=excluded.id, alias=excluded.alias, kind=excluded.kind, scope=excluded.scope, status=excluded.status,
-			parent=excluded.parent, title=excluded.title, goal=excluded.goal,
+			title=excluded.title, goal=excluded.goal,
 			depends_on=excluded.depends_on, labels=excluded.labels,
 			priority=excluded.priority, sprint=excluded.sprint,
 			sections=excluded.sections, features=excluded.features,
 			criteria=excluded.criteria, links=excluded.links,
 			extra=excluded.extra,
 			annotations=excluded.annotations, updated_at=excluded.updated_at`,
-		uid, art.ID, art.Alias, kind, scope, status, art.Parent, art.Title, art.Goal(),
+		uid, art.ID, art.Alias, kind, scope, status, art.Title, art.Goal(),
 		"[]", string(labels), priority, sprint,
 		string(sections), string(features), string(criteria), "{}", string(extra),
 		string(annotations),
@@ -128,9 +128,6 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 		return fmt.Errorf("upsert %s: %w", art.ID, err)
 	}
 
-	if err := reconcileEdgesSQL(ctx, tx, old, art); err != nil {
-		return err
-	}
 	if err := syncLabelsInTx(ctx, tx, art.ID, art.Labels); err != nil {
 		slog.WarnContext(ctx, "label junction sync failed (non-fatal)", slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, err))
 	}
@@ -168,7 +165,7 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 		INSERT INTO artifacts (uid, id, alias, kind, scope, status, parent, title, goal,
 			depends_on, labels, priority, sprint, sections, features, criteria, links,
 			extra, annotations, created_at, updated_at, inserted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(uid) DO UPDATE SET
 			id=excluded.id, alias=excluded.alias, kind=excluded.kind, scope=excluded.scope,
 			status=excluded.status, parent=excluded.parent, title=excluded.title,
@@ -217,8 +214,9 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 		extra, _ := json.Marshal(art.Extra)
 		annotations, _ := json.Marshal(art.Annotations)
 
+
 		_, execErr := stmt.ExecContext(ctx,
-			uid, art.ID, art.Alias, kind, scope, status, art.Parent,
+			uid, art.ID, art.Alias, kind, scope, status,
 			art.Title, art.Goal(), "[]", string(labels), priority, sprint,
 			string(sections), string(features), string(criteria), "{}", string(extra),
 			string(annotations),
@@ -285,6 +283,8 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 	now := time.Now().UTC()
 	art.UpdatedAt = now
 
+	old, _ := scanArtifact(tx.QueryRowContext(ctx, "SELECT "+artifactColumns+" FROM artifacts WHERE id = ?", art.ID))
+
 	kind := labelValue(art.Labels, LabelPrefixKind)
 	scope := labelValue(art.Labels, LabelPrefixScope)
 	status := statusFromLabels(art.Labels)
@@ -297,16 +297,15 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 	extra, _ := json.Marshal(art.Extra)
 	annotations, _ := json.Marshal(art.Annotations)
 
-	old, _ := scanArtifact(tx.QueryRowContext(ctx, "SELECT "+artifactColumns+" FROM artifacts WHERE id = ?", art.ID))
 
 	_, err = tx.ExecContext(ctx, `
 		UPDATE artifacts SET
-			alias=?, kind=?, scope=?, status=?, parent=?, title=?, goal=?,
+			alias=?, kind=?, scope=?, status=?, title=?, goal=?,
 			depends_on=?, labels=?, priority=?, sprint=?,
 			sections=?, features=?, criteria=?, links=?,
 			extra=?, annotations=?, updated_at=?
 		WHERE id=?`,
-		art.Alias, kind, scope, status, art.Parent, art.Title, art.Goal(),
+		art.Alias, kind, scope, status, art.Title, art.Goal(),
 		"[]", string(labels), priority, sprint,
 		string(sections), string(features), string(criteria), "{}",
 		string(extra), string(annotations),
@@ -317,9 +316,6 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 		return fmt.Errorf("update %s: %w", art.ID, err)
 	}
 
-	if err := reconcileEdgesSQL(ctx, tx, old, art); err != nil {
-		return err
-	}
 	if err := syncLabelsInTx(ctx, tx, art.ID, art.Labels); err != nil {
 		slog.WarnContext(ctx, "label junction sync failed (non-fatal)", slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, err))
 	}
@@ -439,9 +435,6 @@ func (s *SQLiteStore) RenameID(ctx context.Context, oldID, newID string) error {
 	}
 
 	// 4. Update parent fields on children.
-	if _, err := tx.ExecContext(ctx, "UPDATE artifacts SET parent = ? WHERE parent = ?", newID, oldID); err != nil {
-		return fmt.Errorf("rename parent refs: %w", err)
-	}
 
 	// 5. Register old ID as alias for backward-compat lookup.
 	if _, err := tx.ExecContext(ctx, "UPDATE artifacts SET alias = ? WHERE id = ?", oldID, newID); err != nil {
@@ -467,7 +460,7 @@ func scanArtifactRows(rows *sql.Rows) (*Artifact, error) {
 
 // artifactColumns is the explicit column list for SELECT queries.
 // Must match the scan order in scanRow exactly.
-const artifactColumns = `uid, id, alias, kind, scope, status, parent, title, goal, depends_on, labels, priority, sprint, sections, features, criteria, links, extra, annotations, created_at, updated_at, inserted_at`
+const artifactColumns = `uid, id, alias, kind, scope, status, title, goal, depends_on, labels, priority, sprint, sections, features, criteria, links, extra, annotations, created_at, updated_at, inserted_at`
 
 func scanRow(s rowScanner) (*Artifact, error) {
 	var art Artifact
@@ -477,7 +470,7 @@ func scanRow(s rowScanner) (*Artifact, error) {
 	var createdAt, updatedAt, insertedAt string
 
 	err := s.Scan(
-		&uid, &art.ID, &art.Alias, &kindCol, &scopeCol, &statusCol, &art.Parent, &art.Title, &goalCol,
+		&uid, &art.ID, &art.Alias, &kindCol, &scopeCol, &statusCol, &art.Title, &goalCol,
 		&dependsOn, &labels, &priorityCol, &sprintCol,
 		&sections, &features, &criteria, &links, &extra,
 		&annotations,
@@ -588,15 +581,6 @@ func syncLabelsInTx(ctx context.Context, tx *sql.Tx, id string, labels []string)
 	return nil
 }
 
-func deleteEdge(ctx context.Context, tx *sql.Tx, from, rel, to string) error {
-	_, err := tx.ExecContext(ctx, "DELETE FROM edges WHERE from_id = ? AND relation = ? AND to_id = ?", from, rel, to)
-	return err
-}
-
-func addEdge(ctx context.Context, tx *sql.Tx, from, rel, to string) error {
-	_, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO edges (from_id, relation, to_id, weight) VALUES (?, ?, ?, 0.0)", from, rel, to)
-	return err
-}
 
 func toSet(items []string) map[string]bool {
 	m := make(map[string]bool, len(items))
@@ -606,23 +590,4 @@ func toSet(items []string) map[string]bool {
 	return m
 }
 
-// reconcileEdgesSQL keeps the parent_of edge in sync with the Parent field.
-func reconcileEdgesSQL(ctx context.Context, tx *sql.Tx, old, cur *Artifact) error {
-	oldParent := ""
-	if old != nil {
-		oldParent = old.Parent
-	}
-	if cur.Parent != oldParent { //nolint:nestif // parent edge reparenting requires conditional edge delete/add; splitting reduces clarity
-		if oldParent != "" {
-			if err := deleteEdge(ctx, tx, oldParent, RelParentOf, cur.ID); err != nil {
-				return fmt.Errorf("delete parent edge: %w", err)
-			}
-		}
-		if cur.Parent != "" {
-			if err := addEdge(ctx, tx, cur.Parent, RelParentOf, cur.ID); err != nil {
-				return fmt.Errorf("add parent edge: %w", err)
-			}
-		}
-	}
-	return nil
-}
+

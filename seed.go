@@ -112,8 +112,6 @@ func ParseMDFile(path string) (*Artifact, error) { //nolint:gosec,gocyclo,cyclop
 			art.Labels = setStatusLabel(art.Labels, val)
 			case "priority":
 				art.Labels = mirrorLabel(art.Labels, LabelPrefixPriority, val)
-				case "parent":
-					art.Parent = val
 				case "labels":
 					val = strings.Trim(val, "[]")
 					for _, l := range strings.Split(val, ",") {

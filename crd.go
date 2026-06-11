@@ -28,8 +28,15 @@ type Resource struct {
 
 type ResourceMeta struct {
 	Name        string `yaml:"name"`
+	ID          string `yaml:"id"`
 	Title       string `yaml:"title"`
 	Description string `yaml:"description"`
+}
+
+// ArtifactSection is a named content block within an Artifact CRD.
+type ArtifactSection struct {
+	Name string `yaml:"name"`
+	Text string `yaml:"text"`
 }
 
 type ResourceSpec struct {
@@ -88,6 +95,16 @@ type ResourceSpec struct {
 	// Guidance section names for seeding compatibility.
 	WhenToCreate string `yaml:"whenToCreate,omitempty"`
 	WhenToApply  string `yaml:"whenToApply,omitempty"`
+
+	// Artifact CRD fields. Use "content" for sections to avoid conflict with
+	// the LabelDefinition "sections" field (which is a struct, not a list).
+	Labels          []string            `yaml:"labels,omitempty"`
+	ArtifactContent []ArtifactSection   `yaml:"content,omitempty"`
+	Goal            string              `yaml:"goal,omitempty"`
+	ArtifactParent  string              `yaml:"parent,omitempty"`
+	DependsOn       []string            `yaml:"dependsOn,omitempty"`
+	Links           map[string][]string `yaml:"links,omitempty"`
+	Extra           map[string]any      `yaml:"extra,omitempty"`
 }
 
 type LifecycleSpec struct {
@@ -160,6 +177,7 @@ func ParseResourceFile(data []byte) ([]*Resource, error) {
 }
 
 // ApplyResource converts a Resource to a parchment artifact and upserts it into _schema.
+// For kind=Artifact, use ApplyArtifactResource instead (requires a Protocol).
 func ApplyResource(ctx context.Context, s Store, r *Resource) error {
 	switch r.Kind {
 	case "LabelDefinition":
@@ -169,6 +187,39 @@ func ApplyResource(ctx context.Context, s Store, r *Resource) error {
 	default:
 		return fmt.Errorf("%w: %s", errUnsupportedKind, r.Kind)
 	}
+}
+
+// ApplyArtifactResource applies an Artifact CRD using the Protocol (needed for business logic).
+// metadata.id is required. metadata.title (or metadata.name) provides the artifact title.
+func ApplyArtifactResource(ctx context.Context, p *Protocol, r *Resource) (UpsertResult, error) {
+	id := r.Metadata.ID
+	if id == "" {
+		id = r.Metadata.Name
+	}
+	if id == "" {
+		return UpsertResult{}, fmt.Errorf("Artifact CRD requires metadata.id") //nolint:err113 // user-facing validation
+	}
+	title := r.Metadata.Title
+	if title == "" {
+		title = r.Metadata.Name
+	}
+
+	sections := make([]Section, 0, len(r.Spec.ArtifactContent))
+	for _, sec := range r.Spec.ArtifactContent {
+		sections = append(sections, Section{Name: sec.Name, Text: strings.TrimSpace(sec.Text)})
+	}
+
+	return p.UpsertArtifact(ctx, CreateInput{
+		ExplicitID: id,
+		Title:      title,
+		Goal:       r.Spec.Goal,
+		Parent:     r.Spec.ArtifactParent,
+		Labels:     r.Spec.Labels,
+		Sections:   sections,
+		Extra:      r.Spec.Extra,
+		DependsOn:  r.Spec.DependsOn,
+		Links:      r.Spec.Links,
+	})
 }
 
 func resourceID(name string) string {

@@ -674,6 +674,125 @@ func (p *Protocol) inferScope(ctx context.Context, explicit, parentID, kind stri
 
 
 
+// UpsertResult is the outcome of UpsertArtifact.
+type UpsertResult struct {
+	Artifact *Artifact
+	Created  bool // true if new, false if updated
+}
+
+// UpsertArtifact applies the given CreateInput idempotently.
+// If an artifact with in.ExplicitID already exists, it is updated in place
+// (labels merged, sections merged by name, extra merged). If it does not
+// exist, it is created. Callers must set in.ExplicitID.
+func (p *Protocol) UpsertArtifact(ctx context.Context, in CreateInput) (UpsertResult, error) { //nolint:gocyclo,gocritic // inherent merge complexity; hugeParam: value semantics intentional, matching CreateArtifact
+	if in.ExplicitID == "" {
+		return UpsertResult{}, fmt.Errorf("UpsertArtifact requires ExplicitID") //nolint:err113 // sentinel; no caller uses errors.Is on this
+	}
+	existing, err := p.store.Get(ctx, in.ExplicitID)
+	if err != nil {
+		if !errors.Is(err, ErrArtifactNotFound) {
+			return UpsertResult{}, err
+		}
+		art, createErr := p.CreateArtifact(ctx, in)
+		if createErr != nil {
+			return UpsertResult{}, createErr
+		}
+		return UpsertResult{Artifact: art, Created: true}, nil
+	}
+
+	// Merge incoming data into the existing artifact.
+	if in.Title != "" {
+		existing.Title = in.Title
+	}
+	if in.Goal != "" {
+		existing.Goal = in.Goal
+	}
+	if in.Parent != "" {
+		existing.Parent = in.Parent
+	}
+
+	// Labels: union — add new labels, keep existing ones.
+	labelSet := make(map[string]struct{}, len(existing.Labels))
+	for _, l := range existing.Labels {
+		labelSet[l] = struct{}{}
+	}
+	for _, l := range in.Labels {
+		if _, ok := labelSet[l]; !ok {
+			existing.Labels = append(existing.Labels, l)
+		}
+	}
+
+	// Sections: merge by name — incoming text wins for matching names, append new ones.
+	sectionIdx := make(map[string]int, len(existing.Sections))
+	for i, s := range existing.Sections {
+		sectionIdx[s.Name] = i
+	}
+	for _, s := range in.Sections {
+		if idx, ok := sectionIdx[s.Name]; ok {
+			existing.Sections[idx].Text = s.Text
+		} else {
+			existing.Sections = append(existing.Sections, s)
+		}
+	}
+
+	// Extra: merge — incoming keys win, existing keys not in incoming are kept.
+	if len(in.Extra) > 0 {
+		if existing.Extra == nil {
+			existing.Extra = make(map[string]any, len(in.Extra))
+		}
+		for k, v := range in.Extra {
+			existing.Extra[k] = v
+		}
+	}
+
+	// DependsOn: union.
+	depSet := make(map[string]struct{}, len(existing.DependsOn))
+	for _, d := range existing.DependsOn {
+		depSet[d] = struct{}{}
+	}
+	for _, d := range in.DependsOn {
+		if _, ok := depSet[d]; !ok {
+			existing.DependsOn = append(existing.DependsOn, d)
+		}
+	}
+
+	// Links: merge per relation key — union of targets per relation.
+	if len(in.Links) > 0 {
+		if existing.Links == nil {
+			existing.Links = make(map[string][]string, len(in.Links))
+		}
+		for rel, targets := range in.Links {
+			existing.Links[rel] = mergeStringSlice(existing.Links[rel], targets)
+		}
+	}
+
+	p.stampCompliance(existing)
+	p.stripEncodedIfStale(ctx, existing)
+	if err := p.store.Put(ctx, existing); err != nil {
+		return UpsertResult{}, err
+	}
+	return UpsertResult{Artifact: existing, Created: false}, nil
+}
+
+// mergeStringSlice returns the union of a and b preserving order without duplicates.
+func mergeStringSlice(a, b []string) []string {
+	seen := make(map[string]struct{}, len(a)+len(b))
+	out := make([]string, 0, len(a)+len(b))
+	for _, s := range a {
+		if _, ok := seen[s]; !ok {
+			seen[s] = struct{}{}
+			out = append(out, s)
+		}
+	}
+	for _, s := range b {
+		if _, ok := seen[s]; !ok {
+			seen[s] = struct{}{}
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 // --- Composite actions ---
 
 // RetireArtifact transitions artifacts to the retired status — terminal but

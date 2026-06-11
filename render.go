@@ -1,11 +1,9 @@
 package parchment
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 )
 
 // RenderMarkdown renders an artifact as a human-readable markdown document.
@@ -175,288 +173,32 @@ func RenderGroupedTable(arts []*Artifact, field string, statusOrder ...[]string)
 }
 
 // RenderGroupedTableByScopeLabel groups artifacts by scope labels.
-func RenderGroupedTableByScopeLabel(arts []*Artifact, scopeLabels map[string][]string) string {
-	if len(arts) == 0 {
-		return renderNoArtifacts
+
+const renderNoArtifacts = "(no artifacts)\n"
+
+func renderWriteField(b *strings.Builder, name, value string) {
+	if value == "" {
+		return
 	}
-	groups := make(map[string][]*Artifact)
-	for _, a := range arts {
-		labels := scopeLabels[labelValue(a.Labels, LabelPrefixScope)]
-		if len(labels) == 0 {
-			groups["(unlabeled)"] = append(groups["(unlabeled)"], a)
-		} else {
-			for _, l := range labels {
-				groups[l] = append(groups[l], a)
-			}
-		}
-	}
-	keys := make([]string, 0, len(groups))
-	for k := range groups {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	var b strings.Builder
-	for _, k := range keys {
-		fmt.Fprintf(&b, "\n## %s\n\n", k)
-		b.WriteString(RenderTable(groups[k]))
-	}
-	return b.String()
+	fmt.Fprintf(b, "%-14s %s\n", name+":", value)
 }
-
-// RenderJSON renders an artifact as a JSON string.
-func RenderJSON(art *Artifact) string {
-	data, _ := json.MarshalIndent(art, "", "  ")
-	return string(data)
-}
-
-// RenderJSONList renders a list of artifacts as a JSON array.
-func RenderJSONList(arts []*Artifact) string {
-	data, _ := json.MarshalIndent(arts, "", "  ")
-	return string(data)
-}
-
-const renderNoArtifacts = "No artifacts found.\n"
-
-// RenderVaultMarkdown renders an artifact as a vault-compatible markdown file
-// with a YAML frontmatter block followed by section bodies. The output is
-// suitable for writing to a .md file in an Obsidian-style vault and can be
-// round-tripped through ParseVaultMarkdown.
-func RenderVaultMarkdown(art *Artifact) string {
-	var b strings.Builder
-
-	// --- YAML frontmatter ---
-	b.WriteString("---\n")
-	fmt.Fprintf(&b, "id: %s\n", art.ID)
-	if art.Alias != "" {
-		fmt.Fprintf(&b, "alias: %s\n", art.Alias)
-	}
-	fmt.Fprintf(&b, "kind: %s\n", labelValue(art.Labels, LabelPrefixKind))
-	fmt.Fprintf(&b, "status: %s\n", statusFromLabels(art.Labels))
-	if labelValue(art.Labels, LabelPrefixScope) != "" {
-		fmt.Fprintf(&b, "scope: %s\n", labelValue(art.Labels, LabelPrefixScope))
-	}
-	if art.Parent != "" {
-		fmt.Fprintf(&b, "parent: %s\n", art.Parent)
-	}
-	if labelValue(art.Labels, LabelPrefixPriority) != "" {
-		fmt.Fprintf(&b, "priority: %s\n", labelValue(art.Labels, LabelPrefixPriority))
-	}
-	if labelValue(art.Labels, LabelPrefixSprint) != "" {
-		fmt.Fprintf(&b, "sprint: %s\n", labelValue(art.Labels, LabelPrefixSprint))
-	}
-	// kind:, status:, scope: are emitted as separate top-level fields; exclude from labels.
-	var userLabels []string
-	for _, l := range art.Labels {
-		if !strings.HasPrefix(l, LabelPrefixKind) &&
-			!isDomainStatusLabel(l) &&
-			!strings.HasPrefix(l, LabelPrefixStatus) &&
-			!strings.HasPrefix(l, LabelPrefixScope) {
-			userLabels = append(userLabels, l)
-		}
-	}
-	if len(userLabels) > 0 {
-		fmt.Fprintf(&b, "labels: [%s]\n", strings.Join(userLabels, ", "))
-	}
-	if len(art.DependsOn) > 0 {
-		fmt.Fprintf(&b, "depends_on: [%s]\n", strings.Join(art.DependsOn, ", "))
-	}
-	if !art.CreatedAt.IsZero() {
-		fmt.Fprintf(&b, "created_at: %s\n", art.CreatedAt.UTC().Format(time.RFC3339))
-	}
-	if !art.UpdatedAt.IsZero() {
-		fmt.Fprintf(&b, "updated_at: %s\n", art.UpdatedAt.UTC().Format(time.RFC3339))
-	}
-	if len(art.Extra) > 0 {
-		for _, k := range renderSortedKeys(art.Extra) {
-			fmt.Fprintf(&b, "%s: %v\n", k, art.Extra[k])
-		}
-	}
-	b.WriteString("---\n\n")
-
-	// --- Title ---
-	fmt.Fprintf(&b, "# %s\n\n", art.Title)
-
-	// --- Goal (if set) ---
-	if art.Goal != "" {
-		fmt.Fprintf(&b, "%s\n\n", art.Goal)
-	}
-
-	// --- Sections as H2 blocks ---
-	for _, sec := range art.Sections {
-		fmt.Fprintf(&b, "## %s\n\n%s\n\n", sec.Name, strings.TrimSpace(sec.Text))
-	}
-
-	return b.String()
-}
-
-// ParseVaultMarkdown parses a vault-compatible markdown file with YAML
-// frontmatter into an Artifact. Frontmatter fields map directly to Artifact
-// fields. H2 headings become named sections. The body between the title and
-// the first H2 (if any) becomes the goal field when no explicit goal section
-// is present.
-//
-// Exported for use by any artifact kind. Parses the full Artifact field set
-// from frontmatter without duplicating the body as a "content" section.
-func ParseVaultMarkdown(data []byte) (*Artifact, error) { //nolint:gocyclo,nestif // parsing logic is inherently branchy
-	content := strings.ReplaceAll(string(data), "\r\n", "\n")
-	art := &Artifact{}
-	content = vaultParseFrontmatter(content, art)
-	content = vaultParseTitle(content, art)
-	vaultParseSections(content, art)
-	return art, nil
-}
-
-// vaultParseFrontmatter extracts YAML frontmatter from content, applies
-// fields to art, and returns the remaining body text.
-func vaultParseFrontmatter(content string, art *Artifact) string {
-	if !strings.HasPrefix(content, "---\n") {
-		return content
-	}
-	end := strings.Index(content[4:], "\n---")
-	if end < 0 {
-		return content
-	}
-	fm := content[4 : 4+end]
-	body := strings.TrimSpace(content[4+end+4:])
-	for _, line := range strings.Split(fm, "\n") {
-		parts := strings.SplitN(line, ":", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		vaultApplyFrontmatterField(art, strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
-	}
-	return body
-}
-
-// vaultApplyFrontmatterField maps a single frontmatter key/value onto art.
-func vaultApplyFrontmatterField(art *Artifact, key, val string) { //nolint:cyclop // switch over all known fields
-	switch key {
-	case "id":
-		art.ID = val
-	case "alias":
-		art.Alias = val
-	case FieldKind:
-		art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, val)
-	case FieldStatus:
-		art.Labels = setStatusLabel(art.Labels, val)
-	case FieldScope:
-		art.Labels = mirrorLabel(art.Labels, LabelPrefixScope, val)
-	case FieldParent:
-		art.Parent = val
-	case FieldPriority:
-		art.Labels = mirrorLabel(art.Labels, LabelPrefixPriority, val)
-	case FieldSprint:
-		art.Labels = mirrorLabel(art.Labels, LabelPrefixSprint, val)
-	case FieldLabels:
-		for _, l := range strings.Split(strings.Trim(val, "[]"), ",") {
-			if l = strings.TrimSpace(l); l != "" {
-				art.Labels = append(art.Labels, l)
-			}
-		}
-	case FieldDependsOn:
-		for _, d := range strings.Split(strings.Trim(val, "[]"), ",") {
-			if d = strings.TrimSpace(d); d != "" {
-				art.DependsOn = append(art.DependsOn, d)
-			}
-		}
-	case "created_at":
-		if t, err := time.Parse(time.RFC3339, val); err == nil {
-			art.CreatedAt = t
-		}
-	case "updated_at":
-		if t, err := time.Parse(time.RFC3339, val); err == nil {
-			art.UpdatedAt = t
-		}
-	default:
-		if art.Extra == nil {
-			art.Extra = make(map[string]any)
-		}
-		art.Extra[key] = val
-	}
-}
-
-// vaultParseTitle finds the H1 heading, sets art.Title, returns remaining body.
-func vaultParseTitle(content string, art *Artifact) string {
-	lines := strings.Split(content, "\n")
-	for i, line := range lines {
-		if strings.HasPrefix(line, "# ") {
-			art.Title = strings.TrimPrefix(line, "# ")
-			return strings.TrimSpace(strings.Join(lines[i+1:], "\n"))
-		}
-	}
-	return content
-}
-
-// vaultParseSections parses H2 sections from body into art.
-// Content before the first H2 becomes art.Goal (if non-empty and goal not already set).
-func vaultParseSections(body string, art *Artifact) {
-	var currentName string
-	var currentText strings.Builder
-	var preH2 strings.Builder
-	hitH2 := false
-
-	flushSection := func() {
-		if currentName != "" {
-			art.Sections = append(art.Sections, Section{
-				Name: currentName,
-				Text: strings.TrimSpace(currentText.String()),
-			})
-			currentText.Reset()
-		}
-	}
-
-	for _, line := range strings.Split(body, "\n") {
-		switch {
-		case strings.HasPrefix(line, "## "):
-			if !hitH2 {
-				if g := strings.TrimSpace(preH2.String()); g != "" && art.Goal == "" {
-					art.Goal = g
-				}
-				hitH2 = true
-			} else {
-				flushSection()
-			}
-			currentName = strings.ToLower(strings.ReplaceAll(
-				strings.TrimPrefix(line, "## "), " ", "_"))
-		case !hitH2:
-			preH2.WriteString(line + "\n")
-		default:
-			currentText.WriteString(line + "\n")
-		}
-	}
-
-	flushSection()
-	if !hitH2 {
-		if g := strings.TrimSpace(preH2.String()); g != "" && art.Goal == "" {
-			art.Goal = g
-		}
-	}
-}
-
-
 
 func renderGroupKey(a *Artifact, field string) string {
 	switch field {
 	case FieldStatus:
 		return statusFromLabels(a.Labels)
-	case FieldScope:
-		return labelValue(a.Labels, LabelPrefixScope)
 	case FieldKind:
 		return labelValue(a.Labels, LabelPrefixKind)
-	case "sprint":
-		return labelValue(a.Labels, LabelPrefixSprint)
+	case FieldScope:
+		return labelValue(a.Labels, LabelPrefixScope)
+	case FieldPriority:
+		return labelValue(a.Labels, LabelPrefixPriority)
 	default:
-		return statusFromLabels(a.Labels)
+		return ""
 	}
 }
 
-func renderGroupOrderForField(_ string) []string {
-	return nil
-}
-
-func renderWriteField(b *strings.Builder, name, value string) {
-	fmt.Fprintf(b, "**%s:** %s  \n", name, value)
-}
+func renderGroupOrderForField(_ string) []string { return nil }
 
 func renderSortedKeys(m map[string]any) []string {
 	keys := make([]string, 0, len(m))

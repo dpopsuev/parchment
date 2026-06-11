@@ -69,45 +69,4 @@ func TestSeedDefinitions_KindArtifact_HasGuidanceSections(t *testing.T) {
 	}
 }
 
-func TestSeedEdgeTypeTraits_HasGuidanceSections(t *testing.T) {
-	// edge_type_definition artifacts carry when_to_use and semantics sections.
-	t.Parallel()
-	dir := t.TempDir()
-	s, err := parchment.OpenSQLite(dir + "/test.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.Close()
 
-	ctx := context.Background()
-	parchment.SeedEdgeTypeTraits(ctx, s)
-
-	arts, err := s.List(ctx, parchment.Filter{
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindEdgeTypeDefinition, parchment.LabelPrefixScope + parchment.SchemaScope},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var dependsOnDef *parchment.Artifact
-	for _, a := range arts {
-		if a.Title == "depends_on" {
-			dependsOnDef = a
-			break
-		}
-	}
-	if dependsOnDef == nil {
-		t.Fatal("depends_on edge_type_definition not found")
-	}
-
-	sectionNames := make(map[string]bool)
-	for _, sec := range dependsOnDef.Sections {
-		sectionNames[sec.Name] = true
-	}
-	if !sectionNames["when_to_use"] {
-		t.Error("depends_on edge_type_definition should have when_to_use section")
-	}
-	if !sectionNames["semantics"] {
-		t.Error("depends_on edge_type_definition should have semantics section")
-	}
-}

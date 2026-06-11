@@ -47,6 +47,16 @@ type LabelTrait struct {
 	RequiresImplementation bool     `json:"requires_implementation,omitempty"`
 	SkipEmptyCheck         bool     `json:"skip_empty_check,omitempty"`
 	Vacuumable             bool     `json:"vacuumable,omitempty"`
+
+	// Edge constraint fields — define what outbound edges this label permits.
+	// AllowedOutbound maps relation names to allowed target label prefixes.
+	// nil = open world (any edge allowed). Non-nil = restricted to listed targets.
+	// "*" in the target list matches any target label.
+	AllowedOutbound map[string][]string `json:"allowed_outbound,omitempty"`
+	// CycleGuardedRelations lists relation names for which cycle detection is enforced.
+	CycleGuardedRelations []string `json:"cycle_guarded_relations,omitempty"`
+	// MaxParents is the max number of incoming parent_of edges (0 = unlimited).
+	MaxParents int `json:"max_parents,omitempty"`
 }
 
 // ConflictPolicy for LabelTrait is ConflictUnion — label traits accumulate
@@ -154,12 +164,17 @@ func LoadLabelTraitsWithComposition(ctx context.Context, s Store) map[string]Lab
 			if own.Family == "" && p.Family != "" {
 				own.Family = p.Family
 			}
-			own.Transitions = unionStrings(own.Transitions, p.Transitions)
-			own.AllowedChildren = unionStrings(own.AllowedChildren, p.AllowedChildren)
-			own.MustSections = unionStrings(own.MustSections, p.MustSections)
-			own.Properties = unionStrings(own.Properties, p.Properties)
+		own.Transitions = unionStrings(own.Transitions, p.Transitions)
+		own.AllowedChildren = unionStrings(own.AllowedChildren, p.AllowedChildren)
+		own.MustSections = unionStrings(own.MustSections, p.MustSections)
+		own.Properties = unionStrings(own.Properties, p.Properties)
+		own.AllowedOutbound = mergeAllowedOutbound(own.AllowedOutbound, p.AllowedOutbound)
+		own.CycleGuardedRelations = unionStrings(own.CycleGuardedRelations, p.CycleGuardedRelations)
+		if p.MaxParents > 0 && (own.MaxParents == 0 || p.MaxParents < own.MaxParents) {
+			own.MaxParents = p.MaxParents
 		}
-		raw[art.Title] = own
+	}
+	raw[art.Title] = own
 	}
 	return raw
 }
@@ -222,8 +237,36 @@ func ResolveTrait(traits map[string]LabelTrait, labels []string) LabelTrait {
 		merged.AllowedChildren = unionStrings(merged.AllowedChildren, lt.AllowedChildren)
 		merged.MustSections = unionStrings(merged.MustSections, lt.MustSections)
 		merged.Properties = unionStrings(merged.Properties, lt.Properties)
+		merged.AllowedOutbound = mergeAllowedOutbound(merged.AllowedOutbound, lt.AllowedOutbound)
+		merged.CycleGuardedRelations = unionStrings(merged.CycleGuardedRelations, lt.CycleGuardedRelations)
+		if lt.MaxParents > 0 && (merged.MaxParents == 0 || lt.MaxParents < merged.MaxParents) {
+			merged.MaxParents = lt.MaxParents
+		}
 	}
 	return merged
+}
+
+// mergeAllowedOutbound merges two AllowedOutbound maps (union of keys, union of value slices).
+// nil means open world — a nil a returns b, a nil b returns a unchanged.
+func mergeAllowedOutbound(a, b map[string][]string) map[string][]string {
+	if b == nil {
+		return a
+	}
+	if a == nil {
+		out := make(map[string][]string, len(b))
+		for k, v := range b {
+			out[k] = v
+		}
+		return out
+	}
+	out := make(map[string][]string, len(a)+len(b))
+	for k, v := range a {
+		out[k] = v
+	}
+	for k, v := range b {
+		out[k] = unionStrings(out[k], v)
+	}
+	return out
 }
 
 func mergeEvictionPolicy(a, b string) string {
@@ -322,17 +365,179 @@ var defaultLabelTraits = []struct {
 		"Requires Extra fields: file, language. Missing any triggers compliance:violation."},
 
 	// Kind lifecycle traits.
-	{"kind:task", LabelTrait{Family: "work", DefaultStatus: "work.draft", Vacuumable: true}, "", ""},
-	{"kind:spec", LabelTrait{Family: "work", DefaultStatus: "work.draft", RequiresImplementation: true, Vacuumable: true}, "", ""},
-	{"kind:bug", LabelTrait{Family: "work", DefaultStatus: "work.draft", RequiresImplementation: true, Vacuumable: true}, "", ""},
-	{"kind:goal", LabelTrait{Family: "work", DefaultStatus: "work.draft", IsContainerKind: true, SkipEmptyCheck: true, Vacuumable: true}, "", ""},
-	{"kind:campaign", LabelTrait{Family: "work", DefaultStatus: "work.draft", IsContainerKind: true, SkipEmptyCheck: true, Vacuumable: true}, "", ""},
-	{"kind:note", LabelTrait{Family: "knowledge", DefaultStatus: "note.fleeting", Vacuumable: true}, "", ""},
-	{"kind:concept", LabelTrait{Family: "knowledge", DefaultStatus: "work.active", Vacuumable: true}, "", ""},
-	{"kind:source", LabelTrait{Family: "knowledge", DefaultStatus: "work.active", Vacuumable: true}, "", ""},
-	{"kind:template", LabelTrait{Family: "support", DefaultStatus: "work.active", SkipEmptyCheck: true}, "", ""},
-	{"kind:decision", LabelTrait{Family: "support", DefaultStatus: "decision.proposed"}, "", ""},
-	{"kind:config", LabelTrait{Family: "support", DefaultStatus: "work.active", SkipEmptyCheck: true}, "", ""},
+	{"kind:task", LabelTrait{
+		Family: "work", DefaultStatus: "work.draft", Vacuumable: true,
+		MaxParents:            1,
+		CycleGuardedRelations: []string{"depends_on"},
+		AllowedOutbound: map[string][]string{
+			"parent_of":  {},
+			"implements": {"kind:spec", "kind:bug"},
+			"depends_on": {"*"},
+			"follows":    {"*"},
+			"satisfies":  {"kind:template"},
+			"documents":  {"*"},
+			"related":    {"*"},
+		},
+	}, "", ""},
+	{"kind:spec", LabelTrait{
+		Family: "work", DefaultStatus: "work.draft", RequiresImplementation: true, Vacuumable: true,
+		MaxParents:            1,
+		CycleGuardedRelations: []string{"depends_on"},
+		AllowedOutbound: map[string][]string{
+			"parent_of":  {},
+			"depends_on": {"*"},
+			"follows":    {"*"},
+			"justifies":  {"*"},
+			"satisfies":  {"kind:template"},
+			"documents":  {"*"},
+			"related":    {"*"},
+		},
+	}, "", ""},
+	{"kind:bug", LabelTrait{
+		Family: "work", DefaultStatus: "work.draft", RequiresImplementation: true, Vacuumable: true,
+		MaxParents:            1,
+		CycleGuardedRelations: []string{"depends_on"},
+		AllowedOutbound: map[string][]string{
+			"parent_of":  {},
+			"depends_on": {"*"},
+			"follows":    {"*"},
+			"implements": {"*"},
+			"satisfies":  {"kind:template"},
+			"related":    {"*"},
+		},
+	}, "", ""},
+	{"kind:goal", LabelTrait{
+		Family: "work", DefaultStatus: "work.draft", IsContainerKind: true, SkipEmptyCheck: true, Vacuumable: true,
+		MaxParents:            1,
+		CycleGuardedRelations: []string{"depends_on"},
+		AllowedOutbound: map[string][]string{
+			"parent_of":  {"kind:task", "kind:spec", "kind:bug", "kind:need", "kind:ref", "kind:doc", "kind:decision"},
+			"depends_on": {"*"},
+			"follows":    {"*"},
+			"justifies":  {"*"},
+			"related":    {"*"},
+		},
+	}, "", ""},
+	{"kind:campaign", LabelTrait{
+		Family: "work", DefaultStatus: "work.draft", IsContainerKind: true, SkipEmptyCheck: true, Vacuumable: true,
+		MaxParents:            1,
+		CycleGuardedRelations: []string{"depends_on"},
+		AllowedOutbound: map[string][]string{
+			"parent_of":  {"kind:goal"},
+			"depends_on": {"*"},
+			"related":    {"*"},
+		},
+	}, "", ""},
+	{"kind:note", LabelTrait{
+		Family: "knowledge", DefaultStatus: "note.fleeting", Vacuumable: true,
+		AllowedOutbound: map[string][]string{
+			"cites":      {"kind:source"},
+			"elaborates": {"kind:concept"},
+			"synthesises": {"*"}, //nolint:misspell // British spelling matches stored edge relation name
+			"contradicts": {"kind:note"},
+			"remembers":  {"*"},
+			"related":    {"*"},
+		},
+	}, "", ""},
+	{"kind:concept", LabelTrait{
+		Family: "knowledge", DefaultStatus: "work.active", Vacuumable: true,
+		AllowedOutbound: map[string][]string{
+			"cites":      {"kind:source"},
+			"elaborates": {"*"},
+			"related":    {"*"},
+			"documents":  {"*"},
+		},
+	}, "", ""},
+	{"kind:source", LabelTrait{
+		Family: "knowledge", DefaultStatus: "work.active", Vacuumable: true,
+		AllowedOutbound: map[string][]string{
+			"calls":      {"*"},
+			"imports":    {"*"},
+			"belongs_to": {"*"},
+			"related":    {"*"},
+		},
+	}, "", ""},
+	{"kind:context", LabelTrait{
+		Family: "knowledge", DefaultStatus: "work.active",
+		AllowedOutbound: map[string][]string{
+			"remembers":  {"*"},
+			"elaborates": {"*"},
+			"related":    {"*"},
+		},
+	}, "", ""},
+	{"kind:template", LabelTrait{
+		Family: "support", DefaultStatus: "work.active", SkipEmptyCheck: true,
+		AllowedOutbound: map[string][]string{
+			"related": {"*"},
+		},
+	}, "", ""},
+	{"kind:decision", LabelTrait{
+		Family: "support", DefaultStatus: "decision.proposed",
+		AllowedOutbound: map[string][]string{
+			"justifies": {"*"},
+			"documents": {"*"},
+			"related":   {"*"},
+		},
+	}, "", ""},
+	{"kind:config", LabelTrait{
+		Family: "support", DefaultStatus: "work.active", SkipEmptyCheck: true,
+		AllowedOutbound: map[string][]string{
+			"related": {"*"},
+		},
+	}, "", ""},
+	{"kind:need", LabelTrait{
+		Family: "work", DefaultStatus: "work.draft",
+		MaxParents: 1,
+		AllowedOutbound: map[string][]string{
+			"parent_of":  {},
+			"depends_on": {"*"},
+			"justifies":  {"*"},
+			"related":    {"*"},
+		},
+	}, "", ""},
+	{"kind:ref", LabelTrait{
+		Family: "work", DefaultStatus: "work.active", SkipEmptyCheck: true,
+		MaxParents: 1,
+		AllowedOutbound: map[string][]string{
+			"parent_of":  {},
+			"documents":  {"*"},
+			"cites":      {"kind:source"},
+			"related":    {"*"},
+		},
+	}, "", ""},
+	{"kind:doc", LabelTrait{
+		Family: "work", DefaultStatus: "work.active", SkipEmptyCheck: true,
+		MaxParents: 1,
+		AllowedOutbound: map[string][]string{
+			"parent_of":  {},
+			"documents":  {"*"},
+			"related":    {"*"},
+		},
+	}, "", ""},
+	{"code:function", LabelTrait{Properties: []string{"signature", "file", "line"},
+		AllowedOutbound: map[string][]string{
+			"calls":      {"*"},
+			"imports":    {"*"},
+			"implements": {"*"},
+			"extends":    {"*"},
+			"has_member": {"*"},
+			"traces_to":  {"*"},
+		},
+	}, "Apply to function/method nodes from code intelligence spokes.", ""},
+	{"code:component", LabelTrait{Properties: []string{"package", "language"},
+		AllowedOutbound: map[string][]string{
+			"imports":    {"*"},
+			"contains":   {"*"},
+			"traces_to":  {"*"},
+		},
+	}, "Apply to package/module nodes from code intelligence spokes.", ""},
+	{"code:file", LabelTrait{Properties: []string{"file", "language"},
+		AllowedOutbound: map[string][]string{
+			"imports":    {"*"},
+			"contains":   {"*"},
+			"traces_to":  {"*"},
+		},
+	}, "Apply to source file nodes from code intelligence spokes.", ""},
 }
 
 // SeedLabelTraits writes default label_definition artifacts into SchemaScope.

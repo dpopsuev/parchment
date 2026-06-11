@@ -13,13 +13,11 @@ import (
 )
 
 const (
-	crdKindLabel          = "Label"
-	crdKindEdgeType       = "EdgeType"
-	crdKindLabelLegacy    = "LabelDefinition"
-	crdKindEdgeTypeLegacy = "EdgeTypeDefinition"
+	crdKindLabel       = "Label"
+	crdKindLabelLegacy = "LabelDefinition"
 )
 
-//go:embed registry/kinds/*.yaml registry/edge_types/*.yaml registry/labels/*.yaml
+//go:embed registry/kinds/*.yaml registry/labels/*.yaml
 var registryFS embed.FS
 
 //go:embed registry/rules
@@ -68,24 +66,6 @@ func crdResourceToKindYAML(r *Resource) kindYAML {
 		k.Relations.Targets = r.Spec.Relations.Targets
 	}
 	return k
-}
-
-func crdResourceToEdgeTypeYAML(r *Resource) edgeTypeYAML {
-	pairs := make([]kindPairYAML, len(r.Spec.AllowedPairs))
-	for i, p := range r.Spec.AllowedPairs {
-		pairs[i] = kindPairYAML(p)
-	}
-	return edgeTypeYAML{
-		Name:             r.Metadata.Name,
-		MaxOutgoing:      r.Spec.MaxOutgoing,
-		MaxIncoming:      r.Spec.MaxIncoming,
-		CycleGuard:       r.Spec.CycleGuard,
-		CompletionRollup: r.Spec.CompletionRollup,
-		ConformanceCheck: r.Spec.ConformanceCheck,
-		AllowedPairs:     pairs,
-		WhenToUse:        r.Spec.WhenToUse,
-		Semantics:        r.Spec.Semantics,
-	}
 }
 
 func crdResourceToLabelYAML(r *Resource) labelYAML {
@@ -140,6 +120,10 @@ type kindYAML struct {
 		Targets          map[string][]string `yaml:"targets"`
 	} `yaml:"relations"`
 
+	AllowedOutbound       map[string][]string `yaml:"allowed_outbound"`
+	CycleGuardedRelations []string            `yaml:"cycle_guarded_relations"`
+	MaxParents            int                 `yaml:"max_parents"`
+
 	WhenToCreate string `yaml:"when_to_create"`
 	AgentNote    string `yaml:"agent_note"`
 }
@@ -155,14 +139,14 @@ func (k *kindYAML) toKindDef() KindDef {
 			Vacuumable: k.Vacuumable,
 		},
 		KindLifecycle: KindLifecycle{
-			DefaultStatus:                k.Lifecycle.DefaultStatus,
-			ActiveStatus:                 k.Lifecycle.ActiveStatus,
-			TriggerStatus:                k.Lifecycle.TriggerStatus,
-			IsGoalKind:                   k.Lifecycle.IsGoalKind,
-			TrackInBrief:                 k.Lifecycle.TrackInBrief,
-			ActivationRequiresSections:   k.Lifecycle.ActivationRequiresSections,
-		Transitions:                  k.Lifecycle.Transitions,
-			CompletionGates:              k.Lifecycle.CompletionGates,
+			DefaultStatus:              k.Lifecycle.DefaultStatus,
+			ActiveStatus:               k.Lifecycle.ActiveStatus,
+			TriggerStatus:              k.Lifecycle.TriggerStatus,
+			IsGoalKind:                 k.Lifecycle.IsGoalKind,
+			TrackInBrief:               k.Lifecycle.TrackInBrief,
+			ActivationRequiresSections: k.Lifecycle.ActivationRequiresSections,
+			Transitions:                k.Lifecycle.Transitions,
+			CompletionGates:            k.Lifecycle.CompletionGates,
 		},
 		KindSections: KindSections{
 			ExpectedSections: k.Sections.Expected,
@@ -170,6 +154,11 @@ func (k *kindYAML) toKindDef() KindDef {
 			ShouldSections:   k.Sections.Should,
 			CouldSections:    k.Sections.Could,
 			RequiredFields:   k.Sections.RequiredFields,
+		},
+		KindEdgeTrait: KindEdgeTrait{
+			AllowedOutbound:       k.AllowedOutbound,
+			CycleGuardedRelations: k.CycleGuardedRelations,
+			MaxParents:            k.MaxParents,
 		},
 		Children: k.Children,
 		Relations: KindRelations{
@@ -180,24 +169,6 @@ func (k *kindYAML) toKindDef() KindDef {
 			Targets:          k.Relations.Targets,
 		},
 	}
-}
-
-// edgeTypeYAML is the internal edge type representation, populated from CRD files.
-type edgeTypeYAML struct {
-	Name             string          `yaml:"name"`
-	MaxOutgoing      int             `yaml:"max_outgoing"`
-	MaxIncoming      int             `yaml:"max_incoming"`
-	CycleGuard       bool            `yaml:"cycle_guard"`
-	CompletionRollup bool            `yaml:"completion_rollup"`
-	ConformanceCheck bool            `yaml:"conformance_check"`
-	AllowedPairs     []kindPairYAML  `yaml:"allowed_pairs"`
-	WhenToUse        string          `yaml:"when_to_use"`
-	Semantics        string          `yaml:"semantics"`
-}
-
-type kindPairYAML struct {
-	Source string `yaml:"source"`
-	Target string `yaml:"target"`
 }
 
 // labelYAML is the internal label representation, populated from CRD files.
@@ -244,39 +215,6 @@ func loadRegistryKinds() []kindYAML {
 		}
 	}
 	return kinds
-}
-
-// loadRegistryEdgeTypes parses all edge_type CRD files from the embedded registry.
-func loadRegistryEdgeTypes() []edgeTypeYAML { //nolint:dupl // parallel structure to loadRegistryKinds; generic helper would obscure embed path
-	entries, err := registryFS.ReadDir("registry/edge_types")
-	if err != nil {
-		return nil
-	}
-	var ets []edgeTypeYAML
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".yaml") {
-			continue
-		}
-		data, err := registryFS.ReadFile("registry/edge_types/" + e.Name())
-		if err != nil {
-			continue
-		}
-		resources, err := ParseResourceFile(data)
-		if err != nil {
-			continue
-		}
-		for _, r := range resources {
-			if r.Kind != crdKindEdgeType && r.Kind != crdKindEdgeTypeLegacy {
-				continue
-			}
-			et := crdResourceToEdgeTypeYAML(r)
-			if et.Name == "" {
-				et.Name = strings.TrimSuffix(e.Name(), ".yaml")
-			}
-			ets = append(ets, et)
-		}
-	}
-	return ets
 }
 
 // loadRegistryLabels parses all label CRD files from the embedded registry.
@@ -349,48 +287,6 @@ func seedKindsFromRegistry(ctx context.Context, s Store) {
 	}
 }
 
-// seedEdgeTypesFromRegistry writes edge_type_definition artifacts from the embedded CRD registry.
-func seedEdgeTypesFromRegistry(ctx context.Context, s Store) {
-	now := time.Now().UTC()
-	for _, et := range loadRegistryEdgeTypes() {
-		id := "EDT-" + et.Name
-		if _, err := s.Get(ctx, id); err == nil {
-			continue
-		}
-		pairs := make([]KindPair, len(et.AllowedPairs))
-		for i, p := range et.AllowedPairs {
-			pairs[i] = KindPair(p)
-		}
-		trait := EdgeTypeTrait{
-			MaxOutgoing:      et.MaxOutgoing,
-			MaxIncoming:      et.MaxIncoming,
-			CycleGuard:       et.CycleGuard,
-			CompletionRollup: et.CompletionRollup,
-			ConformanceCheck: et.ConformanceCheck,
-			AllowedPairs:     pairs,
-		}
-		art := &Artifact{
-			ID:     id,
-			Labels: []string{LabelPrefixKind + KindEdgeTypeDefinition, "work.active", LabelPrefixScope + SchemaScope},
-			Title:  et.Name,
-			Extra:      edgeTypeTraitToExtra(trait),
-			CreatedAt:  now,
-			UpdatedAt:  now,
-			InsertedAt: now,
-		}
-		if et.WhenToUse != "" {
-			art.Sections = append(art.Sections, Section{Name: "when_to_use", Text: strings.TrimSpace(et.WhenToUse)})
-		}
-		if et.Semantics != "" {
-			art.Sections = append(art.Sections, Section{Name: "semantics", Text: strings.TrimSpace(et.Semantics)})
-		}
-		if err := s.Put(ctx, art); err != nil {
-			slog.WarnContext(ctx, "registry: seed edge type failed",
-				slog.String(LogKeyID, id), slog.Any(LogKeyError, err))
-		}
-	}
-}
-
 // seedLabelsFromRegistry writes label_definition artifacts from the embedded CRD registry.
 func seedLabelsFromRegistry(ctx context.Context, s Store) {
 	now := time.Now().UTC()
@@ -454,33 +350,6 @@ func migrateKindSections(ctx context.Context, s Store) {
 		}
 		if k.AgentNote != "" && !existing["agent_note"] {
 			art.Sections = append(art.Sections, Section{Name: "agent_note", Text: strings.TrimSpace(k.AgentNote)})
-			added = true
-		}
-		if added {
-			_ = s.Put(ctx, art)
-		}
-	}
-}
-
-// migrateEdgeTypeSections updates existing edge_type_definition artifacts similarly.
-func migrateEdgeTypeSections(ctx context.Context, s Store) { //nolint:dupl // parallel to migrateLabelSections; different types prevent a shared generic
-	for _, et := range loadRegistryEdgeTypes() {
-		id := "EDT-" + et.Name
-		art, err := s.Get(ctx, id)
-		if err != nil {
-			continue
-		}
-		existing := make(map[string]bool, len(art.Sections))
-		for _, sec := range art.Sections {
-			existing[sec.Name] = true
-		}
-		var added bool
-		if et.WhenToUse != "" && !existing["when_to_use"] {
-			art.Sections = append(art.Sections, Section{Name: "when_to_use", Text: strings.TrimSpace(et.WhenToUse)})
-			added = true
-		}
-		if et.Semantics != "" && !existing["semantics"] {
-			art.Sections = append(art.Sections, Section{Name: "semantics", Text: strings.TrimSpace(et.Semantics)})
 			added = true
 		}
 		if added {

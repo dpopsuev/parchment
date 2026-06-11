@@ -1,6 +1,10 @@
 package parchment
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
 
 // IsTerminal reports whether status is a terminal state.
 // Checks domain status traits (work.draft, note.evergreen, etc.) first,
@@ -108,3 +112,70 @@ func (p *Protocol) SkipEmptyCheck(kind string) bool {
 	}
 	return false
 }
+
+// isEdgeAllowed checks source label traits to see if this outbound relation to target is permitted.
+//
+// Closed world: if AllowedOutbound is nil or the relation is not listed, the edge is denied.
+// Declare what is permitted; everything else is blocked.
+// "*" in the target list matches any target label.
+func (p *Protocol) isEdgeAllowed(sourceLabels []string, relation string, targetLabels []string) bool {
+	lt := ResolveTrait(p.labelTraits, sourceLabels)
+	allowed, ok := lt.AllowedOutbound[relation]
+	if !ok {
+		return false
+	}
+	for _, pattern := range allowed {
+		if pattern == "*" {
+			return true
+		}
+		for _, tl := range targetLabels {
+			if tl == pattern {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isEdgeAllowedErr returns a descriptive error when the edge is not allowed.
+func (p *Protocol) isEdgeAllowedErr(sourceLabels []string, relation string, targetLabels []string) error {
+	lt := ResolveTrait(p.labelTraits, sourceLabels)
+	allowed, ok := lt.AllowedOutbound[relation]
+	if !ok {
+		return fmt.Errorf("%s does not declare outbound %q edges", //nolint:err113 // domain constraint
+			labelValue(sourceLabels, LabelPrefixKind), relation)
+	}
+	return fmt.Errorf("%s→%s is not a valid %s relation (allowed targets: %s)", //nolint:err113 // domain constraint
+		labelValue(sourceLabels, LabelPrefixKind),
+		labelValue(targetLabels, LabelPrefixKind),
+		relation,
+		strings.Join(allowed, ", "))
+}
+
+// isCycleGuarded returns true if the source label traits declare this relation as cycle-guarded.
+func (p *Protocol) isCycleGuarded(sourceLabels []string, relation string) bool {
+	lt := ResolveTrait(p.labelTraits, sourceLabels)
+	for _, r := range lt.CycleGuardedRelations {
+		if r == relation {
+			return true
+		}
+	}
+	return false
+}
+
+// maxParentsFor returns the max incoming parent_of edges for an artifact with these labels (0 = unlimited).
+func (p *Protocol) maxParentsFor(labels []string) int {
+	lt := ResolveTrait(p.labelTraits, labels)
+	return lt.MaxParents
+}
+
+// RegisteredRelations returns the sorted schema relations list.
+func (p *Protocol) RegisteredRelations() []string {
+	out := make([]string, len(p.schema.Relations))
+	copy(out, p.schema.Relations)
+	sort.Strings(out)
+	return out
+}
+
+// Registry returns the ComponentRegistry for hot-reload of traits and rules.
+func (p *Protocol) Registry() *ComponentRegistry { return p.registry }

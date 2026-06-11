@@ -1029,16 +1029,21 @@ func TestArtifactTree_NotFound(t *testing.T) {
 	}
 }
 
-func TestArtifactTree_InvalidRelation(t *testing.T) {
+func TestArtifactTree_UnknownRelationIsOpenWorld(t *testing.T) {
+	// In the label-based edge model, any relation name is valid (open world).
+	// ArtifactTree with an unknown relation succeeds and returns no children.
 	t.Parallel()
 	proto, _ := newProto(t)
 	ctx := context.Background()
 
 	task := createTask(t, proto, "task")
 
-	_, err := proto.ArtifactTree(ctx, parchment.TreeInput{ID: task.ID, Relation: "fantasy"})
-	if err == nil {
-		t.Fatal("expected error for unknown relation")
+	tree, err := proto.ArtifactTree(ctx, parchment.TreeInput{ID: task.ID, Relation: "fantasy"})
+	if err != nil {
+		t.Fatalf("ArtifactTree with unknown relation should succeed, got: %v", err)
+	}
+	if tree == nil {
+		t.Fatal("expected non-nil tree node")
 	}
 }
 

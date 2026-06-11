@@ -1,9 +1,0 @@
-apiVersion: scribe/v1
-kind: EdgeType
-metadata:
-  name: elaborates
-spec:
-  whenToUse: |
-    Use elaborates when a note expands on a concept by adding examples or depth.
-  semantics: |
-    Knowledge elaboration. Used in knowledge graph traversal. No structural enforcement.

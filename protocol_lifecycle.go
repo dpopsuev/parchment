@@ -356,7 +356,7 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 	if len(followsWarnings) > 0 {
 		info = append(info, fmt.Sprintf("warning: activating before followed artifacts complete: %s", strings.Join(followsWarnings, ", ")))
 	}
-	if p.schema.Guards.AutoCompleteParentOnChildrenTerminal && p.IsTerminal(status) {
+	if p.IsTerminal(status) {
 		if extra := p.autoCompleteParent(ctx, art); extra != "" {
 			info = append(info, extra)
 		}
@@ -441,35 +441,32 @@ func (p *Protocol) guardChildrenComplete(ctx context.Context, art *Artifact) err
 	return nil
 }
 
-// completionRollup checks every incoming relation with CompletionRollup=true.
-// For each such source, if all its outgoing edges of that relation are terminal,
-// the source is auto-transitioned to complete.
+// completionRollup checks incoming parent_of edges for container kind parents.
+// If the parent is a container kind and all its children are terminal, it auto-completes.
 func (p *Protocol) completionRollup(ctx context.Context, art *Artifact) string {
 	var msgs []string
-	for relation, trait := range p.edgeTypeTraits {
-		if !trait.CompletionRollup {
+	sources, _ := p.store.Neighbors(ctx, art.ID, RelParentOf, Incoming)
+	for _, e := range sources {
+		source, err := p.store.Get(ctx, e.From)
+		if err != nil || p.IsTerminal(statusFromLabels(source.Labels)) {
 			continue
 		}
-		sources, _ := p.store.Neighbors(ctx, art.ID, relation, Incoming)
-		for _, e := range sources {
-			source, err := p.store.Get(ctx, e.From)
-			if err != nil || p.IsTerminal(statusFromLabels(source.Labels)) {
-				continue
+		if !p.IsContainerKind(labelValue(source.Labels, LabelPrefixKind)) {
+			continue
+		}
+		children, _ := p.store.Neighbors(ctx, source.ID, RelParentOf, Outgoing)
+		allDone := true
+		for _, t := range children {
+			child, err := p.store.Get(ctx, t.To)
+			if err != nil || !p.IsTerminal(statusFromLabels(child.Labels)) {
+				allDone = false
+				break
 			}
-			targets, _ := p.store.Neighbors(ctx, source.ID, relation, Outgoing)
-			allDone := true
-			for _, t := range targets {
-				child, err := p.store.Get(ctx, t.To)
-				if err != nil || !p.IsTerminal(statusFromLabels(child.Labels)) {
-					allDone = false
-					break
-				}
-			}
-			if allDone && len(targets) > 0 {
-				r := p.setStatus(ctx, source, "work.complete")
-				if r.OK {
-					msgs = append(msgs, fmt.Sprintf("auto-completed %s: %s", source.ID, source.Title))
-				}
+		}
+		if allDone && len(children) > 0 {
+			r := p.setStatus(ctx, source, "work.complete")
+			if r.OK {
+				msgs = append(msgs, fmt.Sprintf("auto-completed %s: %s", source.ID, source.Title))
 			}
 		}
 	}
@@ -482,6 +479,9 @@ func (p *Protocol) autoCompleteParent(ctx context.Context, art *Artifact) string
 	}
 	parent, err := p.store.Get(ctx, art.Parent)
 	if err != nil || p.IsTerminal(statusFromLabels(parent.Labels)) {
+		return ""
+	}
+	if !p.IsContainerKind(labelValue(parent.Labels, LabelPrefixKind)) {
 		return ""
 	}
 	children, err := p.store.Children(ctx, parent.ID)

@@ -1,9 +1,0 @@
-apiVersion: scribe/v1
-kind: EdgeType
-metadata:
-  name: cites
-spec:
-  whenToUse: |
-    Use cites when a note or concept draws from a source artifact.
-  semantics: |
-    Knowledge provenance. Tracked by wikilinks. No structural enforcement.

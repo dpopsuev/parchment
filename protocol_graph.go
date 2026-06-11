@@ -20,19 +20,6 @@ type TreeNode struct {
 	Children  []*TreeNode `json:"children,omitempty"`
 }
 
-// kindPairAllowed returns true if (source, target) matches any entry in pairs.
-// An empty Source or Target field in a pair matches any kind.
-func kindPairAllowed(pairs []KindPair, source, target string) bool {
-	for _, p := range pairs {
-		sourceOK := p.Source == "" || p.Source == source
-		targetOK := p.Target == "" || p.Target == target
-		if sourceOK && targetOK {
-			return true
-		}
-	}
-	return false
-}
-
 // wouldCycleParent returns true if setting parentID as the parent of childID
 // would create a cycle. Walks up the parent chain from parentID; if childID
 // is encountered, the assignment would close a loop. When childID is empty
@@ -119,27 +106,37 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 	if len(targetIDs) == 0 {
 		return nil, fmt.Errorf("at least one target ID is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
-	if !p.schema.ValidRelation(relation) && !p.isRegisteredEdgeType(relation) {
-		return nil, fmt.Errorf("unknown relation %q; valid: %s", relation, strings.Join(p.RegisteredRelations(), ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
+
+	art, err := p.store.Get(ctx, sourceID)
+	if err != nil {
+		return nil, err
 	}
 
-	trait := p.ResolveEdgeTrait(relation)
-	if trait.MaxOutgoing > 0 {
-		existing, _ := p.store.Neighbors(ctx, sourceID, relation, Outgoing)
-		if len(existing)+len(targetIDs) > trait.MaxOutgoing {
-			return nil, fmt.Errorf("%s already has %d outgoing %q edge(s); max is %d", sourceID, len(existing), relation, trait.MaxOutgoing) //nolint:err113 // domain constraint
+	// Resolve target artifacts once for validation.
+	targets := make([]*Artifact, 0, len(targetIDs))
+	for _, tid := range targetIDs {
+		target, err := p.store.Get(ctx, tid)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve %s target %s: %w", relation, tid, err)
 		}
+		targets = append(targets, target)
 	}
-	if trait.MaxIncoming > 0 {
-		for _, tid := range targetIDs {
-			incoming, _ := p.store.Neighbors(ctx, tid, relation, Incoming)
-			if len(incoming)+1 > trait.MaxIncoming {
-				return nil, fmt.Errorf("%s already has %d incoming %q edge(s); max is %d", tid, len(incoming), relation, trait.MaxIncoming) //nolint:err113 // domain constraint
+
+	// MaxParents enforcement for parent_of relation.
+	if relation == RelParentOf {
+		for _, target := range targets {
+			maxP := p.maxParentsFor(target.Labels)
+			if maxP > 0 {
+				incoming, _ := p.store.Neighbors(ctx, target.ID, relation, Incoming)
+				if len(incoming)+1 > maxP {
+					return nil, fmt.Errorf("%s already has %d incoming %q edge(s); max is %d", target.ID, len(incoming), relation, maxP) //nolint:err113 // domain constraint
+				}
 			}
 		}
 	}
 
-	if trait.CycleGuard {
+	// Cycle guard from source label traits.
+	if p.isCycleGuarded(art.Labels, relation) {
 		for _, tid := range targetIDs {
 			if cycle, path := p.wouldCycle(ctx, relation, sourceID, tid); cycle {
 				return nil, fmt.Errorf("%s cycle detected: %s", relation, strings.Join(path, " → ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
@@ -147,41 +144,31 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 		}
 	}
 
-	art, err := p.store.Get(ctx, sourceID)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(trait.AllowedPairs) > 0 {
-		for _, tid := range targetIDs {
-			target, err := p.store.Get(ctx, tid)
-			if err != nil {
-				return nil, fmt.Errorf("failed to resolve %s target %s: %w", relation, tid, err)
+	// AllowedOutbound enforcement from source label traits.
+	for _, target := range targets {
+		if !p.isEdgeAllowed(art.Labels, relation, target.Labels) {
+			if err := p.isEdgeAllowedErr(art.Labels, relation, target.Labels); err != nil {
+				return nil, err
 			}
-			if !kindPairAllowed(trait.AllowedPairs, labelValue(art.Labels, LabelPrefixKind), labelValue(target.Labels, LabelPrefixKind)) {
-				return nil, fmt.Errorf("%s→%s is not a valid %s pair", labelValue(art.Labels, LabelPrefixKind), labelValue(target.Labels, LabelPrefixKind), relation) //nolint:err113 // domain constraint
-			}
+			return nil, fmt.Errorf("%s→%s is not a valid %s relation", labelValue(art.Labels, LabelPrefixKind), labelValue(target.Labels, LabelPrefixKind), relation) //nolint:err113 // domain constraint
 		}
 	}
 
-	if trait.ConformanceCheck {
-		for _, tid := range targetIDs {
-			tpl, err := p.store.Get(ctx, tid)
-			if err != nil {
-				return nil, fmt.Errorf("failed to resolve %s target %s: %w", relation, tid, err)
-			}
+	// Conformance check for satisfies relation (protocol-level behavior).
+	if relation == RelSatisfies {
+		for _, tpl := range targets {
 			if labelValue(tpl.Labels, LabelPrefixKind) != KindTemplate {
-				slog.WarnContext(ctx, "conformance_check link target is not a template", slog.String("source_id", sourceID), slog.String("target_id", tid), slog.String("target_kind", labelValue(tpl.Labels, LabelPrefixKind))) //nolint:sloglint // source_id/target_id/target_kind have no LogKey constants
-				return nil, fmt.Errorf("conformance_check target %s is not a template (kind=%s)", tid, labelValue(tpl.Labels, LabelPrefixKind)) //nolint:err113 // sentinel; no caller uses errors.Is on this
+				slog.WarnContext(ctx, "satisfies link target is not a template", slog.String("source_id", sourceID), slog.String("target_id", tpl.ID), slog.String("target_kind", labelValue(tpl.Labels, LabelPrefixKind))) //nolint:sloglint // source_id/target_id/target_kind have no LogKey constants
+				return nil, fmt.Errorf("satisfies target %s is not a template (kind=%s)", tpl.ID, labelValue(tpl.Labels, LabelPrefixKind)) //nolint:err113 // sentinel; no caller uses errors.Is on this
 			}
 			artWithLink := &Artifact{
 				ID:       art.ID,
 				Labels:   []string{LabelPrefixKind + labelValue(art.Labels, LabelPrefixKind)},
 				Sections: art.Sections,
-				Links:    map[string][]string{relation: {tid}},
+				Links:    map[string][]string{relation: {tpl.ID}},
 			}
 			if err := p.checkTemplateConformance(ctx, artWithLink, true); err != nil {
-				slog.WarnContext(ctx, "conformance_check blocked link", slog.String("source_id", sourceID), slog.String("target_id", tid), slog.Any(LogKeyError, err)) //nolint:sloglint // source_id/target_id have no LogKey constants
+				slog.WarnContext(ctx, "satisfies conformance blocked link", slog.String("source_id", sourceID), slog.String("target_id", tpl.ID), slog.Any(LogKeyError, err)) //nolint:sloglint // source_id/target_id have no LogKey constants
 				return nil, err
 			}
 		}
@@ -279,9 +266,6 @@ func (p *Protocol) ArtifactTree(ctx context.Context, in TreeInput) (*TreeNode, e
 	rel := in.Relation
 	if rel == "" {
 		rel = RelParentOf
-	}
-	if !p.schema.ValidRelation(rel) && !p.isRegisteredEdgeType(rel) {
-		return nil, fmt.Errorf("unknown relation %q; valid: %s, *", rel, strings.Join(p.schema.Relations, ", ")) //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
 
 	dir := in.Direction

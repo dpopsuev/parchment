@@ -47,34 +47,6 @@ func TestRegistry_SeedDefinitions_GuidanceFromYAML(t *testing.T) {
 	}
 }
 
-func TestRegistry_EdgeTypeYAML_LoadedBySeedEdgeTypeTraits(t *testing.T) {
-	// edge_type_definition artifacts carry when_to_use/semantics from registry YAML.
-	t.Parallel()
-	dir := t.TempDir()
-	s, err := parchment.OpenSQLite(dir + "/test.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.Close()
-	ctx := context.Background()
-	parchment.SeedEdgeTypeTraits(ctx, s)
-
-	art, err := s.Get(ctx, "EDT-depends_on")
-	if err != nil {
-		t.Fatal("EDT-depends_on not seeded")
-	}
-	sections := make(map[string]string)
-	for _, sec := range art.Sections {
-		sections[sec.Name] = sec.Text
-	}
-	if sections["when_to_use"] == "" {
-		t.Error("EDT-depends_on missing when_to_use section")
-	}
-	if sections["semantics"] == "" {
-		t.Error("EDT-depends_on missing semantics section")
-	}
-}
-
 func TestRegistry_LabelYAML_LoadedBySeedLabelTraits(t *testing.T) {
 	// label_definition artifacts carry when_to_apply/implies from registry YAML.
 	t.Parallel()

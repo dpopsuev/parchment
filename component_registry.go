@@ -32,17 +32,12 @@ func (r *ComponentRegistry) Rules() []*RuleDef {
 	return r.rules
 }
 
-// ReloadTraits re-reads all label_definition and edge_type_definition artifacts
-// from the store and rebuilds the TraitStore atomically.
+// ReloadTraits re-reads all label_definition artifacts from the store and rebuilds the TraitStore atomically.
 func (r *ComponentRegistry) ReloadTraits(ctx context.Context) {
 	labelMap := LoadLabelTraitsWithComposition(ctx, r.store)
-	edgeMap := loadEdgeTypeTraits(ctx, r.store)
 	ts := NewTraitStore()
 	for k, v := range labelMap {
 		ts.PutLabel(k, v)
-	}
-	for k, v := range edgeMap {
-		ts.PutEdge(k, v)
 	}
 	r.mu.Lock()
 	r.ts = ts

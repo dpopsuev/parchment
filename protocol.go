@@ -68,10 +68,9 @@ type ProtocolConfig struct {
 type Protocol struct {
 	store            Store
 	schema           *Schema
-	registry         *ComponentRegistry       // reloadable trait + rule store (Step 9)
-	traits           *TraitStore              // deprecated: use registry.Traits()
-	labelTraits      map[string]LabelTrait    // deprecated: use registry.Traits().LabelMap()
-	edgeTypeTraits   map[string]EdgeTypeTrait // deprecated: use registry.Traits().EdgeMap()
+	registry         *ComponentRegistry    // reloadable trait + rule store (Step 9)
+	traits           *TraitStore           // deprecated: use registry.Traits()
+	labelTraits      map[string]LabelTrait // deprecated: use registry.Traits().LabelMap()
 	scopeLabels      []string
 	vocab            []string
 	mutableCreatedAt bool
@@ -106,17 +105,12 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 	p := &Protocol{store: s, schema: schema, scopeLabels: scopeLabels, vocab: vocab}
 	if s != nil {
 		SeedLabelTraits(context.Background(), s)
-		SeedEdgeTypeTraits(context.Background(), s)
 		SeedRules(context.Background(), s)
 		p.labelTraits = loadLabelTraits(context.Background(), s)
-		p.edgeTypeTraits = loadEdgeTypeTraits(context.Background(), s)
-		// Unified TraitStore — bridges from the existing maps (Step 2 strangler seam).
+		// Unified TraitStore — bridges from the existing map (Step 2 strangler seam).
 		p.traits = NewTraitStore()
 		for k, v := range p.labelTraits {
 			p.traits.PutLabel(k, v)
-		}
-		for k, v := range p.edgeTypeTraits {
-			p.traits.PutEdge(k, v)
 		}
 		rules, _ := p.LoadRules(context.Background())
 		p.rules = rules

@@ -1,9 +1,0 @@
-apiVersion: scribe/v1
-kind: EdgeType
-metadata:
-  name: documents
-spec:
-  whenToUse: |
-    Use documents when a doc or ref artifact describes another artifact.
-  semantics: |
-    Documentation link. Surfaced in briefing. No structural enforcement.

@@ -545,14 +545,6 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		}
 
 		for rel, targets := range art.Links {
-			if !p.schema.ValidRelation(rel) && !p.isRegisteredEdgeType(rel) {
-				report.Violations = append(report.Violations, CheckViolation{
-					ID: art.ID, Labels: art.Labels, Title: art.Title,
-					Category: "invalid_relation",
-					Detail:   fmt.Sprintf("relation %q not in schema", rel),
-				})
-				continue
-			}
 			if len(kd.Relations.Outgoing) > 0 {
 				if !slices.Contains(kd.Relations.Outgoing, rel) {
 					report.Violations = append(report.Violations, CheckViolation{
@@ -790,12 +782,6 @@ func (p *Protocol) CheckFix(ctx context.Context, scope string) (*CheckReport, []
 			}
 			changed := false
 			for rel, targets := range art.Links {
-				if !p.schema.ValidRelation(rel) && !p.isRegisteredEdgeType(rel) {
-					delete(art.Links, rel)
-					fixes = append(fixes, fmt.Sprintf("removed unknown relation %q from %s", rel, v.ID))
-					changed = true
-					continue
-				}
 				kd := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]
 				if len(kd.Relations.Outgoing) > 0 {
 					if !slices.Contains(kd.Relations.Outgoing, rel) {

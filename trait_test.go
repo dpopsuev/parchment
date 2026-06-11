@@ -15,14 +15,6 @@ func TestTrait_ConflictPolicy_LabelTraitImplementsInterface(t *testing.T) {
 	}
 }
 
-func TestTrait_ConflictPolicy_EdgeTypeTraitImplementsInterface(t *testing.T) {
-	var _ parchment.Trait = parchment.EdgeTypeTrait{}
-	et := parchment.EdgeTypeTrait{}
-	if got := et.ConflictPolicy(); got != parchment.ConflictUnion {
-		t.Fatalf("EdgeTypeTrait zero-value ConflictPolicy = %v, want ConflictUnion", got)
-	}
-}
-
 func TestConflictPolicy_Constants(t *testing.T) {
 	// All four policies must be distinct.
 	policies := []parchment.ConflictPolicy{

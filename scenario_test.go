@@ -1,13 +1,12 @@
 package parchment_test
 
-// Scenario tests — five isolated graph models proving data-driven EdgeTypeTrait behavior.
+// Scenario tests — five isolated graph models proving label-based edge constraint behavior.
 // Each scenario is self-contained; Scenario F links across all five.
 
 import (
 	"context"
 	"strings"
 	"testing"
-	"time"
 
 	parchment "github.com/dpopsuev/parchment"
 )
@@ -65,23 +64,6 @@ func sgetStatus(t *testing.T, proto *parchment.Protocol, id string) string {
 	return parchment.StatusFromLabels(art.Labels)
 }
 
-// seedEdgeType stores an edge_type_definition artifact directly in the store
-// so tests can register custom relations with specific traits.
-func seedEdgeType(t *testing.T, store parchment.Store, name string, trait parchment.EdgeTypeTrait) {
-	t.Helper()
-	ctx := context.Background()
-	now := time.Now().UTC()
-	extra := parchment.EdgeTypeTraitToExtra(trait)
-	if err := store.Put(ctx, &parchment.Artifact{
-		ID:     "EDT-" + name,
-		Labels: []string{"kind:edge_type_definition", "status:active", "scope:_schema"},
-		Title:  name, Extra: extra,
-		CreatedAt: now, UpdatedAt: now, InsertedAt: now,
-	}); err != nil {
-		t.Fatalf("seedEdgeType %s: %v", name, err)
-	}
-}
-
 // collectTreeIDs returns all artifact IDs reachable from tree root.
 func collectTreeIDs(node *parchment.TreeNode) map[string]bool {
 	if node == nil {
@@ -98,8 +80,8 @@ func collectTreeIDs(node *parchment.TreeNode) map[string]bool {
 
 // ── Scenario A: Task/Issue Tracking with Hierarchy ────────────────────────────
 
-// TestScenario_A_Hierarchy builds campaign→goal→task and exercises AllowedPairs,
-// CompletionRollup, CascadeArchive, and depends_on cycle detection.
+// TestScenario_A_Hierarchy builds campaign→goal→task and exercises AllowedOutbound,
+// completionRollup (via IsContainerKind), and depends_on cycle detection.
 func TestScenario_A_Hierarchy(t *testing.T) {
 	t.Parallel()
 	proto, _ := scenarioProto(t)
@@ -107,35 +89,35 @@ func TestScenario_A_Hierarchy(t *testing.T) {
 
 	campaign := mustCreate(t, proto, parchment.CreateInput{Title: "Q3 campaign",
 		Sections: []parchment.Section{{Name: "mission", Text: "ship it"}},
-		Labels: []string{"kind:campaign"},})
+		Labels:   []string{"kind:campaign"},})
 	goal := mustCreate(t, proto, parchment.CreateInput{Title: "core goal",
 		Labels: []string{"kind:goal"},})
 	task1 := mustCreate(t, proto, parchment.CreateInput{Title: "task one",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-		Labels: []string{"kind:task"},})
+		Labels:   []string{"kind:task"},})
 	task2 := mustCreate(t, proto, parchment.CreateInput{Title: "task two",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-		Labels: []string{"kind:task"},})
+		Labels:   []string{"kind:task"},})
 
 	slink(t, proto, campaign.ID, parchment.RelParentOf, goal.ID)
 	slink(t, proto, goal.ID, parchment.RelParentOf, task1.ID)
 	slink(t, proto, goal.ID, parchment.RelParentOf, task2.ID)
 
-	// AllowedPairs rejects task→campaign (wrong direction).
+	// AllowedOutbound on kind:task rejects task→parent_of→campaign (task can't parent things).
 	errMsg := slinkFails(t, proto, task1.ID, parchment.RelParentOf, campaign.ID)
 	if !strings.Contains(errMsg, "not a valid") {
-		t.Errorf("expected AllowedPairs rejection, got: %q", errMsg)
+		t.Errorf("expected AllowedOutbound rejection, got: %q", errMsg)
 	}
 
-	// depends_on cycle detection via CycleGuard=true.
+	// depends_on cycle detection via CycleGuardedRelations on kind:task.
 	slink(t, proto, task1.ID, parchment.RelDependsOn, task2.ID)
 	cyclErr := slinkFails(t, proto, task2.ID, parchment.RelDependsOn, task1.ID)
 	if !strings.Contains(cyclErr, "cycle") {
 		t.Errorf("expected cycle error, got: %q", cyclErr)
 	}
 
-	// CompletionRollup: completing all tasks auto-completes the goal.
-	// Use force to bypass intermediate lifecycle steps (mature) — testing rollup, not lifecycle.
+	// CompletionRollup via IsContainerKind: completing all tasks auto-completes the goal.
+	// Use force to bypass intermediate lifecycle steps — testing rollup, not lifecycle.
 	ssetStatusForce(t, proto, task1.ID, "work.active")
 	ssetStatusForce(t, proto, task1.ID, "work.complete")
 	if sgetStatus(t, proto, goal.ID) == "work.complete" {
@@ -144,7 +126,7 @@ func TestScenario_A_Hierarchy(t *testing.T) {
 	ssetStatusForce(t, proto, task2.ID, "work.active")
 	ssetStatusForce(t, proto, task2.ID, "work.complete")
 	if sgetStatus(t, proto, goal.ID) != "work.complete" {
-		t.Errorf("goal should be auto-completed via CompletionRollup; status=%s", sgetStatus(t, proto, goal.ID))
+		t.Errorf("goal should be auto-completed via IsContainerKind rollup; status=%s", sgetStatus(t, proto, goal.ID))
 	}
 
 	// Tree traversal returns full campaign→goal hierarchy.
@@ -164,55 +146,51 @@ func TestScenario_A_Hierarchy(t *testing.T) {
 
 // ── Scenario B: Code Intelligence Dataflow Graph ──────────────────────────────
 
-// TestScenario_B_CodeGraph seeds custom edge types and verifies trait behaviors.
+// TestScenario_B_CodeGraph verifies that source artifacts (open world) accept custom
+// relations freely, and that task.depends_on has cycle detection via label traits.
 func TestScenario_B_CodeGraph(t *testing.T) {
 	t.Parallel()
 	proto, store := scenarioProto(t, "locus")
 	ctx := context.Background()
 
-	// belongs_to MaxIncoming=1: each target (component) can have at most 1 incoming edge.
-	// This models "one owner" — e.g. a file belongs to exactly one package.
-	seedEdgeType(t, store, "calls", parchment.EdgeTypeTrait{})
-	seedEdgeType(t, store, "imports", parchment.EdgeTypeTrait{CycleGuard: true})
-	seedEdgeType(t, store, "belongs_to", parchment.EdgeTypeTrait{MaxIncoming: 1})
-	proto.RefreshEdgeTraits(ctx)
-
+	// Source artifacts have no AllowedOutbound restriction — open world.
 	comp := mustCreate(t, proto, parchment.CreateInput{Title: "code:component:graphEngine",
-		Labels: []string{"kind:note", "source:locus", "kind:component", parchment.LabelPrefixScope + "test"},
+		Labels: []string{"kind:source", parchment.LabelPrefixScope + "test"},
 	})
 	sym1 := mustCreate(t, proto, parchment.CreateInput{Title: "code:symbol:initGraph",
-		Labels: []string{"kind:note", "source:locus", "kind:symbol", parchment.LabelPrefixScope + "test"},
+		Labels: []string{"kind:source", parchment.LabelPrefixScope + "test"},
 	})
 	sym2 := mustCreate(t, proto, parchment.CreateInput{Title: "code:symbol:applyData",
-		Labels: []string{"kind:note", "source:locus", "kind:symbol", parchment.LabelPrefixScope + "test"},
+		Labels: []string{"kind:source", parchment.LabelPrefixScope + "test"},
 	})
 
-	// First belongs_to → comp succeeds.
-	slink(t, proto, sym1.ID, "belongs_to", comp.ID)
+	// Open world: custom relations are accepted for source artifacts.
+	slink(t, proto, sym1.ID, "calls", sym1.ID) // self-link is valid (no cycle guard on source)
+	slink(t, proto, sym1.ID, "calls", sym2.ID)
+	slink(t, proto, sym2.ID, "calls", comp.ID)
 
-	// Second symbol → same comp fails: comp already has 1 incoming belongs_to (MaxIncoming=1).
-	err2 := slinkFails(t, proto, sym2.ID, "belongs_to", comp.ID)
-	if !strings.Contains(err2, "max") {
-		t.Errorf("expected MaxIncoming=1 rejection, got: %q", err2)
-	}
-
-	// calls has no CycleGuard — self-reference (recursive call) is valid.
-	slink(t, proto, sym1.ID, "calls", sym1.ID)
-
-	// imports has CycleGuard=true — cycle rejected.
-	slink(t, proto, sym1.ID, "imports", sym2.ID)
-	cyclErr := slinkFails(t, proto, sym2.ID, "imports", sym1.ID)
+	// task.depends_on has cycle detection via CycleGuardedRelations.
+	t1 := mustCreate(t, proto, parchment.CreateInput{Title: "task-t1",
+		Labels:   []string{"kind:task", parchment.LabelPrefixScope + "test"},
+		Sections: []parchment.Section{{Name: "context", Text: "x"}},
+	})
+	t2 := mustCreate(t, proto, parchment.CreateInput{Title: "task-t2",
+		Labels:   []string{"kind:task", parchment.LabelPrefixScope + "test"},
+		Sections: []parchment.Section{{Name: "context", Text: "x"}},
+	})
+	slink(t, proto, t1.ID, parchment.RelDependsOn, t2.ID)
+	cyclErr := slinkFails(t, proto, t2.ID, parchment.RelDependsOn, t1.ID)
 	if !strings.Contains(cyclErr, "cycle") {
-		t.Errorf("expected imports cycle rejection, got: %q", cyclErr)
+		t.Errorf("expected depends_on cycle rejection, got: %q", cyclErr)
 	}
 
-	// Neighbors returns the one symbol belonging to component.
-	neighbors, err := store.Neighbors(ctx, comp.ID, "belongs_to", parchment.Incoming)
+	// Neighbors returns correct count for custom relation.
+	neighbors, err := store.Neighbors(ctx, comp.ID, "calls", parchment.Incoming)
 	if err != nil {
 		t.Fatalf("neighbors: %v", err)
 	}
 	if len(neighbors) != 1 {
-		t.Errorf("expected 1 symbol belonging to component, got %d", len(neighbors))
+		t.Errorf("expected 1 symbol calling component, got %d", len(neighbors))
 	}
 }
 
@@ -274,18 +252,12 @@ func TestScenario_C_AgentContext(t *testing.T) {
 
 // ── Scenario D: Domain Wikipedia ─────────────────────────────────────────────
 
-// TestScenario_D_Wiki verifies cites AllowedPairs (note→source only)
+// TestScenario_D_Wiki verifies note.AllowedOutbound.cites restriction (note→source only)
 // and FTS search on concepts.
 func TestScenario_D_Wiki(t *testing.T) {
 	t.Parallel()
-	proto, store := scenarioProto(t, "wiki")
+	proto, _ := scenarioProto(t, "wiki")
 	ctx := context.Background()
-
-	// Seed cites with AllowedPairs: only note→source allowed.
-	seedEdgeType(t, store, "cites", parchment.EdgeTypeTrait{
-		AllowedPairs: []parchment.KindPair{{Source: "note", Target: "source"}},
-	})
-	proto.RefreshEdgeTraits(ctx)
 
 	concept := mustCreate(t, proto, parchment.CreateInput{Title: "N-body gravity simulation",
 		Labels: []string{"kind:concept", parchment.LabelPrefixScope + "test"},})
@@ -294,13 +266,13 @@ func TestScenario_D_Wiki(t *testing.T) {
 	note := mustCreate(t, proto, parchment.CreateInput{Title: "notes on N-body",
 		Labels: []string{"kind:note", parchment.LabelPrefixScope + "test"},})
 
-	// note→source is valid per AllowedPairs.
+	// note→source is valid per kind:note.AllowedOutbound.cites.
 	slink(t, proto, note.ID, "cites", src.ID)
 
-	// note→concept (kind=concept, not source) is rejected by AllowedPairs.
+	// note→concept (kind=concept, not source) is rejected by AllowedOutbound.
 	errMsg := slinkFails(t, proto, note.ID, "cites", concept.ID)
 	if !strings.Contains(errMsg, "not a valid") {
-		t.Errorf("expected AllowedPairs rejection for note→concept, got: %q", errMsg)
+		t.Errorf("expected AllowedOutbound rejection for note→concept, got: %q", errMsg)
 	}
 
 	// FTS search finds concept by keyword.
@@ -336,7 +308,7 @@ func TestScenario_E_CrossSource(t *testing.T) {
 		Labels: []string{"kind:note", "source:locus", parchment.LabelPrefixScope + "test"},
 	})
 	issue := mustCreate(t, proto, parchment.CreateInput{Title: "JIRA-101: ingest timeout",
-		Labels: []string{"kind:bug", "source:jira", parchment.LabelPrefixScope + "test"},
+		Labels:   []string{"kind:bug", "source:jira", parchment.LabelPrefixScope + "test"},
 		Sections: []parchment.Section{{Name: "context", Text: "timeout"}},
 	})
 
@@ -379,27 +351,22 @@ func TestScenario_E_CrossSource(t *testing.T) {
 // ── Scenario F: Unified Graph (all five linked) ───────────────────────────────
 
 // TestScenario_F_UnifiedGraph builds a single instance with nodes from all five
-// scenarios and verifies cross-scenario traversal and CascadeArchive isolation.
+// scenarios and verifies cross-scenario traversal.
 func TestScenario_F_UnifiedGraph(t *testing.T) { //nolint:gocyclo // inherent complexity of a cross-scenario integration test
 	t.Parallel()
-	proto, store := scenarioProto(t, "locus", "jira", "human", "agent", "wiki")
+	proto, _ := scenarioProto(t, "locus", "jira", "human", "agent", "wiki")
 	ctx := context.Background()
-
-	// In the unified graph, belongs_to uses MaxOutgoing=1 (a symbol can only be in one component).
-	// MaxIncoming=1 was tested in Scenario B with a single-owner model.
-	seedEdgeType(t, store, "belongs_to", parchment.EdgeTypeTrait{MaxOutgoing: 1})
-	proto.RefreshEdgeTraits(ctx)
 
 	const scopeTest = parchment.LabelPrefixScope + "test"
 	// Task tracker (Scenario A nodes).
 	campaign := mustCreate(t, proto, parchment.CreateInput{Title: "unified campaign",
 		Sections: []parchment.Section{{Name: "mission", Text: "unified"}},
-		Labels: []string{"kind:campaign", scopeTest},})
+		Labels:   []string{"kind:campaign", scopeTest},})
 	goal := mustCreate(t, proto, parchment.CreateInput{Title: "unified goal",
 		Labels: []string{"kind:goal", scopeTest},})
 	task := mustCreate(t, proto, parchment.CreateInput{Title: "unified task",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-		Labels: []string{"kind:task", scopeTest},})
+		Labels:   []string{"kind:task", scopeTest},})
 	slink(t, proto, campaign.ID, parchment.RelParentOf, goal.ID)
 	slink(t, proto, goal.ID, parchment.RelParentOf, task.ID)
 
@@ -409,19 +376,19 @@ func TestScenario_F_UnifiedGraph(t *testing.T) { //nolint:gocyclo // inherent co
 	})
 	slink(t, proto, task.ID, parchment.RelImplements, spec.ID)
 
-	// Code (Scenario B).
+	// Code (Scenario B — using source artifacts for open-world custom relations).
 	component := mustCreate(t, proto, parchment.CreateInput{Title: "code:component:unified",
-		Labels: []string{"kind:note", "source:locus", "kind:component", scopeTest},
+		Labels: []string{"kind:source", "source:locus", scopeTest},
 	})
 	symbol := mustCreate(t, proto, parchment.CreateInput{Title: "code:symbol:unified",
-		Labels: []string{"kind:note", "source:locus", "kind:symbol", scopeTest},
+		Labels: []string{"kind:source", "source:locus", scopeTest},
 	})
 	slink(t, proto, spec.ID, parchment.RelDocuments, component.ID)
 	slink(t, proto, symbol.ID, "belongs_to", component.ID)
 
 	// Jira issue.
 	issue := mustCreate(t, proto, parchment.CreateInput{Title: "JIRA-999: unified bug",
-		Labels: []string{"kind:bug", "source:jira", scopeTest},
+		Labels:   []string{"kind:bug", "source:jira", scopeTest},
 		Sections: []parchment.Section{{Name: "context", Text: "bug"}},
 	})
 	slink(t, proto, issue.ID, parchment.RelImplements, symbol.ID)

@@ -23,19 +23,13 @@ CREATE TABLE IF NOT EXISTS artifacts (
 	kind        TEXT NOT NULL,
 	scope       TEXT NOT NULL DEFAULT '',
 	status      TEXT NOT NULL,
-	parent      TEXT NOT NULL DEFAULT '',
 	title       TEXT NOT NULL,
 	goal        TEXT NOT NULL DEFAULT '',
-	depends_on  TEXT NOT NULL DEFAULT '[]',
 	labels      TEXT NOT NULL DEFAULT '[]',
 	priority    TEXT NOT NULL DEFAULT '',
 	sprint      TEXT NOT NULL DEFAULT '',
 	sections    TEXT NOT NULL DEFAULT '[]',
-	features    TEXT NOT NULL DEFAULT '[]',
-	criteria    TEXT NOT NULL DEFAULT '[]',
-	links       TEXT NOT NULL DEFAULT '{}',
 	extra       TEXT NOT NULL DEFAULT '{}',
-	components  TEXT NOT NULL DEFAULT '{}',
 	annotations TEXT NOT NULL DEFAULT '[]',
 	created_at  TEXT NOT NULL,
 	updated_at  TEXT NOT NULL,
@@ -44,7 +38,6 @@ CREATE TABLE IF NOT EXISTS artifacts (
 CREATE INDEX IF NOT EXISTS idx_art_kind            ON artifacts(kind);
 CREATE INDEX IF NOT EXISTS idx_art_scope           ON artifacts(scope);
 CREATE INDEX IF NOT EXISTS idx_art_status          ON artifacts(status);
-CREATE INDEX IF NOT EXISTS idx_art_parent          ON artifacts(parent);
 CREATE INDEX IF NOT EXISTS idx_art_sprint          ON artifacts(sprint);
 CREATE INDEX IF NOT EXISTS idx_art_scope_inserted  ON artifacts(scope, inserted_at);
 CREATE INDEX IF NOT EXISTS idx_art_scope_updated   ON artifacts(scope, updated_at);
@@ -216,6 +209,14 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 		"ALTER TABLE artifacts ADD COLUMN alias TEXT NOT NULL DEFAULT ''")
 	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
 		"ALTER TABLE artifacts ADD COLUMN components TEXT NOT NULL DEFAULT '{}'")
+	// Drop columns now managed via the edges table.
+	writer.Exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS parent")     //nolint:errcheck,gosec // idempotent migration
+	writer.Exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS depends_on") //nolint:errcheck,gosec // idempotent migration
+	writer.Exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS features")   //nolint:errcheck,gosec // idempotent migration
+	writer.Exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS criteria")   //nolint:errcheck,gosec // idempotent migration
+	writer.Exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS links")      //nolint:errcheck,gosec // idempotent migration
+	writer.Exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS components") //nolint:errcheck,gosec // idempotent migration
+	writer.Exec("DROP INDEX IF EXISTS idx_art_parent")                    //nolint:errcheck,gosec // idempotent migration
 	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: index may already exist
 		"CREATE UNIQUE INDEX IF NOT EXISTS idx_art_alias ON artifacts(alias) WHERE alias != ''")
 	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist

@@ -100,26 +100,23 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	sprint := labelValue(art.Labels, LabelPrefixSprint)
 	labels, _ := json.Marshal(art.Labels)
 	sections, _ := json.Marshal(art.Sections)
-	features := []byte("[]")
-	criteria := []byte("[]")
 	extra, _ := json.Marshal(art.Extra)
 	annotations, _ := json.Marshal(art.Annotations)
 
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO artifacts (uid, id, alias, kind, scope, status, title, goal, depends_on, labels, priority, sprint, sections, features, criteria, links, extra, annotations, created_at, updated_at, inserted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO artifacts (uid, id, alias, kind, scope, status, title, goal, labels, priority, sprint, sections, extra, annotations, created_at, updated_at, inserted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(uid) DO UPDATE SET
-			id=excluded.id, alias=excluded.alias, kind=excluded.kind, scope=excluded.scope, status=excluded.status,
-			title=excluded.title, goal=excluded.goal,
-			depends_on=excluded.depends_on, labels=excluded.labels,
+			id=excluded.id, alias=excluded.alias, kind=excluded.kind, scope=excluded.scope,
+			status=excluded.status, title=excluded.title, goal=excluded.goal,
+			labels=excluded.labels,
 			priority=excluded.priority, sprint=excluded.sprint,
-			sections=excluded.sections, features=excluded.features,
-			criteria=excluded.criteria, links=excluded.links,
+			sections=excluded.sections,
 			extra=excluded.extra,
 			annotations=excluded.annotations, updated_at=excluded.updated_at`,
 		uid, art.ID, art.Alias, kind, scope, status, art.Title, art.Goal(),
-		"[]", string(labels), priority, sprint,
-		string(sections), string(features), string(criteria), "{}", string(extra),
+		string(labels), priority, sprint,
+		string(sections), string(extra),
 		string(annotations),
 		art.CreatedAt.Format(time.RFC3339Nano), art.UpdatedAt.Format(time.RFC3339Nano),
 		art.InsertedAt.Format(time.RFC3339Nano),
@@ -163,15 +160,14 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO artifacts (uid, id, alias, kind, scope, status, title, goal,
-			depends_on, labels, priority, sprint, sections, features, criteria, links,
+			labels, priority, sprint, sections,
 			extra, annotations, created_at, updated_at, inserted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(uid) DO UPDATE SET
 			id=excluded.id, alias=excluded.alias, kind=excluded.kind, scope=excluded.scope,
 			status=excluded.status, title=excluded.title,
-			goal=excluded.goal, depends_on=excluded.depends_on, labels=excluded.labels,
+			goal=excluded.goal, labels=excluded.labels,
 			priority=excluded.priority, sprint=excluded.sprint, sections=excluded.sections,
-			features=excluded.features, criteria=excluded.criteria, links=excluded.links,
 			extra=excluded.extra,
 			annotations=excluded.annotations, updated_at=excluded.updated_at`)
 	if err != nil {
@@ -209,16 +205,13 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 		sprint := labelValue(art.Labels, LabelPrefixSprint)
 		labels, _ := json.Marshal(art.Labels)
 		sections, _ := json.Marshal(art.Sections)
-		features := []byte("[]")
-		criteria := []byte("[]")
 		extra, _ := json.Marshal(art.Extra)
 		annotations, _ := json.Marshal(art.Annotations)
 
-
 		_, execErr := stmt.ExecContext(ctx,
 			uid, art.ID, art.Alias, kind, scope, status,
-			art.Title, art.Goal(), "[]", string(labels), priority, sprint,
-			string(sections), string(features), string(criteria), "{}", string(extra),
+			art.Title, art.Goal(), string(labels), priority, sprint,
+			string(sections), string(extra),
 			string(annotations),
 			art.CreatedAt.Format(time.RFC3339Nano),
 			art.UpdatedAt.Format(time.RFC3339Nano),
@@ -292,22 +285,19 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 	sprint := labelValue(art.Labels, LabelPrefixSprint)
 	labels, _ := json.Marshal(art.Labels)
 	sections, _ := json.Marshal(art.Sections)
-	features := []byte("[]")
-	criteria := []byte("[]")
 	extra, _ := json.Marshal(art.Extra)
 	annotations, _ := json.Marshal(art.Annotations)
-
 
 	_, err = tx.ExecContext(ctx, `
 		UPDATE artifacts SET
 			alias=?, kind=?, scope=?, status=?, title=?, goal=?,
-			depends_on=?, labels=?, priority=?, sprint=?,
-			sections=?, features=?, criteria=?, links=?,
+			labels=?, priority=?, sprint=?,
+			sections=?,
 			extra=?, annotations=?, updated_at=?
 		WHERE id=?`,
 		art.Alias, kind, scope, status, art.Title, art.Goal(),
-		"[]", string(labels), priority, sprint,
-		string(sections), string(features), string(criteria), "{}",
+		string(labels), priority, sprint,
+		string(sections),
 		string(extra), string(annotations),
 		art.UpdatedAt.Format(time.RFC3339Nano),
 		art.ID,
@@ -403,7 +393,7 @@ func (s *SQLiteStore) PatchArtifact(ctx context.Context, id string, patch Artifa
 }
 
 // RenameID atomically renames oldID to newID in a single transaction.
-// Cascades to: edges (from_id, to_id), parent fields, depends_on JSON arrays.
+// Cascades to: edges (from_id, to_id), artifact_labels junction table.
 // Registers oldID as alias on the renamed artifact for backward-compat lookup.
 func (s *SQLiteStore) RenameID(ctx context.Context, oldID, newID string) error { //nolint:funlen // four cascading updates + alias; splitting would break the atomic guarantee
 	tx, err := s.writer.BeginTx(ctx, nil)

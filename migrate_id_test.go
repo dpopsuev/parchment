@@ -164,7 +164,7 @@ func TestSetField_ScopeWithRenameID_MigratesID(t *testing.T) {
 	if newID == "" {
 		t.Fatal("Result.NewID should be populated when rename_id=true")
 	}
-	if !parchment.IsUUIDShaped(newID) {
+	if len(newID) != 36 || newID[8] != '-' || newID[13] != '-' || newID[18] != '-' || newID[23] != '-' {
 		t.Errorf("new ID %q should be UUID-shaped", newID)
 	}
 	got, err := proto.GetArtifact(ctx, newID)

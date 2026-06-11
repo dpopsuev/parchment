@@ -31,7 +31,7 @@ func TestAlias_CustomAliasOnCreate(t *testing.T) {
 	if art.Alias != "login-bug" {
 		t.Errorf("alias = %q, want login-bug", art.Alias)
 	}
-	if !IsUUIDShaped(art.ID) {
+	if !isUUIDShaped(art.ID) {
 		t.Errorf("ID %q should be UUID-shaped", art.ID)
 	}
 }

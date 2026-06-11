@@ -44,26 +44,6 @@ func GenerateUUID() string {
 	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:32]
 }
 
-// IsUUIDShaped reports whether s matches the UUID format (8-4-4-4-12 hex with dashes).
-func IsUUIDShaped(s string) bool {
-	if len(s) != 36 {
-		return false
-	}
-	for i, c := range s {
-		switch i {
-		case 8, 13, 18, 23:
-			if c != '-' {
-				return false
-			}
-		default:
-			if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
-				return false
-			}
-		}
-	}
-	return true
-}
-
 func unusedLetters(source, used string) []rune {
 	usedSet := make(map[rune]bool)
 	for _, r := range used {

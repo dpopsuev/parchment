@@ -190,7 +190,7 @@ func TestV043_NewArtifactsGetUUIDs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateArtifact: %v", err)
 	}
-	if !IsUUIDShaped(art.ID) {
+	if !isUUIDShaped(art.ID) {
 		t.Errorf("new artifact ID %q should be UUID-shaped after migration", art.ID)
 	}
 

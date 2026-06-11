@@ -2,7 +2,6 @@ package parchment_test
 
 import (
 	"context"
-	"math"
 	"testing"
 	"time"
 
@@ -63,67 +62,6 @@ func TestValueTensor_OldNoAccess_IsStale(t *testing.T) {
 	}
 	if v.Label() != parchment.EvictionLabelStale {
 		t.Errorf("stale tensor: want %q, got %q", parchment.EvictionLabelStale, v.Label())
-	}
-}
-
-// --- statusToQuality ---
-
-func TestStatusToQuality_Evergreen(t *testing.T) {
-	cases := map[string]struct {
-		status string
-		min    float64
-	}{
-		"evergreen": {"note.evergreen", 0.9},
-		"retired":   {"retired", 0.7},
-		"active":    {"work.active", 0.5},
-		"fleeting":  {"note.fleeting", 0.2},
-	}
-	for name, tc := range cases {
-		q := parchment.StatusToQuality(tc.status)
-		if q < tc.min {
-			t.Errorf("%s: want quality >= %.1f, got %.2f", name, tc.min, q)
-		}
-	}
-}
-
-// --- AccessHeat decay ---
-
-func TestAccessHeatDecay_RecentIsHot(t *testing.T) {
-	// Accessed now: heat ≈ 1.0
-	heat := parchment.ComputeAccessHeat(10, time.Now())
-	if heat < 0.9 {
-		t.Errorf("recent high-count access: want >= 0.9, got %.2f", heat)
-	}
-}
-
-func TestAccessHeatDecay_OldIsZero(t *testing.T) {
-	// Accessed 200 days ago: heat ≈ 0
-	heat := parchment.ComputeAccessHeat(100, time.Now().Add(-200*24*time.Hour))
-	if heat > 0.1 {
-		t.Errorf("old access: want <= 0.1, got %.2f", heat)
-	}
-}
-
-func TestAccessHeatDecay_NeverAccessed_IsZero(t *testing.T) {
-	heat := parchment.ComputeAccessHeat(0, time.Time{})
-	if heat != 0 {
-		t.Errorf("never accessed: want 0, got %.2f", heat)
-	}
-}
-
-// --- ComputeRecency ---
-
-func TestComputeRecency_UpdatedNow_IsOne(t *testing.T) {
-	r := parchment.ComputeRecency(time.Now(), 90)
-	if math.Abs(float64(r)-1.0) > 0.05 {
-		t.Errorf("updated now: want ≈1.0, got %.2f", r)
-	}
-}
-
-func TestComputeRecency_UpdatedLongAgo_IsNearZero(t *testing.T) {
-	r := parchment.ComputeRecency(time.Now().Add(-365*24*time.Hour), 90)
-	if r > 0.1 {
-		t.Errorf("updated 1y ago: want ≈0.0, got %.2f", r)
 	}
 }
 

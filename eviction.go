@@ -115,8 +115,8 @@ func (v ValueTensor) Label() EvictionLabel {
 
 // ─── Tensor computation ───────────────────────────────────────────────────────
 
-// statusToQuality maps lifecycle status strings to quality scores.
-var statusToQuality = map[string]float64{
+// qualityByStatus maps lifecycle status strings to quality scores.
+var qualityByStatus = map[string]float64{
 	"note.evergreen":    1.0,
 	"retired":           0.8,
 	"note.mature":       0.7,
@@ -131,10 +131,10 @@ var statusToQuality = map[string]float64{
 	"decision.rejected": 0.1,
 }
 
-// StatusToQuality returns the quality score for a status string.
+// statusToQuality returns the quality score for a status string.
 // Unknown statuses return 0.5 (neutral).
-func StatusToQuality(status string) float64 {
-	if q, ok := statusToQuality[status]; ok {
+func statusToQuality(status string) float64 {
+	if q, ok := qualityByStatus[status]; ok {
 		return q
 	}
 	return 0.5
@@ -144,10 +144,10 @@ func StatusToQuality(status string) float64 {
 // Access heat halves every 30 days without a new access.
 const halfLifeDays = 30.0
 
-// ComputeAccessHeat returns the decayed access heat score in [0, 1].
+// computeAccessHeat returns the decayed access heat score in [0, 1].
 // Heat = tanh(count/10) * decay(lastAccessed, halfLife).
 // Never accessed → 0. Accessed today many times → ≈1.
-func ComputeAccessHeat(accessCount int, lastAccessed time.Time) float64 {
+func computeAccessHeat(accessCount int, lastAccessed time.Time) float64 {
 	if accessCount == 0 || lastAccessed.IsZero() {
 		return 0
 	}
@@ -159,9 +159,9 @@ func ComputeAccessHeat(accessCount int, lastAccessed time.Time) float64 {
 	return freq * decay
 }
 
-// ComputeRecency returns the recency score in [0, 1] using exponential decay.
+// computeRecency returns the recency score in [0, 1] using exponential decay.
 // 1.0 = updated now. Approaches 0 as updatedAt recedes beyond windowDays.
-func ComputeRecency(updatedAt time.Time, windowDays int) float64 {
+func computeRecency(updatedAt time.Time, windowDays int) float64 {
 	if updatedAt.IsZero() {
 		return 0
 	}
@@ -190,10 +190,10 @@ func structuralHeatFromCount(incomingEdges int) float64 {
 // recencyWindowDays: days over which recency decays to near-zero (default 90).
 func ComputeTensor(art *Artifact, metrics ArtifactMetrics, incomingEdges, recencyWindowDays int) ValueTensor {
 	return ValueTensor{
-		AccessHeat:     ComputeAccessHeat(metrics.AccessCount, metrics.LastAccessed),
+		AccessHeat:     computeAccessHeat(metrics.AccessCount, metrics.LastAccessed),
 		StructuralHeat: structuralHeatFromCount(incomingEdges),
-		QualityScore:   StatusToQuality(statusFromLabels(art.Labels)),
-		Recency:        ComputeRecency(art.UpdatedAt, recencyWindowDays),
+		QualityScore:   statusToQuality(statusFromLabels(art.Labels)),
+		Recency:        computeRecency(art.UpdatedAt, recencyWindowDays),
 		ComputedAt:     time.Now().UTC(),
 	}
 }

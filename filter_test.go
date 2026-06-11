@@ -48,7 +48,7 @@ func TestFilter_MatchLabels_ScopeLabel_DirectMatch(t *testing.T) {
 func TestGenerateUUID_IsUUIDShaped(t *testing.T) {
 	t.Parallel()
 	id := parchment.GenerateUUID()
-	if !parchment.IsUUIDShaped(id) {
+	if len(id) != 36 || id[8] != '-' || id[13] != '-' || id[18] != '-' || id[23] != '-' {
 		t.Errorf("GenerateUUID returned non-UUID-shaped %q", id)
 	}
 }

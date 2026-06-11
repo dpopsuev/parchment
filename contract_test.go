@@ -106,7 +106,7 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 		t.Parallel()
 		id1 := GenerateUUID()
 		id2 := GenerateUUID()
-		if !IsUUIDShaped(id1) {
+		if !isUUIDShaped(id1) {
 			t.Errorf("id1 %q not UUID-shaped", id1)
 		}
 		if id1 == id2 {

@@ -23,7 +23,6 @@ const AnnotationPin = "pin"
 
 // AnnotationStale marks an artifact as human-confirmed stale.
 // Used as a soft label input; does not trigger automatic deletion.
-const AnnotationStale = "stale"
 
 // ─── ArtifactMetrics ─────────────────────────────────────────────────────────
 

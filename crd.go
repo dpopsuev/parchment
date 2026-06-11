@@ -169,18 +169,6 @@ func ParseResourceFile(data []byte) ([]*Resource, error) {
 	return resources, nil
 }
 
-// ApplyResource converts a Resource to a parchment artifact and upserts it into _schema.
-// For kind=Artifact, use ApplyArtifactResource instead (requires a Protocol).
-func ApplyResource(ctx context.Context, s Store, r *Resource) error {
-	switch r.Kind {
-	case "Label", "LabelDefinition":
-		return applyLabelDefinition(ctx, s, r)
-	case "Relationship":
-		return applyRelationship(ctx, s, r)
-	default:
-		return fmt.Errorf("%w: %s", errUnsupportedKind, r.Kind)
-	}
-}
 
 // ApplyArtifactResource applies an Artifact CRD using the Protocol (needed for business logic).
 // metadata.id is required. metadata.title (or metadata.name) provides the artifact title.

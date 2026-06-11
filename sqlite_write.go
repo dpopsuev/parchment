@@ -162,13 +162,13 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 	defer tx.Rollback() //nolint:errcheck // deferred rollback
 
 	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO artifacts (uid, id, alias, kind, scope, status, parent, title, goal,
+		INSERT INTO artifacts (uid, id, alias, kind, scope, status, title, goal,
 			depends_on, labels, priority, sprint, sections, features, criteria, links,
 			extra, annotations, created_at, updated_at, inserted_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(uid) DO UPDATE SET
 			id=excluded.id, alias=excluded.alias, kind=excluded.kind, scope=excluded.scope,
-			status=excluded.status, parent=excluded.parent, title=excluded.title,
+			status=excluded.status, title=excluded.title,
 			goal=excluded.goal, depends_on=excluded.depends_on, labels=excluded.labels,
 			priority=excluded.priority, sprint=excluded.sprint, sections=excluded.sections,
 			features=excluded.features, criteria=excluded.criteria, links=excluded.links,
@@ -460,19 +460,19 @@ func scanArtifactRows(rows *sql.Rows) (*Artifact, error) {
 
 // artifactColumns is the explicit column list for SELECT queries.
 // Must match the scan order in scanRow exactly.
-const artifactColumns = `uid, id, alias, kind, scope, status, title, goal, depends_on, labels, priority, sprint, sections, features, criteria, links, extra, annotations, created_at, updated_at, inserted_at`
+const artifactColumns = `uid, id, alias, kind, scope, status, title, goal, labels, priority, sprint, sections, extra, annotations, created_at, updated_at, inserted_at`
 
 func scanRow(s rowScanner) (*Artifact, error) {
 	var art Artifact
 	var uid string // internal upsert key — not exposed on Artifact
 	var kindCol, scopeCol, statusCol, priorityCol, sprintCol, goalCol string
-	var dependsOn, labels, sections, features, criteria, links, extra, annotations string
+	var labels, sections, extra, annotations string
 	var createdAt, updatedAt, insertedAt string
 
 	err := s.Scan(
 		&uid, &art.ID, &art.Alias, &kindCol, &scopeCol, &statusCol, &art.Title, &goalCol,
-		&dependsOn, &labels, &priorityCol, &sprintCol,
-		&sections, &features, &criteria, &links, &extra,
+		&labels, &priorityCol, &sprintCol,
+		&sections, &extra,
 		&annotations,
 		&createdAt, &updatedAt, &insertedAt,
 	)
@@ -579,15 +579,6 @@ func syncLabelsInTx(ctx context.Context, tx *sql.Tx, id string, labels []string)
 		}
 	}
 	return nil
-}
-
-
-func toSet(items []string) map[string]bool {
-	m := make(map[string]bool, len(items))
-	for _, item := range items {
-		m[item] = true
-	}
-	return m
 }
 
 

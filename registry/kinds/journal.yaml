@@ -1,17 +1,21 @@
-name: journal
-prefix: JRN
-code: "j"
-family: knowledge
-lifecycle:
-  default_status: work.active
-sections:
-  should: [body]
-relations:
-  outgoing: [cites, documents]
-children: []
-when_to_create: |
-  Create a journal entry for a daily dated record — one per day, idempotent.
-  Use for session summaries, daily notes, and time-bound observations.
-agent_note: |
-  One journal per day. Creating the same date twice is a no-op. Journal entries
-  cite sources and document artifacts but do not define concepts.
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: kind.journal
+spec:
+  prefix: JRN
+  code: "j"
+  family: knowledge
+  children: []
+  lifecycle:
+    defaultStatus: work.active
+  sections:
+    should: [body]
+  relations:
+    outgoing: [cites, documents]
+  whenToCreate: |
+    Create a journal entry for a daily dated record — one per day, idempotent.
+    Use for session summaries, daily notes, and time-bound observations.
+  agentNote: |
+    One journal per day. Creating the same date twice is a no-op. Journal entries
+    cite sources and document artifacts but do not define concepts.

@@ -1,9 +1,13 @@
-name: decision
-eviction_policy: protected
-when_to_apply: |
-  Apply "decision" to notes created via admin(action=decision) — cached answers
-  to recurring questions. Not the same as kind=decision (ADR); this is a
-  lightweight key-value cache on kind=note.
-implies: |
-  Protected from eviction. Queryable via admin(action=decision,
-  snapshot_action=check, check=<key>).
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: decision
+spec:
+  evictionPolicy: protected
+  whenToApply: |
+    Apply "decision" to notes created via admin(action=decision) — cached answers
+    to recurring questions. Not the same as kind=decision (ADR); this is a
+    lightweight key-value cache on kind=note.
+  implies: |
+    Protected from eviction. Queryable via admin(action=decision,
+    snapshot_action=check, check=<key>).

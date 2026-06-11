@@ -1,21 +1,24 @@
-name: ref
-prefix: REF
-code: REF
-family: support
-protected: true
-sections:
-  should: [summary, source]
-relations:
-  outgoing: [documents, satisfies]
-  expected_outgoing: [documents]
-  targets:
-    satisfies: [template]
-when_to_create: |
-  Create a ref to link an external source (paper, blog post, RFC, documentation)
-  into the artifact graph. Refs provide citeable provenance for notes and specs.
-agent_note: |
-  Refs are support artifacts — they document other artifacts. A ref without a
-  documents edge is an orphan; lint surfaces this. source section should contain
-  the URL or citation.
-
-children: []
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: kind.ref
+spec:
+  prefix: REF
+  code: REF
+  family: support
+  protected: true
+  children: []
+  sections:
+    should: [summary, source]
+  relations:
+    outgoing: [documents, satisfies]
+    expectedOutgoing: [documents]
+    targets:
+      satisfies: [template]
+  whenToCreate: |
+    Create a ref to link an external source (paper, blog post, RFC, documentation)
+    into the artifact graph. Refs provide citeable provenance for notes and specs.
+  agentNote: |
+    Refs are support artifacts — they document other artifacts. A ref without a
+    documents edge is an orphan; lint surfaces this. source section should contain
+    the URL or citation.

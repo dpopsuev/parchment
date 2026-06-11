@@ -1,10 +1,14 @@
-name: skill
-world: behavioral
-eviction_policy: protected
-when_to_apply: |
-  Apply "skill" to notes that encode procedural knowledge — how to do X,
-  step-by-step instructions, reusable procedures. Skills are the agent's
-  procedural memory.
-implies: |
-  Protected from eviction. Included in context_read as procedural guidance.
-  Searchable via recall(query="how to X").
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: skill
+spec:
+  world: behavioral
+  evictionPolicy: protected
+  whenToApply: |
+    Apply "skill" to notes that encode procedural knowledge — how to do X,
+    step-by-step instructions, reusable procedures. Skills are the agent's
+    procedural memory.
+  implies: |
+    Protected from eviction. Included in context_read as procedural guidance.
+    Searchable via recall(query="how to X").

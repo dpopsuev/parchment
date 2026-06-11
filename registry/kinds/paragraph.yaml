@@ -1,12 +1,16 @@
-name: paragraph
-prefix: PAR
-code: PAR
-family: support
-lifecycle:
-  default_status: work.active
-children: []
-when_to_create: |
-  Paragraph artifacts are sub-section units. Not used in current Scribe
-  surface — reserved for future fine-grained document structure.
-agent_note: |
-  Internal kind. Do not create paragraph artifacts directly.
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: kind.paragraph
+spec:
+  prefix: PAR
+  code: PAR
+  family: support
+  children: []
+  lifecycle:
+    defaultStatus: work.active
+  whenToCreate: |
+    Paragraph artifacts are sub-section units. Not used in current Scribe
+    surface — reserved for future fine-grained document structure.
+  agentNote: |
+    Internal kind. Do not create paragraph artifacts directly.

@@ -1,9 +1,13 @@
-name: lang
-world: behavioral
-when_to_apply: |
-  Apply "lang.go", "lang.ts", "lang.python" etc. to scope rules and skills to
-  a specific programming language. Use dot-namespacing: "lang.go.test" inherits
-  both "lang.go" and "lang".
-implies: |
-  Dot-expanded: "lang.go" also matches "lang" queries. Behavioral world —
-  affects context_read assembly for language-specific sessions.
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: lang
+spec:
+  world: behavioral
+  whenToApply: |
+    Apply "lang.go", "lang.ts", "lang.python" etc. to scope rules and skills to
+    a specific programming language. Use dot-namespacing: "lang.go.test" inherits
+    both "lang.go" and "lang".
+  implies: |
+    Dot-expanded: "lang.go" also matches "lang" queries. Behavioral world —
+    affects context_read assembly for language-specific sessions.

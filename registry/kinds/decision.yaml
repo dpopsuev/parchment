@@ -1,28 +1,37 @@
-name: decision
-prefix: ADR
-code: ADR
-family: intent
-protected: true
-lifecycle:
-  default_status: decision.proposed
-  transitions:
-    work.draft: [decision.proposed, cancelled]
-    decision.proposed: [decision.accepted, decision.rejected, decision.deferred, work.draft]
-    decision.accepted: [archived]
-    decision.rejected: []
-    decision.deferred: [work.draft]
-    cancelled: []
-relations:
-  outgoing: [satisfies]
-  targets:
-    satisfies: [template]
-when_to_create: |
-  Create a decision (ADR) when you evaluate multiple options and choose one —
-  a technology choice, an architectural pattern, a policy. The decision records
-  what was chosen and why, so future agents do not re-litigate settled questions.
-agent_note: |
-  Decisions are immutable once accepted. They document options considered and
-  rationale. Accepted decisions are authoritative. Specs that build on a draft
-  decision are building on sand — lint surfaces this as a warning.
-
-children: []
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: kind.decision
+spec:
+  prefix: ADR
+  code: ADR
+  family: intent
+  protected: true
+  children: []
+  lifecycle:
+    defaultStatus: decision.proposed
+    transitions:
+      - from: work.draft
+        to: [decision.proposed, cancelled]
+      - from: decision.proposed
+        to: [decision.accepted, decision.rejected, decision.deferred, work.draft]
+      - from: decision.accepted
+        to: [archived]
+      - from: decision.rejected
+        to: []
+      - from: decision.deferred
+        to: [work.draft]
+      - from: cancelled
+        to: []
+  relations:
+    outgoing: [satisfies]
+    targets:
+      satisfies: [template]
+  whenToCreate: |
+    Create a decision (ADR) when you evaluate multiple options and choose one —
+    a technology choice, an architectural pattern, a policy. The decision records
+    what was chosen and why, so future agents do not re-litigate settled questions.
+  agentNote: |
+    Decisions are immutable once accepted. They document options considered and
+    rationale. Accepted decisions are authoritative. Specs that build on a draft
+    decision are building on sand — lint surfaces this as a warning.

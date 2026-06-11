@@ -1,7 +1,11 @@
-name: follows
-when_to_use: |
-  Use follows for a soft ordering preference — B should come after A but is
-  not blocked. Unlike depends_on, follows does not prevent activation.
-semantics: |
-  Advisory sequencing. No cycle detection. Does not affect TopoSort. Surfaced
-  as a warning if B is activated before A completes.
+apiVersion: scribe/v1
+kind: EdgeTypeDefinition
+metadata:
+  name: follows
+spec:
+  whenToUse: |
+    Use follows for a soft ordering preference — B should come after A but is
+    not blocked. Unlike depends_on, follows does not prevent activation.
+  semantics: |
+    Advisory sequencing. No cycle detection. Does not affect TopoSort. Surfaced
+    as a warning if B is activated before A completes.

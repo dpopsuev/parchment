@@ -1,6 +1,10 @@
-name: remembers
-when_to_use: |
-  Use remembers when an agent context artifact bookmarks a note or concept for
-  the current session — ephemeral recall tagging.
-semantics: |
-  Session-scoped bookmark. Used by context_read to surface relevant knowledge.
+apiVersion: scribe/v1
+kind: EdgeTypeDefinition
+metadata:
+  name: remembers
+spec:
+  whenToUse: |
+    Use remembers when an agent context artifact bookmarks a note or concept for
+    the current session — ephemeral recall tagging.
+  semantics: |
+    Session-scoped bookmark. Used by context_read to surface relevant knowledge.

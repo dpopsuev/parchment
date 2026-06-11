@@ -1,32 +1,41 @@
-name: need
-prefix: NEED
-code: NED
-family: intent
-protected: true
-lifecycle:
-  default_status: work.draft
-  transitions:
-    work.draft: [decision.proposed, cancelled]
-    decision.proposed: [decision.accepted, decision.rejected, decision.deferred, work.draft]
-    decision.accepted: [archived]
-    decision.rejected: []
-    decision.deferred: [work.draft]
-    cancelled: []
-sections:
-  must: [problem]
-  should: [value, acceptance]
-relations:
-  outgoing: [justifies, satisfies]
-  targets:
-    justifies: [spec]
-    satisfies: [template]
-when_to_create: |
-  Create a need when you have identified a capability gap or a problem statement
-  before any solution exists. A need captures the "why" — the pressure that
-  justifies downstream specs and tasks.
-agent_note: |
-  Needs are the root of the intent chain: need → (justifies) → spec →
-  (implements) → task. A need without a justifying spec is unresolved.
-  A need without a task chain is unscheduled intent.
-
-children: []
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: kind.need
+spec:
+  prefix: NEED
+  code: NED
+  family: intent
+  protected: true
+  children: []
+  lifecycle:
+    defaultStatus: work.draft
+    transitions:
+      - from: work.draft
+        to: [decision.proposed, cancelled]
+      - from: decision.proposed
+        to: [decision.accepted, decision.rejected, decision.deferred, work.draft]
+      - from: decision.accepted
+        to: [archived]
+      - from: decision.rejected
+        to: []
+      - from: decision.deferred
+        to: [work.draft]
+      - from: cancelled
+        to: []
+  sections:
+    must: [problem]
+    should: [value, acceptance]
+  relations:
+    outgoing: [justifies, satisfies]
+    targets:
+      justifies: [spec]
+      satisfies: [template]
+  whenToCreate: |
+    Create a need when you have identified a capability gap or a problem statement
+    before any solution exists. A need captures the "why" — the pressure that
+    justifies downstream specs and tasks.
+  agentNote: |
+    Needs are the root of the intent chain: need → (justifies) → spec →
+    (implements) → task. A need without a justifying spec is unresolved.
+    A need without a task chain is unscheduled intent.

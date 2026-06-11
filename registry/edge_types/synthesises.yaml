@@ -1,7 +1,11 @@
-name: synthesises
-when_to_use: |
-  Use synthesises when a note is a synthesis of multiple source notes — a
-  meta-note that combines insights from several notes.
-semantics: |
-  Knowledge synthesis. The synthesized note is the canonical view; the source
-  notes are its evidence base.
+apiVersion: scribe/v1
+kind: EdgeTypeDefinition
+metadata:
+  name: synthesises
+spec:
+  whenToUse: |
+    Use synthesises when a note is a synthesis of multiple source notes — a
+    meta-note that combines insights from several notes.
+  semantics: |
+    Knowledge synthesis. The synthesized note is the canonical view; the source
+    notes are its evidence base.

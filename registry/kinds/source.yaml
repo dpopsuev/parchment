@@ -1,18 +1,23 @@
-name: source
-prefix: SRC
-code: "s"
-family: knowledge
-lifecycle:
-  default_status: work.active
-sections:
-  must: [summary]
-  should: [key-insights, provenance]
-relations:
-  incoming: [cites]
-children: []
-when_to_create: |
-  Create a source to capture an external reference — a paper, article, book,
-  URL, or dataset. Sources are cited by notes and concepts.
-agent_note: |
-  Sources are the citation anchors of the knowledge graph. summary is required.
-  provenance should contain the URL or publication reference.
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: kind.source
+spec:
+  prefix: SRC
+  code: "s"
+  family: knowledge
+  vacuumable: true
+  children: []
+  lifecycle:
+    defaultStatus: work.active
+  sections:
+    must: [summary]
+    should: [key-insights, provenance]
+  relations:
+    incoming: [cites]
+  whenToCreate: |
+    Create a source to capture an external reference — a paper, article, book,
+    URL, or dataset. Sources are cited by notes and concepts.
+  agentNote: |
+    Sources are the citation anchors of the knowledge graph. summary is required.
+    provenance should contain the URL or publication reference.

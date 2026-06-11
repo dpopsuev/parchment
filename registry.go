@@ -12,14 +12,95 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	crdKindLabelDefinition    = "LabelDefinition"
+	crdKindEdgeTypeDefinition = "EdgeTypeDefinition"
+)
+
 //go:embed registry/kinds/*.yaml registry/edge_types/*.yaml registry/labels/*.yaml
 var registryFS embed.FS
 
 //go:embed registry/rules
 var rulesFS embed.FS
 
-// kindYAML is the on-disk format for a kind definition.
-// Fields map directly to KindDef embedded structs plus guidance sections.
+func crdResourceToKindYAML(r *Resource) kindYAML {
+	name := strings.TrimPrefix(r.Metadata.Name, "kind.")
+	k := kindYAML{
+		Name:       name,
+		Prefix:     r.Spec.Prefix,
+		Code:       r.Spec.Code,
+		Family:     r.Spec.Family,
+		Protected:  r.Spec.Protected,
+		Vacuumable: r.Spec.Vacuumable,
+		SkipGuards: r.Spec.SkipGuards,
+		Children:   r.Spec.Children,
+		WhenToCreate: r.Spec.WhenToCreate,
+		AgentNote:    r.Spec.AgentNote,
+	}
+	if r.Spec.Lifecycle != nil {
+		k.Lifecycle.DefaultStatus = r.Spec.Lifecycle.DefaultStatus
+		if len(r.Spec.Lifecycle.Transitions) > 0 {
+			k.Lifecycle.Transitions = make(map[string][]string, len(r.Spec.Lifecycle.Transitions))
+			for _, t := range r.Spec.Lifecycle.Transitions {
+				k.Lifecycle.Transitions[t.From] = t.To
+			}
+		}
+	}
+	k.Lifecycle.ActiveStatus = r.Spec.ActiveStatus
+	k.Lifecycle.TriggerStatus = r.Spec.TriggerStatus
+	k.Lifecycle.IsGoalKind = r.Spec.IsGoalKind
+	k.Lifecycle.TrackInBrief = r.Spec.TrackInBrief
+	k.Lifecycle.ActivationRequiresSections = r.Spec.ActivationRequiresSections
+	k.Lifecycle.CompletionGates = r.Spec.CompletionGates
+	if r.Spec.Sections != nil {
+		k.Sections.Must = r.Spec.Sections.Must
+		k.Sections.Should = r.Spec.Sections.Should
+		k.Sections.Could = r.Spec.Sections.Could
+	}
+	k.Sections.RequiredFields = r.Spec.RequiredFields
+	if r.Spec.Relations != nil {
+		k.Relations.Outgoing = r.Spec.Relations.Outgoing
+		k.Relations.Incoming = r.Spec.Relations.Incoming
+		k.Relations.ExpectedOutgoing = r.Spec.Relations.ExpectedOutgoing
+		k.Relations.RequiredOutgoing = r.Spec.Relations.RequiredOutgoing
+		k.Relations.Targets = r.Spec.Relations.Targets
+	}
+	return k
+}
+
+func crdResourceToEdgeTypeYAML(r *Resource) edgeTypeYAML {
+	pairs := make([]kindPairYAML, len(r.Spec.AllowedPairs))
+	for i, p := range r.Spec.AllowedPairs {
+		pairs[i] = kindPairYAML(p)
+	}
+	return edgeTypeYAML{
+		Name:             r.Metadata.Name,
+		MaxOutgoing:      r.Spec.MaxOutgoing,
+		MaxIncoming:      r.Spec.MaxIncoming,
+		Directionality:   r.Spec.Directionality,
+		CycleGuard:       r.Spec.CycleGuard,
+		CompletionRollup: r.Spec.CompletionRollup,
+		ConformanceCheck: r.Spec.ConformanceCheck,
+		AllowedPairs:     pairs,
+		WhenToUse:        r.Spec.WhenToUse,
+		Semantics:        r.Spec.Semantics,
+	}
+}
+
+func crdResourceToLabelYAML(r *Resource) labelYAML {
+	return labelYAML{
+		Name:             r.Metadata.Name,
+		World:            r.Spec.World,
+		EvictionPolicy:   r.Spec.EvictionPolicy,
+		HalfLifeDays:     r.Spec.HalfLifeDays,
+		AlwaysApply:      r.Spec.AlwaysApply,
+		RequiredSections: r.Spec.RequiredSections,
+		WhenToApply:      r.Spec.WhenToApply,
+		Implies:          r.Spec.Implies,
+	}
+}
+
+// kindYAML is the internal kind representation, populated from CRD files.
 type kindYAML struct {
 	Name     string `yaml:"name"`
 	Prefix   string `yaml:"prefix"`
@@ -58,8 +139,6 @@ type kindYAML struct {
 		Targets          map[string][]string `yaml:"targets"`
 	} `yaml:"relations"`
 
-	// Agent guidance — stored as sections on the kind_definition artifact,
-	// not as fields on KindDef. These are documentation, not runtime behavior.
 	WhenToCreate string `yaml:"when_to_create"`
 	AgentNote    string `yaml:"agent_note"`
 }
@@ -102,7 +181,7 @@ func (k *kindYAML) toKindDef() KindDef {
 	}
 }
 
-// edgeTypeYAML is the on-disk format for an edge type definition.
+// edgeTypeYAML is the internal edge type representation, populated from CRD files.
 type edgeTypeYAML struct {
 	Name             string          `yaml:"name"`
 	MaxOutgoing      int             `yaml:"max_outgoing"`
@@ -121,7 +200,7 @@ type kindPairYAML struct {
 	Target string `yaml:"target"`
 }
 
-// labelYAML is the on-disk format for a label definition.
+// labelYAML is the internal label representation, populated from CRD files.
 type labelYAML struct {
 	Name             string   `yaml:"name"`
 	World            string   `yaml:"world"`
@@ -133,7 +212,7 @@ type labelYAML struct {
 	Implies          string   `yaml:"implies"`
 }
 
-// loadRegistryKinds parses all kind YAML files from the embedded registry.
+// loadRegistryKinds parses all kind CRD files from the embedded registry.
 func loadRegistryKinds() []kindYAML {
 	entries, err := registryFS.ReadDir("registry/kinds")
 	if err != nil {
@@ -148,20 +227,26 @@ func loadRegistryKinds() []kindYAML {
 		if err != nil {
 			continue
 		}
-		var k kindYAML
-		if err := yaml.Unmarshal(data, &k); err != nil {
-			slog.WarnContext(context.Background(), "registry: parse kind YAML failed", slog.String("file", e.Name()), slog.Any(LogKeyError, err)) //nolint:sloglint // "file" has no LogKey constant
+		resources, err := ParseResourceFile(data)
+		if err != nil {
+			slog.WarnContext(context.Background(), "registry: parse kind CRD failed", slog.String("file", e.Name()), slog.Any(LogKeyError, err)) //nolint:sloglint // "file" has no LogKey constant
 			continue
 		}
-		if k.Name == "" {
-			k.Name = strings.TrimSuffix(e.Name(), ".yaml")
+		for _, r := range resources {
+			if r.Kind != crdKindLabelDefinition {
+				continue
+			}
+			k := crdResourceToKindYAML(r)
+			if k.Name == "" {
+				k.Name = strings.TrimSuffix(e.Name(), ".yaml")
+			}
+			kinds = append(kinds, k)
 		}
-		kinds = append(kinds, k)
 	}
 	return kinds
 }
 
-// loadRegistryEdgeTypes parses all edge_type YAML files from the embedded registry.
+// loadRegistryEdgeTypes parses all edge_type CRD files from the embedded registry.
 func loadRegistryEdgeTypes() []edgeTypeYAML { //nolint:dupl // parallel structure to loadRegistryKinds; generic helper would obscure embed path
 	entries, err := registryFS.ReadDir("registry/edge_types")
 	if err != nil {
@@ -176,20 +261,26 @@ func loadRegistryEdgeTypes() []edgeTypeYAML { //nolint:dupl // parallel structur
 		if err != nil {
 			continue
 		}
-		var et edgeTypeYAML
-		if err := yaml.Unmarshal(data, &et); err != nil {
+		resources, err := ParseResourceFile(data)
+		if err != nil {
 			continue
 		}
-		if et.Name == "" {
-			et.Name = strings.TrimSuffix(filepath.Base(e.Name()), ".yaml")
+		for _, r := range resources {
+			if r.Kind != crdKindEdgeTypeDefinition {
+				continue
+			}
+			et := crdResourceToEdgeTypeYAML(r)
+			if et.Name == "" {
+				et.Name = strings.TrimSuffix(e.Name(), ".yaml")
+			}
+			ets = append(ets, et)
 		}
-		ets = append(ets, et)
 	}
 	return ets
 }
 
-// loadRegistryLabels parses all label YAML files from the embedded registry.
-func loadRegistryLabels() []labelYAML { //nolint:dupl // parallel structure to loadRegistryEdgeTypes; generic helper would obscure embed path
+// loadRegistryLabels parses all label CRD files from the embedded registry.
+func loadRegistryLabels() []labelYAML { //nolint:dupl // parallel to loadRegistryEdgeTypes; generic helper would obscure embed path
 	entries, err := registryFS.ReadDir("registry/labels")
 	if err != nil {
 		return nil
@@ -203,20 +294,25 @@ func loadRegistryLabels() []labelYAML { //nolint:dupl // parallel structure to l
 		if err != nil {
 			continue
 		}
-		var l labelYAML
-		if err := yaml.Unmarshal(data, &l); err != nil {
+		resources, err := ParseResourceFile(data)
+		if err != nil {
 			continue
 		}
-		if l.Name == "" {
-			l.Name = strings.TrimSuffix(filepath.Base(e.Name()), ".yaml")
+		for _, r := range resources {
+			if r.Kind != crdKindLabelDefinition {
+				continue
+			}
+			l := crdResourceToLabelYAML(r)
+			if l.Name == "" {
+				l.Name = strings.TrimSuffix(e.Name(), ".yaml")
+			}
+			labels = append(labels, l)
 		}
-		labels = append(labels, l)
 	}
 	return labels
 }
 
-// seedKindsFromRegistry writes kind_definition artifacts to the store from the embedded YAML registry.
-// Called from SeedDefinitions. Guidance sections (when_to_create, agent_note) are stored on the artifact.
+// seedKindsFromRegistry writes kind_definition artifacts to the store from the embedded CRD registry.
 func seedKindsFromRegistry(ctx context.Context, s Store) {
 	now := time.Now().UTC()
 	allKinds := loadRegistryKinds()
@@ -253,7 +349,7 @@ func seedKindsFromRegistry(ctx context.Context, s Store) {
 	}
 }
 
-// seedEdgeTypesFromRegistry writes edge_type_definition artifacts from the embedded YAML registry.
+// seedEdgeTypesFromRegistry writes edge_type_definition artifacts from the embedded CRD registry.
 func seedEdgeTypesFromRegistry(ctx context.Context, s Store) {
 	now := time.Now().UTC()
 	for _, et := range loadRegistryEdgeTypes() {
@@ -296,7 +392,7 @@ func seedEdgeTypesFromRegistry(ctx context.Context, s Store) {
 	}
 }
 
-// seedLabelsFromRegistry writes label_definition artifacts from the embedded YAML registry.
+// seedLabelsFromRegistry writes label_definition artifacts from the embedded CRD registry.
 func seedLabelsFromRegistry(ctx context.Context, s Store) {
 	now := time.Now().UTC()
 	for _, l := range loadRegistryLabels() {
@@ -337,10 +433,8 @@ func seedLabelsFromRegistry(ctx context.Context, s Store) {
 }
 
 // migrateKindSections updates existing kind_definition artifacts in the store
-// by adding any guidance sections present in the registry YAML but absent from
-// the stored artifact. Existing sections are never overwritten — operator
-// customisation is preserved. This is the forward-migration path for stores
-// seeded before the registry existed.
+// by adding any guidance sections present in the registry CRD but absent from
+// the stored artifact. Existing sections are never overwritten.
 func migrateKindSections(ctx context.Context, s Store) {
 	allKinds := loadRegistryKinds()
 	for i := range allKinds {
@@ -348,7 +442,7 @@ func migrateKindSections(ctx context.Context, s Store) {
 		id := "DEF-" + k.Name
 		art, err := s.Get(ctx, id)
 		if err != nil {
-			continue // not yet seeded; seedKindsFromRegistry will handle it
+			continue
 		}
 		existing := make(map[string]bool, len(art.Sections))
 		for _, sec := range art.Sections {
@@ -461,8 +555,7 @@ func loadRegistryRules() []ruleYAML { //nolint:dupl // parallel to other loadReg
 	return rules
 }
 
-// registrySchema builds a Schema from the embedded kind registry YAML files.
-// This replaces the hardcoded KnowledgeSchema() kind map with data-driven definitions.
+// registrySchema builds a Schema from the embedded kind registry CRD files.
 func registrySchema() map[string]KindDef {
 	kinds := make(map[string]KindDef)
 	registryKinds := loadRegistryKinds()

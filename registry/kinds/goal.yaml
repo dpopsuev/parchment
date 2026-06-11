@@ -1,27 +1,30 @@
-name: goal
-prefix: GOAL
-code: GOL
-family: effort
-protected: true
-vacuumable: true
-lifecycle:
-  is_goal_kind: true
-  default_status: work.draft
-  active_status: work.active
-  track_in_brief: true
-  auto_archive_on_justify_complete: true
-children: [task, spec, bug, need, ref, doc, decision]
-relations:
-  incoming: [parent_of]
-  outgoing: [satisfies]
-  targets:
-    satisfies: [template]
-when_to_create: |
-  Create a goal when you have a measurable outcome that multiple tasks serve —
-  a shipped feature, a passing test suite, a published release. Goals are the
-  unit of strategic intent inside a campaign. Use admin(action=set_goal) to
-  create a goal and archive the previous active goal atomically.
-agent_note: |
-  Only one goal is current at a time per scope. set_goal archives existing
-  current goals before creating the new one. Goals auto-archive when their
-  justifying spec is complete. Tasks and specs live as children of the current goal.
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: kind.goal
+spec:
+  prefix: GOAL
+  code: GOL
+  family: effort
+  protected: true
+  vacuumable: true
+  children: [task, spec, bug, need, ref, doc, decision]
+  lifecycle:
+    defaultStatus: work.draft
+  isGoalKind: true
+  activeStatus: work.active
+  trackInBrief: true
+  relations:
+    incoming: [parent_of]
+    outgoing: [satisfies]
+    targets:
+      satisfies: [template]
+  whenToCreate: |
+    Create a goal when you have a measurable outcome that multiple tasks serve —
+    a shipped feature, a passing test suite, a published release. Goals are the
+    unit of strategic intent inside a campaign. Use admin(action=set_goal) to
+    create a goal and archive the previous active goal atomically.
+  agentNote: |
+    Only one goal is current at a time per scope. set_goal archives existing
+    current goals before creating the new one. Goals auto-archive when their
+    justifying spec is complete. Tasks and specs live as children of the current goal.

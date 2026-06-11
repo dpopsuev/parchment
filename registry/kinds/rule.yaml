@@ -1,20 +1,24 @@
-name: rule
-prefix: RULE
-code: RUL
-family: support
-protected: true
-skip_guards: true
-lifecycle:
-  default_status: work.active
-sections:
-  must: [trigger, when, action, message]
-children: []
-when_to_create: |
-  Create a rule artifact to encode a lifecycle constraint that currently lives
-  as a Go transitionGuard function. Rules are data — they are evaluated by the
-  RuleEvaluator at status transition time. Prefer rules over Go code for any
-  guard that could be expressed as: trigger=status_changed, when=predicate, action=block|warn.
-agent_note: |
-  Rules live in _schema scope. They are loaded at Protocol.New time via LoadRules().
-  The RuleEvaluator evaluates them after the built-in Transitions map check but
-  before returning the result. Forceable rules are bypassed when SetFieldOptions.BypassGuards=true.
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: kind.rule
+spec:
+  prefix: RULE
+  code: RUL
+  family: support
+  protected: true
+  skipGuards: true
+  children: []
+  lifecycle:
+    defaultStatus: work.active
+  sections:
+    must: [trigger, when, action, message]
+  whenToCreate: |
+    Create a rule artifact to encode a lifecycle constraint that currently lives
+    as a Go transitionGuard function. Rules are data — they are evaluated by the
+    RuleEvaluator at status transition time. Prefer rules over Go code for any
+    guard that could be expressed as: trigger=status_changed, when=predicate, action=block|warn.
+  agentNote: |
+    Rules live in _schema scope. They are loaded at Protocol.New time via LoadRules().
+    The RuleEvaluator evaluates them after the built-in Transitions map check but
+    before returning the result. Forceable rules are bypassed when SetFieldOptions.BypassGuards=true.

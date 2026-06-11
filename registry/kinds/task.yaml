@@ -1,36 +1,45 @@
-name: task
-prefix: TASK
-code: TSK
-family: effort
-vacuumable: true
-lifecycle:
-  default_status: work.draft
-  trigger_status: work.complete
-  activation_requires_sections: true
-  transitions:
-    work.draft: [work.active, cancelled]
-    work.active: [work.complete, work.draft, cancelled]
-    work.blocked: [work.active, work.draft, cancelled]
-    work.complete: [retired, archived]
-    cancelled: [work.draft, retired, archived]
-    retired: []
-sections:
-  must: [context]
-  should: [checklist, acceptance]
-  could: [current_architecture, desired_architecture]
-  required_fields: [priority]
-relations:
-  outgoing: [implements, depends_on, satisfies]
-  targets:
-    implements: [spec, bug]
-    satisfies: [template]
-when_to_create: |
-  Create a task when work is discrete, time-bounded, and assigned to a single
-  effort. A task has clear done-criteria. If the work is too large to fit in
-  one effort, break it into multiple tasks under a goal.
-agent_note: |
-  Tasks block via depends_on — TopoSort respects this. Priority is required
-  before activation. A task implements a spec or bug (intent family). Completion
-  auto-propagates to the parent goal when all siblings are terminal.
-
-children: []
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: kind.task
+spec:
+  prefix: TASK
+  code: TSK
+  family: effort
+  vacuumable: true
+  children: []
+  lifecycle:
+    defaultStatus: work.draft
+    transitions:
+      - from: work.draft
+        to: [work.active, cancelled]
+      - from: work.active
+        to: [work.complete, work.draft, cancelled]
+      - from: work.blocked
+        to: [work.active, work.draft, cancelled]
+      - from: work.complete
+        to: [retired, archived]
+      - from: cancelled
+        to: [work.draft, retired, archived]
+      - from: retired
+        to: []
+  activationRequiresSections: true
+  triggerStatus: work.complete
+  sections:
+    must: [context]
+    should: [checklist, acceptance]
+    could: [current_architecture, desired_architecture]
+  requiredFields: [priority]
+  relations:
+    outgoing: [implements, depends_on, satisfies]
+    targets:
+      implements: [spec, bug]
+      satisfies: [template]
+  whenToCreate: |
+    Create a task when work is discrete, time-bounded, and assigned to a single
+    effort. A task has clear done-criteria. If the work is too large to fit in
+    one effort, break it into multiple tasks under a goal.
+  agentNote: |
+    Tasks block via depends_on — TopoSort respects this. Priority is required
+    before activation. A task implements a spec or bug (intent family). Completion
+    auto-propagates to the parent goal when all siblings are terminal.

@@ -1,8 +1,12 @@
-name: satisfies
-conformance_check: true
-when_to_use: |
-  Use satisfies when an artifact conforms to a template. Template conformance
-  is checked at promotion to active.
-semantics: |
-  Template conformance. LinkArtifacts(satisfies) triggers a conformance check:
-  the source artifact must have all sections marked required by the template.
+apiVersion: scribe/v1
+kind: EdgeTypeDefinition
+metadata:
+  name: satisfies
+spec:
+  conformanceCheck: true
+  whenToUse: |
+    Use satisfies when an artifact conforms to a template. Template conformance
+    is checked at promotion to active.
+  semantics: |
+    Template conformance. LinkArtifacts(satisfies) triggers a conformance check:
+    the source artifact must have all sections marked required by the template.

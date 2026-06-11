@@ -1,23 +1,30 @@
-name: note
-prefix: NOT
-code: "n"
-family: knowledge
-lifecycle:
-  default_status: note.fleeting
-  transitions:
-    note.fleeting: [note.mature, note.evergreen, archived]
-    note.mature: [note.evergreen, note.fleeting, archived]
-    note.evergreen: [note.mature, archived]
-    archived: []
-sections:
-  could: [body, summary, source]
-when_to_create: |
-  Create a note to capture an idea, observation, or piece of knowledge during
-  a session. Start as note.fleeting (draft in transit). Promote to note.evergreen when
-  the insight has been validated across multiple contexts.
-agent_note: |
-  Notes are the primary knowledge artifact. recall() searches notes by FTS.
-  Wikilinks ([[note-title]]) are indexed automatically. Labels route notes
-  into the correct knowledge context (rule, skill, knowledge, decision).
-
-children: []
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: kind.note
+spec:
+  prefix: NOT
+  code: "n"
+  family: knowledge
+  children: []
+  lifecycle:
+    defaultStatus: note.fleeting
+    transitions:
+      - from: note.fleeting
+        to: [note.mature, note.evergreen, archived]
+      - from: note.mature
+        to: [note.evergreen, note.fleeting, archived]
+      - from: note.evergreen
+        to: [note.mature, archived]
+      - from: archived
+        to: []
+  sections:
+    could: [body, summary, source]
+  whenToCreate: |
+    Create a note to capture an idea, observation, or piece of knowledge during
+    a session. Start as note.fleeting (draft in transit). Promote to note.evergreen when
+    the insight has been validated across multiple contexts.
+  agentNote: |
+    Notes are the primary knowledge artifact. recall() searches notes by FTS.
+    Wikilinks ([[note-title]]) are indexed automatically. Labels route notes
+    into the correct knowledge context (rule, skill, knowledge, decision).

@@ -1,16 +1,19 @@
-name: concept
-prefix: CON
-code: "c"
-family: knowledge
-lifecycle:
-  default_status: work.active
-sections:
-  should: [definition, examples]
-when_to_create: |
-  Create a concept to define a domain term or abstract idea that recurs across
-  multiple notes and discussions. Concepts are atomic — one idea per artifact.
-agent_note: |
-  Notes elaborate concepts. Concepts anchor the knowledge graph. Use sparingly —
-  only create a concept when a term needs a canonical definition.
-
-children: []
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: kind.concept
+spec:
+  prefix: CON
+  code: "c"
+  family: knowledge
+  children: []
+  lifecycle:
+    defaultStatus: work.active
+  sections:
+    should: [definition, examples]
+  whenToCreate: |
+    Create a concept to define a domain term or abstract idea that recurs across
+    multiple notes and discussions. Concepts are atomic — one idea per artifact.
+  agentNote: |
+    Notes elaborate concepts. Concepts anchor the knowledge graph. Use sparingly —
+    only create a concept when a term needs a canonical definition.

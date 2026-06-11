@@ -1,20 +1,23 @@
-name: parent_of
-max_incoming: 1
-cascade_archive: true
-completion_rollup: true
-allowed_pairs:
-  - source: campaign
-    target: goal
-  - source: goal
-    target: task
-  - source: goal
-    target: spec
-  - source: goal
-    target: bug
-when_to_use: |
-  Use parent_of to place an artifact inside a container: a goal inside a
-  campaign, a task inside a goal. Each artifact has at most one parent.
-semantics: |
-  Structural containment. Drives tree/briefing traversal and auto-completion
-  propagation. A child completing does not block its parent — all children
-  must be terminal for the parent to auto-complete.
+apiVersion: scribe/v1
+kind: EdgeTypeDefinition
+metadata:
+  name: parent_of
+spec:
+  maxIncoming: 1
+  completionRollup: true
+  allowedPairs:
+    - source: campaign
+      target: goal
+    - source: goal
+      target: task
+    - source: goal
+      target: spec
+    - source: goal
+      target: bug
+  whenToUse: |
+    Use parent_of to place an artifact inside a container: a goal inside a
+    campaign, a task inside a goal. Each artifact has at most one parent.
+  semantics: |
+    Structural containment. Drives tree/briefing traversal and auto-completion
+    propagation. A child completing does not block its parent — all children
+    must be terminal for the parent to auto-complete.

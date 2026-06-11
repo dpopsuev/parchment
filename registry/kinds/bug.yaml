@@ -1,35 +1,45 @@
-name: bug
-prefix: BUG
-code: BUG
-family: intent
-protected: true
-vacuumable: true
-lifecycle:
-  default_status: work.draft
-  transitions:
-    work.draft: [work.active, decision.proposed, cancelled]
-    work.active: [decision.accepted, decision.rejected, decision.deferred, work.draft]
-    decision.proposed: [decision.accepted, decision.rejected, decision.deferred, work.draft]
-    decision.accepted: [archived]
-    decision.rejected: []
-    decision.deferred: [work.draft]
-    cancelled: []
-sections:
-  must: [observed]
-  should: [reproduction]
-relations:
-  incoming: [implements]
-  outgoing: [satisfies]
-  targets:
-    satisfies: [template]
-when_to_create: |
-  Create a bug when observed behavior deviates from desired state — a crash,
-  wrong output, missing guard, or broken contract. Bugs are intent artifacts:
-  they describe a defect to be corrected, not the corrective work (that's a
-  task that implements the bug).
-agent_note: |
-  Bug family=intent. A task implements a bug to close it. Filing a bug does
-  not schedule work — link a task via implements to make it actionable.
-  observed section is required; reproduction is strongly recommended.
-
-children: []
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: kind.bug
+spec:
+  prefix: BUG
+  code: BUG
+  family: intent
+  protected: true
+  vacuumable: true
+  children: []
+  lifecycle:
+    defaultStatus: work.draft
+    transitions:
+      - from: work.draft
+        to: [work.active, decision.proposed, cancelled]
+      - from: work.active
+        to: [decision.accepted, decision.rejected, decision.deferred, work.draft]
+      - from: decision.proposed
+        to: [decision.accepted, decision.rejected, decision.deferred, work.draft]
+      - from: decision.accepted
+        to: [archived]
+      - from: decision.rejected
+        to: []
+      - from: decision.deferred
+        to: [work.draft]
+      - from: cancelled
+        to: []
+  sections:
+    must: [observed]
+    should: [reproduction]
+  relations:
+    incoming: [implements]
+    outgoing: [satisfies]
+    targets:
+      satisfies: [template]
+  whenToCreate: |
+    Create a bug when observed behavior deviates from desired state — a crash,
+    wrong output, missing guard, or broken contract. Bugs are intent artifacts:
+    they describe a defect to be corrected, not the corrective work (that's a
+    task that implements the bug).
+  agentNote: |
+    Bug family=intent. A task implements a bug to close it. Filing a bug does
+    not schedule work — link a task via implements to make it actionable.
+    observed section is required; reproduction is strongly recommended.

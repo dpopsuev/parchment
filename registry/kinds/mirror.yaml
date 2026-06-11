@@ -1,14 +1,18 @@
-name: mirror
-prefix: MIR
-code: MIR
-family: support
-protected: true
-skip_guards: true
-children: []
-when_to_create: |
-  Mirror artifacts represent externally managed entities (Jira tickets,
-  GitHub issues) whose lifecycle is controlled outside Parchment.
-  Guards are skipped — the external system drives state.
-agent_note: |
-  Mirror artifacts bypass all transition guards (skip_guards=true). Status
-  changes are driven by the external source, not by Parchment rules.
+apiVersion: scribe/v1
+kind: LabelDefinition
+metadata:
+  name: kind.mirror
+spec:
+  prefix: MIR
+  code: MIR
+  family: support
+  protected: true
+  skipGuards: true
+  children: []
+  whenToCreate: |
+    Mirror artifacts represent externally managed entities (Jira tickets,
+    GitHub issues) whose lifecycle is controlled outside Parchment.
+    Guards are skipped — the external system drives state.
+  agentNote: |
+    Mirror artifacts bypass all transition guards (skip_guards=true). Status
+    changes are driven by the external source, not by Parchment rules.

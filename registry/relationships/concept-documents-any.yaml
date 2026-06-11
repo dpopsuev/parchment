@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: concept-documents-any
+spec:
+  from: kind:concept
+  relation: documents
+  to: "*"

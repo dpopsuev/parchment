@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: concept-elaborates-any
+spec:
+  from: kind:concept
+  relation: elaborates
+  to: "*"

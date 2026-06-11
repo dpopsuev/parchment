@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: ref-cites-source
+spec:
+  from: kind:ref
+  relation: cites
+  to: kind:source

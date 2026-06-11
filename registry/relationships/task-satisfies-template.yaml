@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: task-satisfies-template
+spec:
+  from: kind:task
+  relation: satisfies
+  to: kind:template

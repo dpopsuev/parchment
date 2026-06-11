@@ -1,0 +1,9 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: campaign-parent_of-goal
+spec:
+  from: kind:campaign
+  relation: parent_of
+  to: kind:goal
+  maxIncoming: 1

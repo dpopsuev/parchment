@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: context-remembers-any
+spec:
+  from: kind:context
+  relation: remembers
+  to: "*"

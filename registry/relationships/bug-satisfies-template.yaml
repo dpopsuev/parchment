@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: bug-satisfies-template
+spec:
+  from: kind:bug
+  relation: satisfies
+  to: kind:template

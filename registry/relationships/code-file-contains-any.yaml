@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: code-file-contains-any
+spec:
+  from: code:file
+  relation: contains
+  to: "*"

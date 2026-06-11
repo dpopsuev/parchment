@@ -1,0 +1,9 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: spec-depends_on-any
+spec:
+  from: kind:spec
+  relation: depends_on
+  to: "*"
+  cycleGuard: true

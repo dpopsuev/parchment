@@ -3,7 +3,6 @@ package parchment
 import (
 	"fmt"
 	"sort"
-	"strings"
 )
 
 // IsTerminal reports whether status is a terminal state.
@@ -113,23 +112,28 @@ func (p *Protocol) SkipEmptyCheck(kind string) bool {
 	return false
 }
 
-// isEdgeAllowed checks source label traits to see if this outbound relation to target is permitted.
-//
-// Closed world: if AllowedOutbound is nil or the relation is not listed, the edge is denied.
-// Declare what is permitted; everything else is blocked.
-// "*" in the target list matches any target label.
+// isEdgeAllowed reports whether any Relationship permits this source→relation→target edge.
+// Closed world: if no Relationship matches, the edge is denied.
 func (p *Protocol) isEdgeAllowed(sourceLabels []string, relation string, targetLabels []string) bool {
-	lt := ResolveTrait(p.labelTraits, sourceLabels)
-	allowed, ok := lt.AllowedOutbound[relation]
-	if !ok {
-		return false
-	}
-	for _, pattern := range allowed {
-		if pattern == "*" {
-			return true
+	return findRelationship(p.relationships, sourceLabels, relation, targetLabels) != nil
+}
+
+// isEdgeAllowedErr returns a descriptive error when the edge is not allowed.
+func (p *Protocol) isEdgeAllowedErr(sourceLabels []string, relation string, targetLabels []string) error {
+	return fmt.Errorf("%s→%s is not a valid %s relation", //nolint:err113 // domain constraint
+		labelValue(sourceLabels, LabelPrefixKind),
+		labelValue(targetLabels, LabelPrefixKind),
+		relation)
+}
+
+// isCycleGuarded returns true if any Relationship for this source+relation has CycleGuard set.
+func (p *Protocol) isCycleGuarded(sourceLabels []string, relation string) bool {
+	for _, r := range p.relationships {
+		if r.Relation != relation || !r.CycleGuard {
+			continue
 		}
-		for _, tl := range targetLabels {
-			if tl == pattern {
+		for _, sl := range sourceLabels {
+			if r.From == sl {
 				return true
 			}
 		}
@@ -137,36 +141,19 @@ func (p *Protocol) isEdgeAllowed(sourceLabels []string, relation string, targetL
 	return false
 }
 
-// isEdgeAllowedErr returns a descriptive error when the edge is not allowed.
-func (p *Protocol) isEdgeAllowedErr(sourceLabels []string, relation string, targetLabels []string) error {
-	lt := ResolveTrait(p.labelTraits, sourceLabels)
-	allowed, ok := lt.AllowedOutbound[relation]
-	if !ok {
-		return fmt.Errorf("%s does not declare outbound %q edges", //nolint:err113 // domain constraint
-			labelValue(sourceLabels, LabelPrefixKind), relation)
-	}
-	return fmt.Errorf("%s→%s is not a valid %s relation (allowed targets: %s)", //nolint:err113 // domain constraint
-		labelValue(sourceLabels, LabelPrefixKind),
-		labelValue(targetLabels, LabelPrefixKind),
-		relation,
-		strings.Join(allowed, ", "))
-}
-
-// isCycleGuarded returns true if the source label traits declare this relation as cycle-guarded.
-func (p *Protocol) isCycleGuarded(sourceLabels []string, relation string) bool {
-	lt := ResolveTrait(p.labelTraits, sourceLabels)
-	for _, r := range lt.CycleGuardedRelations {
-		if r == relation {
-			return true
-		}
-	}
-	return false
-}
-
 // maxParentsFor returns the max incoming parent_of edges for an artifact with these labels (0 = unlimited).
 func (p *Protocol) maxParentsFor(labels []string) int {
-	lt := ResolveTrait(p.labelTraits, labels)
-	return lt.MaxParents
+	for _, r := range p.relationships {
+		if r.Relation != RelParentOf || r.MaxIncoming == 0 {
+			continue
+		}
+		for _, tl := range labels {
+			if r.To == tl || r.To == "*" {
+				return r.MaxIncoming
+			}
+		}
+	}
+	return 0
 }
 
 // RegisteredRelations returns the sorted schema relations list.

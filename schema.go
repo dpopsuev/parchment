@@ -58,15 +58,6 @@ type KindSections struct {
 	RequiredFields   []string `json:"required_fields,omitempty" yaml:"required_fields,omitempty"`
 }
 
-// KindEdgeTrait carries edge constraint fields for a kind.
-// These fields share JSON tags with LabelTrait so the kind_definition artifact
-// round-trips through extra correctly: kindDefToExtra → JSON → extraToLabelTrait.
-type KindEdgeTrait struct {
-	AllowedOutbound       map[string][]string `json:"allowed_outbound,omitempty" yaml:"allowed_outbound,omitempty"`
-	CycleGuardedRelations []string            `json:"cycle_guarded_relations,omitempty" yaml:"cycle_guarded_relations,omitempty"`
-	MaxParents            int                 `json:"max_parents,omitempty" yaml:"max_parents,omitempty"`
-}
-
 // KindDef is the full definition of a kind. Embedding promotes all fields to
 // the top level so JSON/YAML serialization is identical to a flat struct —
 // existing Artifact.Extra values round-trip without migration.
@@ -74,7 +65,6 @@ type KindDef struct {
 	KindIdentity
 	KindLifecycle
 	KindSections
-	KindEdgeTrait
 	Relations KindRelations `json:"relations,omitempty" yaml:"relations,omitempty"`
 	Children  []string      `json:"children,omitempty" yaml:"children,omitempty"`
 	// Agent guidance lives in kind_definition artifact sections (when_to_create, agent_note),

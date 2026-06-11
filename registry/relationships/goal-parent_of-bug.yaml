@@ -1,0 +1,9 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: goal-parent_of-bug
+spec:
+  from: kind:goal
+  relation: parent_of
+  to: kind:bug
+  maxIncoming: 1

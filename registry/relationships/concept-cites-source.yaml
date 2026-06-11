@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: concept-cites-source
+spec:
+  from: kind:concept
+  relation: cites
+  to: kind:source

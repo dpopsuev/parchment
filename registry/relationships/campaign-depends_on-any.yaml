@@ -1,0 +1,9 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: campaign-depends_on-any
+spec:
+  from: kind:campaign
+  relation: depends_on
+  to: "*"
+  cycleGuard: true

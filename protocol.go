@@ -71,6 +71,7 @@ type Protocol struct {
 	registry         *ComponentRegistry    // reloadable trait + rule store (Step 9)
 	traits           *TraitStore           // deprecated: use registry.Traits()
 	labelTraits      map[string]LabelTrait // deprecated: use registry.Traits().LabelMap()
+	relationships    []RelationshipTrait   // first-class edge permission model
 	scopeLabels      []string
 	vocab            []string
 	mutableCreatedAt bool
@@ -106,7 +107,9 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 	if s != nil {
 		SeedLabelTraits(context.Background(), s)
 		SeedRules(context.Background(), s)
+		seedRelationshipsFromRegistry(context.Background(), s)
 		p.labelTraits = loadLabelTraits(context.Background(), s)
+		p.relationships = loadRelationships(context.Background(), s)
 		// Unified TraitStore — bridges from the existing map (Step 2 strangler seam).
 		p.traits = NewTraitStore()
 		for k, v := range p.labelTraits {

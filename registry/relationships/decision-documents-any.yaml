@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: decision-documents-any
+spec:
+  from: kind:decision
+  relation: documents
+  to: "*"

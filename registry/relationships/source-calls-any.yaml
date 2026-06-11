@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: source-calls-any
+spec:
+  from: kind:source
+  relation: calls
+  to: "*"

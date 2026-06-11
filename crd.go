@@ -82,10 +82,13 @@ type ResourceSpec struct {
 	Terminal         bool     `yaml:"terminal,omitempty"`
 	Readonly         bool     `yaml:"readonly,omitempty"`
 
-	// Edge constraint fields (label-based, replaces EdgeType).
-	AllowedOutbound       map[string][]string `yaml:"allowedOutbound,omitempty"`
-	CycleGuardedRelations []string            `yaml:"cycleGuardedRelations,omitempty"`
-	MaxParents            int                 `yaml:"maxParents,omitempty"`
+	// Relationship fields — for kind: Relationship CRDs.
+	From               string `yaml:"from,omitempty"`
+	Relation           string `yaml:"relation,omitempty"`
+	To                 string `yaml:"to,omitempty"`
+	RelCycleGuard      bool   `yaml:"cycleGuard,omitempty"`
+	RelMaxIncoming     int    `yaml:"maxIncoming,omitempty"`
+	RelConformanceCheck bool  `yaml:"conformanceCheck,omitempty"`
 
 	// Guidance section names for seeding compatibility.
 	WhenToCreate string `yaml:"whenToCreate,omitempty"`
@@ -172,6 +175,8 @@ func ApplyResource(ctx context.Context, s Store, r *Resource) error {
 	switch r.Kind {
 	case "Label", "LabelDefinition":
 		return applyLabelDefinition(ctx, s, r)
+	case "Relationship":
+		return applyRelationship(ctx, s, r)
 	default:
 		return fmt.Errorf("%w: %s", errUnsupportedKind, r.Kind)
 	}
@@ -217,18 +222,15 @@ func resourceID(name string) string {
 
 func applyLabelDefinition(ctx context.Context, s Store, r *Resource) error {
 	trait := LabelTrait{
-		World:                 r.Spec.World,
-		EvictionPolicy:        r.Spec.EvictionPolicy,
-		HalfLifeDays:          int(r.Spec.HalfLifeDays),
-		AlwaysApply:           r.Spec.AlwaysApply,
-		RequiredSections:      r.Spec.RequiredSections,
-		Family:                r.Spec.Family,
-		AllowedChildren:       r.Spec.AllowedChildren,
-		IsContainerKind:       r.Spec.IsContainerKind,
-		Vacuumable:            r.Spec.Vacuumable,
-		AllowedOutbound:       r.Spec.AllowedOutbound,
-		CycleGuardedRelations: r.Spec.CycleGuardedRelations,
-		MaxParents:            r.Spec.MaxParents,
+		World:            r.Spec.World,
+		EvictionPolicy:   r.Spec.EvictionPolicy,
+		HalfLifeDays:     int(r.Spec.HalfLifeDays),
+		AlwaysApply:      r.Spec.AlwaysApply,
+		RequiredSections: r.Spec.RequiredSections,
+		Family:           r.Spec.Family,
+		AllowedChildren:  r.Spec.AllowedChildren,
+		IsContainerKind:  r.Spec.IsContainerKind,
+		Vacuumable:       r.Spec.Vacuumable,
 	}
 	if r.Spec.Lifecycle != nil {
 		trait.DefaultStatus = r.Spec.Lifecycle.DefaultStatus
@@ -271,4 +273,34 @@ func applyLabelDefinition(ctx context.Context, s Store, r *Resource) error {
 	return s.Put(ctx, art)
 }
 
-
+func applyRelationship(ctx context.Context, s Store, r *Resource) error {
+	rt := RelationshipTrait{
+		From:             r.Spec.From,
+		Relation:         r.Spec.Relation,
+		To:               r.Spec.To,
+		CycleGuard:       r.Spec.RelCycleGuard,
+		MaxIncoming:      r.Spec.RelMaxIncoming,
+		ConformanceCheck: r.Spec.RelConformanceCheck,
+	}
+	b, err := json.Marshal(rt)
+	if err != nil {
+		return err
+	}
+	var extra map[string]any
+	if err := json.Unmarshal(b, &extra); err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	sanitized := strings.NewReplacer(".", "-", ":", "-").Replace(r.Metadata.Name)
+	id := "REL-" + sanitized
+	art := &Artifact{
+		ID:         id,
+		Labels:     []string{LabelPrefixKind + KindRelationship, "work.active", LabelPrefixScope + SchemaScope},
+		Title:      r.Metadata.Name,
+		Extra:      extra,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+		InsertedAt: now,
+	}
+	return s.Put(ctx, art)
+}

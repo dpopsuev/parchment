@@ -17,7 +17,7 @@ const (
 	crdKindLabelLegacy = "LabelDefinition"
 )
 
-//go:embed registry/kinds/*.yaml registry/labels/*.yaml
+//go:embed registry/kinds/*.yaml registry/labels/*.yaml registry/relationships/*.yaml
 var registryFS embed.FS
 
 //go:embed registry/rules
@@ -120,10 +120,6 @@ type kindYAML struct {
 		Targets          map[string][]string `yaml:"targets"`
 	} `yaml:"relations"`
 
-	AllowedOutbound       map[string][]string `yaml:"allowed_outbound"`
-	CycleGuardedRelations []string            `yaml:"cycle_guarded_relations"`
-	MaxParents            int                 `yaml:"max_parents"`
-
 	WhenToCreate string `yaml:"when_to_create"`
 	AgentNote    string `yaml:"agent_note"`
 }
@@ -154,11 +150,6 @@ func (k *kindYAML) toKindDef() KindDef {
 			ShouldSections:   k.Sections.Should,
 			CouldSections:    k.Sections.Could,
 			RequiredFields:   k.Sections.RequiredFields,
-		},
-		KindEdgeTrait: KindEdgeTrait{
-			AllowedOutbound:       k.AllowedOutbound,
-			CycleGuardedRelations: k.CycleGuardedRelations,
-			MaxParents:            k.MaxParents,
 		},
 		Children: k.Children,
 		Relations: KindRelations{
@@ -421,6 +412,78 @@ func loadRegistryRules() []ruleYAML { //nolint:dupl // parallel to other loadReg
 		rules = append(rules, r)
 	}
 	return rules
+}
+
+// loadRegistryRelationships parses all relationship CRD files from the embedded registry.
+func loadRegistryRelationships() []RelationshipTrait {
+	entries, err := registryFS.ReadDir("registry/relationships")
+	if err != nil {
+		return nil
+	}
+	var rels []RelationshipTrait
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".yaml") {
+			continue
+		}
+		data, err := registryFS.ReadFile("registry/relationships/" + e.Name())
+		if err != nil {
+			continue
+		}
+		resources, err := ParseResourceFile(data)
+		if err != nil {
+			slog.WarnContext(context.Background(), "registry: parse relationship CRD failed",
+				slog.String("file", e.Name()), slog.Any(LogKeyError, err)) //nolint:sloglint // "file" has no LogKey constant
+			continue
+		}
+		for _, r := range resources {
+			if r.Kind != "Relationship" {
+				continue
+			}
+			rels = append(rels, RelationshipTrait{
+				From:             r.Spec.From,
+				Relation:         r.Spec.Relation,
+				To:               r.Spec.To,
+				CycleGuard:       r.Spec.RelCycleGuard,
+				MaxIncoming:      r.Spec.RelMaxIncoming,
+				ConformanceCheck: r.Spec.RelConformanceCheck,
+			})
+		}
+	}
+	return rels
+}
+
+// seedRelationshipsFromRegistry writes relationship artifacts from the embedded CRD registry.
+func seedRelationshipsFromRegistry(ctx context.Context, s Store) {
+	now := time.Now().UTC()
+	for _, r := range loadRegistryRelationships() {
+		sanitized := strings.NewReplacer(".", "-", ":", "-").Replace(r.From + "-" + r.Relation + "-" + r.To)
+		id := "REL-" + sanitized
+		if _, err := s.Get(ctx, id); err == nil {
+			continue
+		}
+		b, err := json.Marshal(r)
+		if err != nil {
+			continue
+		}
+		var extra map[string]any
+		if err := json.Unmarshal(b, &extra); err != nil {
+			continue
+		}
+		art := &Artifact{
+			ID:         id,
+			Labels:     []string{LabelPrefixKind + KindRelationship, "work.active", LabelPrefixScope + SchemaScope},
+			Title:      r.From + "-" + r.Relation + "-" + r.To,
+			Extra:      extra,
+			CreatedAt:  now,
+			UpdatedAt:  now,
+			InsertedAt: now,
+		}
+		if err := s.Put(ctx, art); err != nil {
+			slog.WarnContext(ctx, "registry: seed relationship failed",
+				slog.String(LogKeyFrom, r.From), slog.String(LogKeyRelation, r.Relation),
+				slog.String(LogKeyTo, r.To), slog.Any(LogKeyError, err))
+		}
+	}
 }
 
 // registrySchema builds a Schema from the embedded kind registry CRD files.

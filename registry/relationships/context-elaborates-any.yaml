@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: context-elaborates-any
+spec:
+  from: kind:context
+  relation: elaborates
+  to: "*"

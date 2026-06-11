@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: bug-follows-any
+spec:
+  from: kind:bug
+  relation: follows
+  to: "*"

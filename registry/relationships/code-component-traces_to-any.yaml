@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: code-component-traces_to-any
+spec:
+  from: code:component
+  relation: traces_to
+  to: "*"

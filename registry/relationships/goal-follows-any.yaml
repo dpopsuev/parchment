@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: goal-follows-any
+spec:
+  from: kind:goal
+  relation: follows
+  to: "*"

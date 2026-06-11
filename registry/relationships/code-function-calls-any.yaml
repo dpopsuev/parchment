@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: code-function-calls-any
+spec:
+  from: code:function
+  relation: calls
+  to: "*"

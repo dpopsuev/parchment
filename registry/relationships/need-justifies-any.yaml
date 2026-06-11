@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: need-justifies-any
+spec:
+  from: kind:need
+  relation: justifies
+  to: "*"

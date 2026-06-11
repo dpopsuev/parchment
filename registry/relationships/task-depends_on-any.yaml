@@ -1,0 +1,9 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: task-depends_on-any
+spec:
+  from: kind:task
+  relation: depends_on
+  to: "*"
+  cycleGuard: true

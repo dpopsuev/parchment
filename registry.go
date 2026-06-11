@@ -77,7 +77,6 @@ func crdResourceToEdgeTypeYAML(r *Resource) edgeTypeYAML {
 		Name:             r.Metadata.Name,
 		MaxOutgoing:      r.Spec.MaxOutgoing,
 		MaxIncoming:      r.Spec.MaxIncoming,
-		Directionality:   r.Spec.Directionality,
 		CycleGuard:       r.Spec.CycleGuard,
 		CompletionRollup: r.Spec.CompletionRollup,
 		ConformanceCheck: r.Spec.ConformanceCheck,
@@ -186,7 +185,6 @@ type edgeTypeYAML struct {
 	Name             string          `yaml:"name"`
 	MaxOutgoing      int             `yaml:"max_outgoing"`
 	MaxIncoming      int             `yaml:"max_incoming"`
-	Directionality   string          `yaml:"directionality"`
 	CycleGuard       bool            `yaml:"cycle_guard"`
 	CompletionRollup bool            `yaml:"completion_rollup"`
 	ConformanceCheck bool            `yaml:"conformance_check"`
@@ -364,9 +362,8 @@ func seedEdgeTypesFromRegistry(ctx context.Context, s Store) {
 		trait := EdgeTypeTrait{
 			MaxOutgoing:      et.MaxOutgoing,
 			MaxIncoming:      et.MaxIncoming,
-			Directionality:   et.Directionality,
-		CycleGuard:       et.CycleGuard,
-		CompletionRollup: et.CompletionRollup,
+			CycleGuard:       et.CycleGuard,
+			CompletionRollup: et.CompletionRollup,
 			ConformanceCheck: et.ConformanceCheck,
 			AllowedPairs:     pairs,
 		}

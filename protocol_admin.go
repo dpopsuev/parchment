@@ -257,6 +257,19 @@ func (p *Protocol) DetectOrphans(ctx context.Context, in OrphanInput) (*OrphanRe
 		return nil, err
 	}
 
+	ids := make([]string, len(arts))
+	for i, a := range arts {
+		ids[i] = a.ID
+	}
+	allEdges, _ := p.store.ListEdges(ctx, ids, nil)
+	outgoing := make(map[string]map[string]bool, len(ids))
+	for _, e := range allEdges {
+		if outgoing[e.From] == nil {
+			outgoing[e.From] = make(map[string]bool)
+		}
+		outgoing[e.From][e.Relation] = true
+	}
+
 	report := &OrphanReport{}
 	for _, art := range arts {
 		if p.IsTerminal(labelValue(art.Labels, LabelPrefixStatus)) {
@@ -270,15 +283,11 @@ func (p *Protocol) DetectOrphans(ctx context.Context, in OrphanInput) (*OrphanRe
 
 		for _, rel := range append(kd.Relations.RequiredOutgoing, kd.Relations.ExpectedOutgoing...) {
 			report.TotalScanned++
-			edges, err := p.store.Neighbors(ctx, art.ID, rel, Outgoing)
-			if err != nil {
-				continue
-			}
-			if len(edges) == 0 {
-			report.Orphans = append(report.Orphans, OrphanEntry{
-				ID: art.ID, Title: art.Title, Labels: art.Labels,
-				Reason: fmt.Sprintf("%s has no outgoing %s link", labelValue(art.Labels, LabelPrefixKind), rel),
-			})
+			if !outgoing[art.ID][rel] {
+				report.Orphans = append(report.Orphans, OrphanEntry{
+					ID: art.ID, Title: art.Title, Labels: art.Labels,
+					Reason: fmt.Sprintf("%s has no outgoing %s link", labelValue(art.Labels, LabelPrefixKind), rel),
+				})
 			}
 		}
 	}
@@ -492,6 +501,22 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		return nil, err
 	}
 
+	checkIDs := make([]string, len(arts))
+	for i, a := range arts {
+		checkIDs[i] = a.ID
+	}
+	checkEdges, _ := p.store.ListEdges(ctx, checkIDs, nil)
+	checkOutgoing := make(map[string][]Edge, len(checkIDs))
+	checkIncoming := make(map[string][]Edge, len(checkIDs))
+	for _, e := range checkEdges {
+		checkOutgoing[e.From] = append(checkOutgoing[e.From], e)
+		checkIncoming[e.To] = append(checkIncoming[e.To], e)
+	}
+	checkArtByID := make(map[string]*Artifact, len(arts))
+	for _, a := range arts {
+		checkArtByID[a.ID] = a
+	}
+
 	report := &CheckReport{TotalScanned: len(arts)}
 
 	for _, art := range arts {
@@ -559,11 +584,14 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 			if p.IsTerminal(statusFromLabels(art.Labels)) {
 				continue
 			}
-			edges, err := p.store.Neighbors(ctx, art.ID, reqRel, Outgoing)
-			if err != nil {
-				continue
+			found := false
+			for _, e := range checkOutgoing[art.ID] {
+				if e.Relation == reqRel {
+					found = true
+					break
+				}
 			}
-			if len(edges) == 0 {
+			if !found {
 				report.Violations = append(report.Violations, CheckViolation{
 					ID: art.ID, Labels: art.Labels, Title: art.Title,
 					Category: "missing_link",
@@ -637,7 +665,14 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		if !p.IsContainerKind(labelValue(art.Labels, LabelPrefixKind)) {
 			continue
 		}
-		children, _ := p.store.Children(ctx, art.ID)
+		var children []*Artifact
+		for _, e := range checkOutgoing[art.ID] {
+			if e.Relation == RelParentOf {
+				if ch, ok := checkArtByID[e.To]; ok {
+					children = append(children, ch)
+				}
+			}
+		}
 		if len(children) == 0 {
 			continue
 		}
@@ -663,8 +698,14 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 			continue
 		}
 		if p.RequiresImplementation(labelValue(art.Labels, LabelPrefixKind)) {
-			edges, _ := p.store.Neighbors(ctx, art.ID, RelImplements, Incoming)
-			if len(edges) == 0 {
+			hasImpl := false
+			for _, e := range checkIncoming[art.ID] {
+				if e.Relation == RelImplements {
+					hasImpl = true
+					break
+				}
+			}
+			if !hasImpl {
 				report.Violations = append(report.Violations, CheckViolation{
 					ID: art.ID, Labels: art.Labels, Title: art.Title,
 					Category: "unimplemented_spec",
@@ -710,8 +751,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 			continue // already flagged as unknown_kind
 		}
 		if art.Goal == "" && len(art.Sections) == 0 && art.Parent == "" {
-			edges, _ := p.store.Neighbors(ctx, art.ID, "", Outgoing)
-			if len(edges) == 0 {
+			if len(checkOutgoing[art.ID]) == 0 {
 				report.Violations = append(report.Violations, CheckViolation{
 					ID: art.ID, Labels: art.Labels, Title: art.Title,
 					Category: "empty_artifact",

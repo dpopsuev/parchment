@@ -42,9 +42,7 @@ type LabelTrait struct {
 	AllowedChildren        []string `json:"allowed_children,omitempty"`
 	Family                 string   `json:"family,omitempty"`
 	MustSections           []string `json:"must_sections,omitempty"`
-	ShouldSections         []string `json:"should_sections,omitempty"`
-	CouldSections          []string `json:"could_sections,omitempty"`
-	IDPrefix               string   `json:"id_prefix,omitempty"`
+	Properties             []string `json:"properties,omitempty"`
 	IsContainerKind        bool     `json:"is_container_kind,omitempty"`
 	RequiresImplementation bool     `json:"requires_implementation,omitempty"`
 	SkipEmptyCheck         bool     `json:"skip_empty_check,omitempty"`
@@ -156,14 +154,10 @@ func LoadLabelTraitsWithComposition(ctx context.Context, s Store) map[string]Lab
 			if own.Family == "" && p.Family != "" {
 				own.Family = p.Family
 			}
-			if own.IDPrefix == "" && p.IDPrefix != "" {
-				own.IDPrefix = p.IDPrefix
-			}
 			own.Transitions = unionStrings(own.Transitions, p.Transitions)
 			own.AllowedChildren = unionStrings(own.AllowedChildren, p.AllowedChildren)
 			own.MustSections = unionStrings(own.MustSections, p.MustSections)
-			own.ShouldSections = unionStrings(own.ShouldSections, p.ShouldSections)
-			own.CouldSections = unionStrings(own.CouldSections, p.CouldSections)
+			own.Properties = unionStrings(own.Properties, p.Properties)
 		}
 		raw[art.Title] = own
 	}
@@ -224,14 +218,10 @@ func ResolveTrait(traits map[string]LabelTrait, labels []string) LabelTrait {
 		if lt.Family != "" && merged.Family == "" {
 			merged.Family = lt.Family
 		}
-		if lt.IDPrefix != "" && merged.IDPrefix == "" {
-			merged.IDPrefix = lt.IDPrefix
-		}
 		merged.Transitions = unionStrings(merged.Transitions, lt.Transitions)
 		merged.AllowedChildren = unionStrings(merged.AllowedChildren, lt.AllowedChildren)
 		merged.MustSections = unionStrings(merged.MustSections, lt.MustSections)
-		merged.ShouldSections = unionStrings(merged.ShouldSections, lt.ShouldSections)
-		merged.CouldSections = unionStrings(merged.CouldSections, lt.CouldSections)
+		merged.Properties = unionStrings(merged.Properties, lt.Properties)
 	}
 	return merged
 }
@@ -319,6 +309,17 @@ var defaultLabelTraits = []struct {
 	{"code.current", LabelTrait{Terminal: false, Readonly: false}, "", ""},
 	{"code.stale", LabelTrait{Terminal: false, Readonly: false}, "", ""},
 	{"code.outdated", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+
+	// Code intelligence kind traits.
+	{"code:function", LabelTrait{Properties: []string{"signature", "file", "line"}},
+		"Apply to artifacts representing a single function or method in a codebase.",
+		"Requires Extra fields: signature, file, line. Missing any triggers compliance:violation."},
+	{"code:component", LabelTrait{Properties: []string{"package", "language"}},
+		"Apply to artifacts representing a package, module, or architectural component.",
+		"Requires Extra fields: package, language. Missing any triggers compliance:violation."},
+	{"code:file", LabelTrait{Properties: []string{"file", "language"}},
+		"Apply to artifacts representing a source file.",
+		"Requires Extra fields: file, language. Missing any triggers compliance:violation."},
 
 	// Kind lifecycle traits.
 	{"kind:task", LabelTrait{Family: "work", DefaultStatus: "work.draft", Vacuumable: true}, "", ""},

@@ -247,8 +247,34 @@ func (p *Protocol) setStatus(ctx context.Context, art *Artifact, status string) 
 
 
 
+func (p *Protocol) isValidTransition(kind, from, to string) (valid bool, reason string) {
+	if lt, ok := p.labelTraits["kind:"+kind]; ok && len(lt.Transitions) > 0 {
+		for _, t := range lt.Transitions {
+			parts := strings.SplitN(t, "→", 2)
+			if len(parts) == 2 && parts[0] == from && parts[1] == to {
+				return true, ""
+			}
+		}
+		return false, fmt.Sprintf("cannot transition %s from %q to %q; valid next: %v", kind, from, to, p.validNextStatuses(kind, from))
+	}
+	reason, valid = p.schema.ValidTransition(kind, from, to)
+	return valid, reason
+}
+
+func (p *Protocol) validNextStatuses(kind, from string) []string {
+	lt := p.labelTraits["kind:"+kind]
+	var next []string
+	for _, t := range lt.Transitions {
+		parts := strings.SplitN(t, "→", 2)
+		if len(parts) == 2 && parts[0] == from {
+			next = append(next, parts[1])
+		}
+	}
+	return next
+}
+
 func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status string, force bool) Result { //nolint:gocyclo,funlen // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol.go
-	reason, valid := p.schema.ValidTransition(labelValue(art.Labels, LabelPrefixKind), statusFromLabels(art.Labels), status)
+	valid, reason := p.isValidTransition(labelValue(art.Labels, LabelPrefixKind), statusFromLabels(art.Labels), status)
 	if !valid {
 		if !force {
 			return Result{ID: art.ID, Error: reason}

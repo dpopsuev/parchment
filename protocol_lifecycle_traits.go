@@ -62,11 +62,7 @@ func (p *Protocol) MustSections(kind string) []string {
 }
 
 // ShouldSections returns sections recommended for activation for the kind.
-// Consults label traits first; falls back to schema.
 func (p *Protocol) ShouldSections(kind string) []string {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok && len(lt.ShouldSections) > 0 {
-		return lt.ShouldSections
-	}
 	return p.schema.GetShouldSections(kind)
 }
 

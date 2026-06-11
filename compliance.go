@@ -65,7 +65,7 @@ func computeViolations(traits map[string]LabelTrait, art *Artifact) []string {
 		return nil
 	}
 	merged := ResolveTrait(traits, userLabels)
-	if len(merged.RequiredSections) == 0 {
+	if len(merged.RequiredSections) == 0 && len(merged.Properties) == 0 {
 		return nil
 	}
 	have := make(map[string]bool, len(art.Sections))
@@ -76,6 +76,11 @@ func computeViolations(traits map[string]LabelTrait, art *Artifact) []string {
 	for _, required := range merged.RequiredSections {
 		if !have[required] {
 			viols = append(viols, "missing section: "+required)
+		}
+	}
+	for _, prop := range merged.Properties {
+		if _, ok := art.Extra[prop]; !ok {
+			viols = append(viols, "missing property: "+prop)
 		}
 	}
 	return viols

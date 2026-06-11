@@ -246,8 +246,6 @@ func applyLabelDefinition(ctx context.Context, s Store, r *Resource) error {
 	}
 	if r.Spec.Sections != nil {
 		trait.MustSections = r.Spec.Sections.Must
-		trait.ShouldSections = r.Spec.Sections.Should
-		trait.CouldSections = r.Spec.Sections.Could
 	}
 
 	b, err := json.Marshal(trait)
@@ -290,7 +288,6 @@ func applyEdgeTypeDefinition(ctx context.Context, s Store, r *Resource) error {
 	trait := EdgeTypeTrait{
 		MaxOutgoing:      r.Spec.MaxOutgoing,
 		MaxIncoming:      r.Spec.MaxIncoming,
-		Directionality:   r.Spec.Directionality,
 		CycleGuard:       r.Spec.CycleGuard,
 		CompletionRollup: r.Spec.CompletionRollup,
 		ConformanceCheck: r.Spec.ConformanceCheck,

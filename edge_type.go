@@ -21,7 +21,6 @@ type KindPair struct {
 type EdgeTypeTrait struct {
 	MaxOutgoing      int        `json:"max_outgoing,omitempty"`
 	MaxIncoming      int        `json:"max_incoming,omitempty"`
-	Directionality   string     `json:"directionality,omitempty"`
 	CycleGuard       bool       `json:"cycle_guard,omitempty"`       // reject edges that would create a cycle
 	CompletionRollup bool       `json:"completion_rollup,omitempty"` // all targets complete → source auto-transitions
 	AllowedPairs     []KindPair `json:"allowed_pairs,omitempty"`     // empty = open world
@@ -61,9 +60,6 @@ func extraToEdgeTypeTrait(extra map[string]any) EdgeTypeTrait {
 	var t EdgeTypeTrait
 	t.MaxOutgoing = extraInt(extra, "max_outgoing")
 	t.MaxIncoming = extraInt(extra, "max_incoming")
-	if v, ok := extra["directionality"].(string); ok {
-		t.Directionality = v
-	}
 	if v, ok := extra["cycle_guard"].(bool); ok {
 		t.CycleGuard = v
 	}
@@ -116,9 +112,6 @@ func edgeTypeTraitToExtra(t EdgeTypeTrait) map[string]any {
 	}
 	if t.MaxIncoming > 0 {
 		extra["max_incoming"] = t.MaxIncoming
-	}
-	if t.Directionality != "" {
-		extra["directionality"] = t.Directionality
 	}
 	if t.CycleGuard {
 		extra["cycle_guard"] = true
@@ -177,7 +170,7 @@ var defaultEdgeTypes = []struct {
 	{RelElaborates, EdgeTypeTrait{},
 		"Use elaborates when a note expands on a concept — a note elaborates a concept by adding examples or depth.",
 		"Knowledge elaboration. Used in knowledge graph traversal. No structural enforcement."},
-	{RelContradicts, EdgeTypeTrait{Directionality: "symmetric"},
+	{RelContradicts, EdgeTypeTrait{},
 		"Use contradicts when two notes document a genuine disagreement — one note contradicts another. Symmetric: A contradicts B implies B contradicts A.",
 		"Symmetric disagreement marker. Surfaced by knowledge lint as a tension to resolve. Does not block anything."},
 	{RelSynthesises, EdgeTypeTrait{}, //nolint:misspell // British spelling; changing the value would break stored edges
@@ -186,7 +179,7 @@ var defaultEdgeTypes = []struct {
 	{RelRemembers, EdgeTypeTrait{},
 		"Use remembers when an agent context artifact bookmarks a note or concept for the current session — ephemeral recall tagging.",
 		"Session-scoped bookmark. Not persisted across sessions. Used by context_read to surface relevant knowledge."},
-	{"related", EdgeTypeTrait{Directionality: "symmetric"},
+	{"related", EdgeTypeTrait{},
 		"Use related for a generic bidirectional association when no more specific relation fits. Prefer a specific relation (documents, cites, implements) when one applies.",
 		"Symmetric generic association. No structural or lifecycle enforcement. Last resort when no semantic relation fits."},
 }

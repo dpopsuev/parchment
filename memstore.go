@@ -186,7 +186,7 @@ func (m *MemoryStore) Search(_ context.Context, query string) ([]string, error) 
 	var ids []string
 	for _, art := range m.artifacts {
 		if strings.Contains(strings.ToLower(art.Title), query) ||
-			strings.Contains(strings.ToLower(art.Goal), query) ||
+			strings.Contains(strings.ToLower(art.Goal()), query) ||
 			strings.Contains(strings.ToLower(art.ID), query) {
 			ids = append(ids, art.ID)
 			continue

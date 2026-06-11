@@ -26,7 +26,7 @@ func LabelEncoded(model string) string { return LabelEncodedPrefix + model }
 func ContentHash(art *Artifact) string {
 	h := sha256.New()
 	_, _ = h.Write([]byte(art.Title))
-	_, _ = h.Write([]byte(art.Goal))
+	_, _ = h.Write([]byte(art.Goal()))
 	for _, s := range art.Sections {
 		_, _ = h.Write([]byte(s.Name))
 		_, _ = h.Write([]byte(s.Text))
@@ -187,10 +187,15 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	}
 	art := &Artifact{
 		ID: id, Alias: in.Alias, Parent: in.Parent,
-		Title: in.Title, Goal: in.Goal,
+		Title: in.Title,
 		DependsOn: in.DependsOn, Labels: seedLabels,
 		Links: in.Links, Extra: in.Extra,
 		Sections: in.Sections,
+	}
+	if in.Goal != "" {
+		if !hasSectionNamed(art.Sections, FieldGoal) {
+			art.Sections = append([]Section{{Name: FieldGoal, Text: in.Goal}}, art.Sections...)
+		}
 	}
 	if in.CreatedAt != "" {
 		if t, err := time.Parse(time.RFC3339, in.CreatedAt); err == nil {
@@ -538,7 +543,7 @@ func matchesQuery(art *Artifact, q string) bool {
 	if strings.Contains(strings.ToLower(art.Title), q) {
 		return true
 	}
-	if strings.Contains(strings.ToLower(art.Goal), q) {
+	if strings.Contains(strings.ToLower(art.Goal()), q) {
 		return true
 	}
 	for _, sec := range art.Sections {
@@ -705,7 +710,18 @@ func (p *Protocol) UpsertArtifact(ctx context.Context, in CreateInput) (UpsertRe
 		existing.Title = in.Title
 	}
 	if in.Goal != "" {
-		existing.Goal = in.Goal
+		goalIdx := -1
+		for i, s := range existing.Sections {
+			if s.Name == FieldGoal {
+				goalIdx = i
+				break
+			}
+		}
+		if goalIdx >= 0 {
+			existing.Sections[goalIdx].Text = in.Goal
+		} else {
+			existing.Sections = append([]Section{{Name: FieldGoal, Text: in.Goal}}, existing.Sections...)
+		}
 	}
 	if in.Parent != "" {
 		existing.Parent = in.Parent

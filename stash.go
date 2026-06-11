@@ -111,7 +111,17 @@ func MergeInput(base CreateInput, patch CreateInput) CreateInput { //nolint:gocr
 		base.Title = patch.Title
 	}
 	if patch.Goal != "" {
-		base.Goal = patch.Goal
+		goalFound := false
+		for i, s := range base.Sections {
+			if s.Name == FieldGoal {
+				base.Sections[i].Text = patch.Goal
+				goalFound = true
+				break
+			}
+		}
+		if !goalFound {
+			base.Sections = append([]Section{{Name: FieldGoal, Text: patch.Goal}}, base.Sections...)
+		}
 	}
 	if patch.Parent != "" {
 		base.Parent = patch.Parent

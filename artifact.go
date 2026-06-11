@@ -11,7 +11,6 @@ type Artifact struct {
 	Alias       string              `json:"alias,omitempty"`
 	Parent      string              `json:"parent,omitempty"`
 	Title       string              `json:"title"`
-	Goal        string              `json:"goal,omitempty"`
 	DependsOn   []string            `json:"depends_on,omitempty"`
 	Labels      []string            `json:"labels,omitempty"`
 	Sections    []Section           `json:"sections,omitempty"`
@@ -25,6 +24,16 @@ type Artifact struct {
 	// Warnings carries transient advisory messages set by Protocol operations.
 	// Not persisted — callers should surface these to agents/operators.
 	Warnings []string `json:"warnings,omitempty"`
+}
+
+// Goal returns the text of the first section named "goal", or "" if none exists.
+func (a *Artifact) Goal() string {
+	for _, s := range a.Sections {
+		if s.Name == FieldGoal {
+			return s.Text
+		}
+	}
+	return ""
 }
 
 // Section is a named free-text block within an artifact.

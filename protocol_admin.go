@@ -742,7 +742,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		if _, known := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]; !known {
 			continue // already flagged as unknown_kind
 		}
-		if art.Goal == "" && len(art.Sections) == 0 && art.Parent == "" {
+		if art.Goal() == "" && len(art.Sections) == 0 && art.Parent == "" {
 			if len(checkOutgoing[art.ID]) == 0 {
 				report.Violations = append(report.Violations, CheckViolation{
 					ID: art.ID, Labels: art.Labels, Title: art.Title,

@@ -161,7 +161,18 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 	case FieldTitle:
 		art.Title = value
 	case FieldGoal:
-		art.Goal = value
+		goalIdx := -1
+		for i, s := range art.Sections {
+			if s.Name == FieldGoal {
+				goalIdx = i
+				break
+			}
+		}
+		if goalIdx >= 0 {
+			art.Sections[goalIdx].Text = value
+		} else {
+			art.Sections = append([]Section{{Name: FieldGoal, Text: value}}, art.Sections...)
+		}
 	case FieldScope:
 		if value == "" {
 			return Result{ID: id, Error: "scope cannot be empty"}

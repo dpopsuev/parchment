@@ -45,8 +45,8 @@ func RenderMarkdown(art *Artifact) string { //nolint:gocyclo // display logic is
 	}
 	b.WriteByte('\n')
 
-	if art.Goal != "" {
-		fmt.Fprintf(&b, "## Goal\n\n%s\n\n", art.Goal)
+	if art.Goal() != "" {
+		fmt.Fprintf(&b, "## Goal\n\n%s\n\n", art.Goal())
 	}
 
 	for _, s := range art.Sections {

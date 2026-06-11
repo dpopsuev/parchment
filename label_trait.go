@@ -325,22 +325,22 @@ var defaultLabelTraits = []struct {
 	// Kind lifecycle traits.
 	{"kind:task", LabelTrait{
 		Family: "work", DefaultStatus: "work.draft", Vacuumable: true,
-	}, "", ""},
+	}, "Create a task when work is discrete, time-bounded, and directly actionable — a concrete unit of effort with a clear done condition. Use for implementation, review, or operational steps.", ""},
 	{"kind:spec", LabelTrait{
 		Family: "work", DefaultStatus: "work.draft", RequiresImplementation: true, Vacuumable: true,
-	}, "", ""},
+	}, "Create a spec when you need to capture intent, requirements, or a design decision before implementation begins. A spec requires at least one implementing task to be considered complete.", ""},
 	{"kind:bug", LabelTrait{
 		Family: "work", DefaultStatus: "work.draft", RequiresImplementation: true, Vacuumable: true,
-	}, "", ""},
+	}, "Create a bug when observed behavior deviates from expected behavior in a shipped or deployed system. A bug requires at least one implementing task (the fix) to be considered resolved.", ""},
 	{"kind:goal", LabelTrait{
 		Family: "work", DefaultStatus: "work.draft", IsContainerKind: true, SkipEmptyCheck: true, Vacuumable: true,
-	}, "", ""},
+	}, "Create a goal to capture a high-level outcome — a desired end state, OKR, or strategic target. Goals are containers: they are complete when all child artifacts reach terminal status.", ""},
 	{"kind:campaign", LabelTrait{
 		Family: "work", DefaultStatus: "work.draft", IsContainerKind: true, SkipEmptyCheck: true, Vacuumable: true,
-	}, "", ""},
+	}, "Create a campaign to group a set of related specs, tasks, and bugs under a single coordinating effort. Campaigns are containers: they are complete when all child artifacts reach terminal status.", ""},
 	{"kind:note", LabelTrait{
 		Family: "knowledge", DefaultStatus: "note.fleeting", Vacuumable: true,
-	}, "", ""},
+	}, "Create a note to capture an observation, idea, or finding that does not yet warrant a task or decision. Notes start fleeting and are promoted to mature or evergreen as they gain supporting evidence.", ""},
 	{"kind:concept", LabelTrait{
 		Family: "knowledge", DefaultStatus: "work.active", Vacuumable: true,
 	}, "", ""},
@@ -355,7 +355,7 @@ var defaultLabelTraits = []struct {
 	}, "", ""},
 	{"kind:decision", LabelTrait{
 		Family: "support", DefaultStatus: "decision.proposed",
-	}, "", ""},
+	}, "Create a decision (ADR) when a significant architectural or design choice must be recorded for future reference. Decisions progress through proposed → accepted/rejected/deferred and are readonly once accepted.", ""},
 	{"kind:config", LabelTrait{
 		Family: "support", DefaultStatus: "work.active", SkipEmptyCheck: true,
 	}, "", ""},

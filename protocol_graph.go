@@ -154,32 +154,35 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 		}
 	}
 
-	// Conformance check for satisfies relation (protocol-level behavior).
+	// Build dedup set from existing edges.
+	existingEdges, _ := p.store.Neighbors(ctx, sourceID, relation, Outgoing)
+	existing := make(map[string]bool, len(existingEdges))
+	for _, e := range existingEdges {
+		existing[e.To] = true
+	}
+
+	// Conformance check for satisfies relation: add edge, verify, rollback on failure.
 	if relation == RelSatisfies {
 		for _, tpl := range targets {
 			if labelValue(tpl.Labels, LabelPrefixKind) != KindTemplate {
 				slog.WarnContext(ctx, "satisfies link target is not a template", slog.String("source_id", sourceID), slog.String("target_id", tpl.ID), slog.String("target_kind", labelValue(tpl.Labels, LabelPrefixKind))) //nolint:sloglint // source_id/target_id/target_kind have no LogKey constants
 				return nil, fmt.Errorf("satisfies target %s is not a template (kind=%s)", tpl.ID, labelValue(tpl.Labels, LabelPrefixKind)) //nolint:err113 // sentinel; no caller uses errors.Is on this
 			}
-			artWithLink := &Artifact{
-				ID:       art.ID,
-				Labels:   []string{LabelPrefixKind + labelValue(art.Labels, LabelPrefixKind)},
-				Sections: art.Sections,
-				Links:    map[string][]string{relation: {tpl.ID}},
+			if existing[tpl.ID] {
+				continue
 			}
-			if err := p.checkTemplateConformance(ctx, artWithLink, true); err != nil {
+			if err := p.store.AddEdge(ctx, Edge{From: sourceID, To: tpl.ID, Relation: relation, Weight: weight}); err != nil {
+				return nil, err
+			}
+			if err := p.checkTemplateConformance(ctx, art, true); err != nil {
+				_ = p.store.RemoveEdge(ctx, Edge{From: sourceID, To: tpl.ID, Relation: relation})
 				slog.WarnContext(ctx, "satisfies conformance blocked link", slog.String("source_id", sourceID), slog.String("target_id", tpl.ID), slog.Any(LogKeyError, err)) //nolint:sloglint // source_id/target_id have no LogKey constants
 				return nil, err
 			}
+			existing[tpl.ID] = true
 		}
 	}
-	if art.Links == nil {
-		art.Links = make(map[string][]string)
-	}
-	existing := make(map[string]bool, len(art.Links[relation]))
-	for _, id := range art.Links[relation] {
-		existing[id] = true
-	}
+
 	results := make([]Result, 0, len(targetIDs))
 	for _, tid := range targetIDs {
 		if existing[tid] {
@@ -190,11 +193,9 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 			results = append(results, Result{ID: tid, Error: err.Error()})
 			continue
 		}
-		art.Links[relation] = append(art.Links[relation], tid)
 		existing[tid] = true
 		results = append(results, Result{ID: tid, OK: true})
 	}
-	_ = p.store.Put(ctx, art)
 	slog.InfoContext(ctx, "link artifacts",
 		slog.String(LogKeyID, sourceID),
 		slog.String(LogKeyRelation, relation),
@@ -213,14 +214,6 @@ func (p *Protocol) UnlinkArtifacts(ctx context.Context, sourceID, relation strin
 	if len(targetIDs) == 0 {
 		return nil, fmt.Errorf("at least one target ID is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
-	art, err := p.store.Get(ctx, sourceID)
-	if err != nil {
-		return nil, err
-	}
-	removeSet := make(map[string]bool, len(targetIDs))
-	for _, t := range targetIDs {
-		removeSet[t] = true
-	}
 	results := make([]Result, 0, len(targetIDs))
 	for _, tid := range targetIDs {
 		if err := p.store.RemoveEdge(ctx, Edge{From: sourceID, To: tid, Relation: relation}); err != nil {
@@ -229,18 +222,6 @@ func (p *Protocol) UnlinkArtifacts(ctx context.Context, sourceID, relation strin
 		}
 		results = append(results, Result{ID: tid, OK: true})
 	}
-	var kept []string
-	for _, id := range art.Links[relation] {
-		if !removeSet[id] {
-			kept = append(kept, id)
-		}
-	}
-	if len(kept) > 0 {
-		art.Links[relation] = kept
-	} else {
-		delete(art.Links, relation)
-	}
-	_ = p.store.Put(ctx, art)
 	slog.InfoContext(ctx, "unlink artifacts",
 		slog.String(LogKeyID, sourceID),
 		slog.String(LogKeyRelation, relation),

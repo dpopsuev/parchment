@@ -24,7 +24,6 @@ func buildV044DB(t *testing.T, path string) {
 		{ID: "SCR-CAM-1", Labels: []string{"kind:campaign", "status:active", "scope:scribe"},
 			Title:    "Migration campaign",
 			Sections: []Section{{Name: "mission", Text: "stay safe"}},
-			Links:    map[string][]string{RelJustifies: {"SCR-GOL-1"}},
 		},
 		{ID: "SCR-TSK-1", Labels: []string{"kind:task", "status:draft", "scope:scribe"},
 			Title:    "Task alpha",
@@ -41,6 +40,9 @@ func buildV044DB(t *testing.T, path string) {
 		if err := s.Put(ctx, a); err != nil {
 			t.Fatalf("seed %s: %v", a.ID, err)
 		}
+	}
+	if err := s.AddEdge(ctx, Edge{From: "SCR-CAM-1", To: "SCR-GOL-1", Relation: RelJustifies}); err != nil {
+		t.Fatal(err)
 	}
 	if err := s.AddEdge(ctx, Edge{From: "SCR-CAM-1", To: "SCR-TSK-1", Relation: RelParentOf}); err != nil {
 		t.Fatal(err)

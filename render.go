@@ -29,11 +29,6 @@ func RenderMarkdown(art *Artifact) string { //nolint:gocyclo // display logic is
 	if len(art.Labels) > 0 {
 		renderWriteField(&b, "Labels", strings.Join(art.Labels, ", "))
 	}
-	if len(art.Links) > 0 {
-		for rel, ids := range art.Links {
-			renderWriteField(&b, strings.Title(rel), strings.Join(ids, ", ")) //nolint:staticcheck // strings.Title is fine for display
-		}
-	}
 	if len(art.Extra) > 0 {
 		keys := renderSortedKeys(art.Extra)
 		for _, k := range keys {

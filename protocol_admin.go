@@ -544,7 +544,14 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 			}
 		}
 
-		for rel, targets := range art.Links {
+		relTargets := make(map[string][]string)
+		for _, e := range checkOutgoing[art.ID] {
+			if e.Relation == RelParentOf {
+				continue
+			}
+			relTargets[e.Relation] = append(relTargets[e.Relation], e.To)
+		}
+		for rel, targets := range relTargets {
 			if len(kd.Relations.Outgoing) > 0 {
 				if !slices.Contains(kd.Relations.Outgoing, rel) {
 					report.Violations = append(report.Violations, CheckViolation{
@@ -780,39 +787,29 @@ func (p *Protocol) CheckFix(ctx context.Context, scope string) (*CheckReport, []
 			if err != nil {
 				continue
 			}
-			changed := false
-			for rel, targets := range art.Links {
-				kd := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]
+			kd := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]
+			edges, _ := p.store.Neighbors(ctx, v.ID, "", Outgoing)
+			for _, e := range edges {
+				if e.Relation == RelParentOf {
+					continue
+				}
 				if len(kd.Relations.Outgoing) > 0 {
-					if !slices.Contains(kd.Relations.Outgoing, rel) {
-						delete(art.Links, rel)
-						fixes = append(fixes, fmt.Sprintf("removed disallowed %q link from %s", rel, v.ID))
-						changed = true
+					if !slices.Contains(kd.Relations.Outgoing, e.Relation) {
+						_ = p.store.RemoveEdge(ctx, Edge{From: v.ID, To: e.To, Relation: e.Relation})
+						fixes = append(fixes, fmt.Sprintf("removed disallowed %q link from %s", e.Relation, v.ID))
 						continue
 					}
 				}
-			if validTargets, ok := kd.Relations.Targets[rel]; ok {
-				var keep []string
-				for _, tid := range targets {
-					target, err := p.store.Get(ctx, tid)
+				if validTargets, ok := kd.Relations.Targets[e.Relation]; ok {
+					target, err := p.store.Get(ctx, e.To)
 					if err != nil {
-						keep = append(keep, tid)
 						continue
 					}
-					if slices.Contains(validTargets, labelValue(target.Labels, LabelPrefixKind)) {
-						keep = append(keep, tid)
-					} else {
-						fixes = append(fixes, fmt.Sprintf("removed %s->%s (%s %s) target mismatch", v.ID, tid, rel, labelValue(target.Labels, LabelPrefixKind)))
+					if !slices.Contains(validTargets, labelValue(target.Labels, LabelPrefixKind)) {
+						_ = p.store.RemoveEdge(ctx, Edge{From: v.ID, To: e.To, Relation: e.Relation})
+						fixes = append(fixes, fmt.Sprintf("removed %s->%s (%s %s) target mismatch", v.ID, e.To, e.Relation, labelValue(target.Labels, LabelPrefixKind)))
 					}
 				}
-					if len(keep) != len(targets) {
-						art.Links[rel] = keep
-						changed = true
-					}
-				}
-			}
-			if changed {
-				_ = p.store.Put(ctx, art)
 			}
 
 		case "invalid_parent", "parent_cycle":

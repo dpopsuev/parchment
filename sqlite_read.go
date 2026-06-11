@@ -71,10 +71,6 @@ func (s *SQLiteStore) Delete(ctx context.Context, id string) error {
 		return err
 	}
 
-	// Clean dangling references from other artifacts' DependsOn and Links fields
-	if err := s.cleanDanglingRefs(ctx, tx, id); err != nil {
-		slog.WarnContext(context.Background(), "cleanDanglingRefs", slog.String("deleted_id", id), slog.Any(LogKeyError, err)) //nolint:sloglint // deleted_id has no LogKey constant
-	}
 	if art != nil && rowid > 0 {
 		deleteFTSInTx(ctx, tx, rowid, art)
 	}

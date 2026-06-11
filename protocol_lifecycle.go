@@ -383,7 +383,11 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 	}
 	// Auto-enrichment: on task completion, update implementing spec
 	if labelValue(art.Labels, LabelPrefixKind) == KindTask && status == "work.complete" { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
-		if targets, ok := art.Links[RelImplements]; ok {
+		if implEdges, _ := p.store.Neighbors(ctx, art.ID, RelImplements, Outgoing); len(implEdges) > 0 {
+			targets := make([]string, len(implEdges))
+			for i, e := range implEdges {
+				targets[i] = e.To
+			}
 			for _, specID := range targets {
 				spec, err := p.store.Get(ctx, specID)
 				if err != nil || labelValue(spec.Labels, LabelPrefixKind) != KindSpec {

@@ -13,7 +13,6 @@ type Artifact struct {
 	Title       string              `json:"title"`
 	Labels      []string            `json:"labels,omitempty"`
 	Sections    []Section           `json:"sections,omitempty"`
-	Links       map[string][]string `json:"links,omitempty"`
 	Extra       map[string]any      `json:"extra,omitempty"`
 	Annotations []Annotation        `json:"annotations,omitempty"`
 	CreatedAt   time.Time           `json:"created_at"`

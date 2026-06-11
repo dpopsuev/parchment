@@ -26,7 +26,6 @@ func buildV042DB(t *testing.T, path string) {
 		{ID: "SCR-GOL-1", Labels: []string{"kind:goal", "status:active", "scope:scribe"}, Title: "Ship v1"},
 		{ID: "SCR-CAM-1", Labels: []string{"kind:campaign", "status:active", "scope:scribe"},
 			Title: "Q2 Campaign",
-			Links: map[string][]string{RelJustifies: {"SCR-GOL-1"}},
 			Sections: []Section{
 				{Name: "mission", Text: "ship the thing"},
 			},
@@ -47,13 +46,15 @@ func buildV042DB(t *testing.T, path string) {
 		},
 		{ID: "SCR-BUG-1", Labels: []string{"kind:bug", "status:open", "scope:scribe"},
 			Title: "Crash on startup",
-			Links: map[string][]string{RelDependsOn: {"SCR-TSK-1"}},
 		},
 	}
 	for _, a := range artifacts {
 		if err := s.Put(ctx, a); err != nil {
 			t.Fatalf("seed %s: %v", a.ID, err)
 		}
+	}
+	if err := s.AddEdge(ctx, Edge{From: "SCR-CAM-1", To: "SCR-GOL-1", Relation: RelJustifies}); err != nil {
+		t.Fatal(err)
 	}
 	if err := s.AddEdge(ctx, Edge{From: "SCR-CAM-1", To: "SCR-TSK-1", Relation: RelParentOf}); err != nil {
 		t.Fatal(err)
@@ -62,6 +63,9 @@ func buildV042DB(t *testing.T, path string) {
 		t.Fatal(err)
 	}
 	if err := s.AddEdge(ctx, Edge{From: "SCR-TSK-2", To: "SCR-TSK-1", Relation: RelDependsOn}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddEdge(ctx, Edge{From: "SCR-BUG-1", To: "SCR-TSK-1", Relation: RelDependsOn}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {
@@ -143,13 +147,13 @@ func TestV043_CrossRefsIntactAfterOpen(t *testing.T) {
 		t.Errorf("SCR-TSK-2 depends_on edges = %v, want [{To: SCR-TSK-1}]", depEdges)
 	}
 
-	// links
-	cam, err := s.Get(ctx, "SCR-CAM-1")
+	// links via edges
+	justifies, err := s.Neighbors(ctx, "SCR-CAM-1", RelJustifies, Outgoing)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cam.Links[RelJustifies]) != 1 || cam.Links[RelJustifies][0] != "SCR-GOL-1" {
-		t.Errorf("SCR-CAM-1.Links[justifies] = %v, want [SCR-GOL-1]", cam.Links[RelJustifies])
+	if len(justifies) != 1 || justifies[0].To != "SCR-GOL-1" {
+		t.Errorf("SCR-CAM-1 justifies edges = %v, want [{To: SCR-GOL-1}]", justifies)
 	}
 
 	// edges

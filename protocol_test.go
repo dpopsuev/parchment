@@ -769,7 +769,7 @@ func TestCreateArtifact_ScopeRequiredWhenMultiple(t *testing.T) {
 
 func TestLinkArtifacts_BasicLink(t *testing.T) {
 	t.Parallel()
-	proto, _ := newProto(t)
+	proto, store := newProto(t)
 	ctx := context.Background()
 
 	task := createTask(t, proto, "task A")
@@ -788,9 +788,9 @@ func TestLinkArtifacts_BasicLink(t *testing.T) {
 		t.Errorf("expected OK result, got %+v", results)
 	}
 
-	// Verify link persisted
-	got, _ := proto.GetArtifact(ctx, task.ID)
-	if targets, ok := got.Links["implements"]; !ok || len(targets) == 0 {
+	// Verify link persisted via edge store
+	implEdges, _ := store.Neighbors(ctx, task.ID, "implements", parchment.Outgoing)
+	if len(implEdges) == 0 {
 		t.Error("expected implements link on task")
 	}
 }
@@ -920,7 +920,7 @@ func TestLinkArtifacts_SatisfiesNonTemplate(t *testing.T) {
 
 func TestUnlinkArtifacts_Success(t *testing.T) {
 	t.Parallel()
-	proto, _ := newProto(t)
+	proto, store := newProto(t)
 	ctx := context.Background()
 
 	a := createTask(t, proto, "task A")
@@ -936,9 +936,9 @@ func TestUnlinkArtifacts_Success(t *testing.T) {
 		t.Errorf("expected OK result, got %+v", results)
 	}
 
-	// Verify link removed
-	got, _ := proto.GetArtifact(ctx, a.ID)
-	if targets, ok := got.Links["depends_on"]; ok && len(targets) > 0 {
+	// Verify link removed via edge store
+	depEdges, _ := store.Neighbors(ctx, a.ID, "depends_on", parchment.Outgoing)
+	if len(depEdges) > 0 {
 		t.Error("expected depends_on link to be removed")
 	}
 }

@@ -10,11 +10,11 @@ import (
 
 // executeTemplateHooks creates prefix/suffix child artifacts from template hooks.
 func (p *Protocol) executeTemplateHooks(ctx context.Context, art *Artifact) {
-	tplIDs, ok := art.Links[RelSatisfies]
-	if !ok || len(tplIDs) == 0 {
+	satisfies, _ := p.store.Neighbors(ctx, art.ID, RelSatisfies, Outgoing)
+	if len(satisfies) == 0 {
 		return
 	}
-	tpl, err := p.store.Get(ctx, tplIDs[0])
+	tpl, err := p.store.Get(ctx, satisfies[0].To)
 	if err != nil || tpl.Extra == nil {
 		return
 	}
@@ -124,16 +124,16 @@ func (p *Protocol) findTemplateForKind(ctx context.Context, kind, scope string) 
 	return ""
 }
 
-// resolveTemplate follows the satisfies link on an artifact to find its template.
-// Returns nil if no satisfies link exists or the template can't be loaded.
+// resolveTemplate follows the satisfies edge on an artifact to find its template.
+// Returns nil if no satisfies edge exists or the template can't be loaded.
 func (p *Protocol) resolveTemplate(ctx context.Context, art *Artifact) *Artifact {
-	targets, ok := art.Links[RelSatisfies]
-	if !ok || len(targets) == 0 {
+	satisfies, _ := p.store.Neighbors(ctx, art.ID, RelSatisfies, Outgoing)
+	if len(satisfies) == 0 {
 		return nil
 	}
-	tpl, err := p.store.Get(ctx, targets[0])
+	tpl, err := p.store.Get(ctx, satisfies[0].To)
 	if err != nil {
-		slog.DebugContext(ctx, "failed to resolve template", slog.String("artifact_id", art.ID), slog.String("template_id", targets[0]), slog.Any(LogKeyError, err)) //nolint:sloglint // artifact_id/template_id have no LogKey constants
+		slog.DebugContext(ctx, "failed to resolve template", slog.String("artifact_id", art.ID), slog.String("template_id", satisfies[0].To), slog.Any(LogKeyError, err)) //nolint:sloglint // artifact_id/template_id have no LogKey constants
 		return nil
 	}
 	if labelValue(tpl.Labels, LabelPrefixKind) != KindTemplate {

@@ -189,7 +189,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		ID: id, Alias: in.Alias, Parent: in.Parent,
 		Title:    in.Title,
 		Labels:   seedLabels,
-		Links:    in.Links, Extra: in.Extra,
+		Extra:    in.Extra,
 		Sections: in.Sections,
 	}
 	if in.Goal != "" {
@@ -221,14 +221,12 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		skipGuards = kd.SkipGuards
 	}
 
+	// Determine template auto-link ID before store.Put.
+	autoTplID := ""
 	if !skipGuards { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity
-		// Auto-link template if no satisfies link provided
-		if art.Links == nil || len(art.Links[RelSatisfies]) == 0 {
+		if len(in.Links[RelSatisfies]) == 0 {
 			if tplID := p.findTemplateForKind(ctx, labelValue(art.Labels, LabelPrefixKind), scope); tplID != "" {
-				if art.Links == nil {
-					art.Links = make(map[string][]string)
-				}
-				art.Links[RelSatisfies] = []string{tplID}
+				autoTplID = tplID
 				slog.DebugContext(ctx, "auto-linked template",
 					slog.String("artifact_kind", labelValue(art.Labels, LabelPrefixKind)), slog.String("scope", scope), slog.String("template_id", tplID)) //nolint:sloglint // artifact_kind/scope/template_id have no LogKey constants
 			}
@@ -237,7 +235,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		if kd, ok := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]; ok {
 			for _, reqRel := range kd.Relations.RequiredOutgoing {
 				hasEdge := false
-				if targets, ok := art.Links[reqRel]; ok && len(targets) > 0 {
+				if targets, ok := in.Links[reqRel]; ok && len(targets) > 0 {
 					hasEdge = true
 				}
 				if reqRel == RelDependsOn && len(in.DependsOn) > 0 {
@@ -253,18 +251,6 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 			}
 		}
 
-		// When the caller explicitly requests draft, skip conformance —
-		// draft is intentional "work in progress"; sections come later.
-		// When status defaults to draft, still warn so agents know what's missing.
-		explicitDraft := statusFromLabels(in.Labels) == "work.draft"
-		if !explicitDraft {
-			if err := p.checkTemplateConformance(ctx, art, true); err != nil {
-				slog.WarnContext(ctx, "partial create: template sections missing",
-					slog.String(LogKeyID, art.ID),
-					slog.Any(LogKeyError, err))
-				art.Warnings = append(art.Warnings, err.Error())
-			}
-		}
 		// Duplicate awareness: warn if similar non-terminal artifact exists
 		if existing, _ := p.store.List(ctx, Filter{Labels: []string{LabelPrefixKind + labelValue(art.Labels, LabelPrefixKind), LabelPrefixScope + labelValue(art.Labels, LabelPrefixScope)}}); len(existing) > 0 {
 			for _, e := range existing {
@@ -282,6 +268,28 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	}
 	for _, dep := range in.DependsOn {
 		_ = p.store.AddEdge(ctx, Edge{From: art.ID, To: dep, Relation: RelDependsOn})
+	}
+	for rel, targets := range in.Links {
+		for _, tid := range targets {
+			_ = p.store.AddEdge(ctx, Edge{From: art.ID, To: tid, Relation: rel})
+		}
+	}
+	if autoTplID != "" {
+		_ = p.store.AddEdge(ctx, Edge{From: art.ID, To: autoTplID, Relation: RelSatisfies})
+	}
+	// When the caller explicitly requests draft, skip conformance —
+	// draft is intentional "work in progress"; sections come later.
+	// When status defaults to draft, still warn so agents know what's missing.
+	if !skipGuards {
+		explicitDraft := statusFromLabels(in.Labels) == "work.draft"
+		if !explicitDraft {
+			if err := p.checkTemplateConformance(ctx, art, true); err != nil {
+				slog.WarnContext(ctx, "partial create: template sections missing",
+					slog.String(LogKeyID, art.ID),
+					slog.Any(LogKeyError, err))
+				art.Warnings = append(art.Warnings, err.Error())
+			}
+		}
 	}
 
 	// Execute template hooks (prefix/suffix auto-generation)
@@ -764,16 +772,6 @@ func (p *Protocol) UpsertArtifact(ctx context.Context, in CreateInput) (UpsertRe
 		}
 	}
 
-	// Links: merge per relation key — union of targets per relation.
-	if len(in.Links) > 0 {
-		if existing.Links == nil {
-			existing.Links = make(map[string][]string, len(in.Links))
-		}
-		for rel, targets := range in.Links {
-			existing.Links[rel] = mergeStringSlice(existing.Links[rel], targets)
-		}
-	}
-
 	p.stampCompliance(existing)
 	p.stripEncodedIfStale(ctx, existing)
 	if err := p.store.Put(ctx, existing); err != nil {
@@ -781,6 +779,11 @@ func (p *Protocol) UpsertArtifact(ctx context.Context, in CreateInput) (UpsertRe
 	}
 	for _, dep := range in.DependsOn {
 		_ = p.store.AddEdge(ctx, Edge{From: existing.ID, To: dep, Relation: RelDependsOn})
+	}
+	for rel, targets := range in.Links {
+		for _, tid := range targets {
+			_ = p.store.AddEdge(ctx, Edge{From: existing.ID, To: tid, Relation: rel})
+		}
 	}
 	return UpsertResult{Artifact: existing, Created: false}, nil
 }

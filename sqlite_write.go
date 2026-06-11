@@ -102,7 +102,6 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	sections, _ := json.Marshal(art.Sections)
 	features := []byte("[]")
 	criteria := []byte("[]")
-	links, _ := json.Marshal(art.Links)
 	extra, _ := json.Marshal(art.Extra)
 	annotations, _ := json.Marshal(art.Annotations)
 
@@ -120,7 +119,7 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 			annotations=excluded.annotations, updated_at=excluded.updated_at`,
 		uid, art.ID, art.Alias, kind, scope, status, art.Parent, art.Title, art.Goal(),
 		"[]", string(labels), priority, sprint,
-		string(sections), string(features), string(criteria), string(links), string(extra),
+		string(sections), string(features), string(criteria), "{}", string(extra),
 		string(annotations),
 		art.CreatedAt.Format(time.RFC3339Nano), art.UpdatedAt.Format(time.RFC3339Nano),
 		art.InsertedAt.Format(time.RFC3339Nano),
@@ -215,14 +214,13 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 		sections, _ := json.Marshal(art.Sections)
 		features := []byte("[]")
 		criteria := []byte("[]")
-		links, _ := json.Marshal(art.Links)
 		extra, _ := json.Marshal(art.Extra)
 		annotations, _ := json.Marshal(art.Annotations)
 
 		_, execErr := stmt.ExecContext(ctx,
 			uid, art.ID, art.Alias, kind, scope, status, art.Parent,
 			art.Title, art.Goal(), "[]", string(labels), priority, sprint,
-			string(sections), string(features), string(criteria), string(links), string(extra),
+			string(sections), string(features), string(criteria), "{}", string(extra),
 			string(annotations),
 			art.CreatedAt.Format(time.RFC3339Nano),
 			art.UpdatedAt.Format(time.RFC3339Nano),
@@ -296,7 +294,6 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 	sections, _ := json.Marshal(art.Sections)
 	features := []byte("[]")
 	criteria := []byte("[]")
-	links, _ := json.Marshal(art.Links)
 	extra, _ := json.Marshal(art.Extra)
 	annotations, _ := json.Marshal(art.Annotations)
 
@@ -311,7 +308,7 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 		WHERE id=?`,
 		art.Alias, kind, scope, status, art.Parent, art.Title, art.Goal(),
 		"[]", string(labels), priority, sprint,
-		string(sections), string(features), string(criteria), string(links),
+		string(sections), string(features), string(criteria), "{}",
 		string(extra), string(annotations),
 		art.UpdatedAt.Format(time.RFC3339Nano),
 		art.ID,
@@ -454,61 +451,6 @@ func (s *SQLiteStore) RenameID(ctx context.Context, oldID, newID string) error {
 	return tx.Commit()
 }
 
-// cleanDanglingRefs removes a deleted ID from other artifacts' Links JSON field.
-func (s *SQLiteStore) cleanDanglingRefs(ctx context.Context, tx *sql.Tx, deletedID string) error {
-	rows, err := tx.QueryContext(ctx,
-		"SELECT id, links FROM artifacts WHERE links LIKE ?",
-		"%"+deletedID+"%")
-	if err != nil {
-		return err
-	}
-	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
-
-	type refUpdate struct {
-		id    string
-		links string
-	}
-	var updates []refUpdate
-	for rows.Next() {
-		var u refUpdate
-		if err := rows.Scan(&u.id, &u.links); err != nil {
-			continue
-		}
-		updates = append(updates, u)
-	}
-
-	for _, u := range updates {
-		var links map[string][]string
-		_ = json.Unmarshal([]byte(u.links), &links) // malformed JSON → nil map; safe fallback
-		changed := false
-		for rel, targets := range links {
-			var clean []string
-			for _, t := range targets {
-				if t != deletedID {
-					clean = append(clean, t)
-				} else {
-					changed = true
-				}
-			}
-			if len(clean) == 0 {
-				delete(links, rel)
-			} else {
-				links[rel] = clean
-			}
-		}
-
-		if changed {
-			linksJSON, _ := json.Marshal(links)
-			if _, err := tx.ExecContext(ctx,
-				"UPDATE artifacts SET links = ? WHERE id = ?",
-				string(linksJSON), u.id); err != nil {
-				return fmt.Errorf("clean refs in %s: %w", u.id, err)
-			}
-		}
-	}
-	return nil
-}
-
 // --- scan helpers ---
 
 type rowScanner interface {
@@ -552,7 +494,6 @@ func scanRow(s rowScanner) (*Artifact, error) {
 	}{
 		{labels, &art.Labels, "labels"},
 		{sections, &art.Sections, "sections"},
-		{links, &art.Links, "links"},
 		{extra, &art.Extra, "extra"},
 		{annotations, &art.Annotations, "annotations"},
 	} {
@@ -665,8 +606,8 @@ func toSet(items []string) map[string]bool {
 	return m
 }
 
-// reconcileEdgesSQL mirrors the bbolt reconcileEdges logic using SQL.
-func reconcileEdgesSQL(ctx context.Context, tx *sql.Tx, old, cur *Artifact) error { //nolint:gocyclo // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
+// reconcileEdgesSQL keeps the parent_of edge in sync with the Parent field.
+func reconcileEdgesSQL(ctx context.Context, tx *sql.Tx, old, cur *Artifact) error {
 	oldParent := ""
 	if old != nil {
 		oldParent = old.Parent
@@ -680,37 +621,6 @@ func reconcileEdgesSQL(ctx context.Context, tx *sql.Tx, old, cur *Artifact) erro
 		if cur.Parent != "" {
 			if err := addEdge(ctx, tx, cur.Parent, RelParentOf, cur.ID); err != nil {
 				return fmt.Errorf("add parent edge: %w", err)
-			}
-		}
-	}
-
-	oldLinks := make(map[string]map[string]bool)
-	if old != nil {
-		for rel, ids := range old.Links {
-			oldLinks[rel] = toSet(ids)
-		}
-	}
-	newLinks := make(map[string]map[string]bool)
-	for rel, ids := range cur.Links {
-		newLinks[rel] = toSet(ids)
-	}
-	for rel, oldSet := range oldLinks {
-		newSet := newLinks[rel]
-		for id := range oldSet {
-			if newSet == nil || !newSet[id] {
-				if err := deleteEdge(ctx, tx, cur.ID, rel, id); err != nil {
-					return fmt.Errorf("delete link edge %s/%s: %w", rel, id, err)
-				}
-			}
-		}
-	}
-	for rel, newSet := range newLinks {
-		oldSet := oldLinks[rel]
-		for id := range newSet {
-			if oldSet == nil || !oldSet[id] {
-				if err := addEdge(ctx, tx, cur.ID, rel, id); err != nil {
-					return fmt.Errorf("add link edge %s/%s: %w", rel, id, err)
-				}
 			}
 		}
 	}

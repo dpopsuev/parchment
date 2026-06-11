@@ -120,15 +120,11 @@ func TestCreateArtifact_PatchOverridesExplicitSection(t *testing.T) {
 	}
 }
 
-func TestPromoteStash_PatchFillsMissingSections(t *testing.T) {
+func TestAttachSection_EnablesStatusPromotion(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	proto := setupTemplateProto(t)
 
-	// Create without required sections — now succeeds as draft with a warning.
-	// The stash/promote_stash recovery path is still supported for callers that
-	// pre-built a stash from an older workflow, but the happy path no longer
-	// requires it.
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "stash test bug",
 
 		Labels: []string{"kind:bug"},})
@@ -139,7 +135,6 @@ func TestPromoteStash_PatchFillsMissingSections(t *testing.T) {
 		t.Error("expected conformance warning on partial create")
 	}
 
-	// Attach the missing section directly — no stash needed.
 	_, err = proto.AttachSection(ctx, art.ID, "observed", "it crashes")
 	if err != nil {
 		t.Fatalf("attach_section should succeed: %v", err)
@@ -159,27 +154,4 @@ func TestPromoteStash_PatchFillsMissingSections(t *testing.T) {
 	}
 }
 
-func TestMergeInput_PatchFieldMerged(t *testing.T) {
-	t.Parallel()
 
-	base := parchment.CreateInput{Title: "base title",
-		Sections: []parchment.Section{
-			{Name: "observed", Text: "existing observed"},
-		},
-		Labels: []string{"kind:bug"},}
-	patch := parchment.CreateInput{
-		Patch: map[string]string{
-			"reproduction": "new reproduction",
-			"root_cause":   "new root_cause",
-		},
-	}
-
-	merged := parchment.MergeInput(base, patch)
-
-	if len(merged.Patch) != 2 {
-		t.Errorf("patch map should be merged, got %d entries", len(merged.Patch))
-	}
-	if merged.Patch["reproduction"] != "new reproduction" {
-		t.Errorf("patch entry not merged, got: %q", merged.Patch["reproduction"])
-	}
-}

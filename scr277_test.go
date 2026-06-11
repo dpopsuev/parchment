@@ -7,6 +7,23 @@ import (
 	parchment "github.com/dpopsuev/parchment"
 )
 
+func setupTemplateProtoForConformance(t *testing.T) *parchment.Protocol {
+	t.Helper()
+	store := parchment.NewMemoryStore()
+	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
+	ctx := context.Background()
+	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
+		ID: "TPL-BUG-1", Labels: []string{"kind:template", "work.active", "scope:test"}, Title: "Bug Template",
+		Sections: []parchment.Section{
+			{Name: "content", Text: "raw markdown"},
+			{Name: "observed", Text: "Observed vs expected behavior"},
+			{Name: "reproduction", Text: "Steps to reproduce"},
+			{Name: "root_cause", Text: "Component and code path"},
+		},
+	})
+	return proto
+}
+
 // TestCreateDraft_SkipsTemplateConformance reproduces SCR-TSK-277:
 // creating with status=work.draft should not trigger template conformance checks.
 // Draft means "work in progress" — sections can be filled in later.

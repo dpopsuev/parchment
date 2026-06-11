@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -1813,32 +1812,6 @@ func TestCreateArtifact_TemplateIsScopeless(t *testing.T) {
 	}
 }
 
-// --- Stash ---
-
-func TestStash_PutAndGet(t *testing.T) {
-	t.Parallel()
-	proto, _ := newProto(t)
-
-	stash := proto.Stash()
-	id, err := stash.Put(parchment.CreateInput{Title: "stashed task",
-
-		Labels: []string{"kind:task"},})
-	if err != nil {
-		t.Fatalf("Stash.Put: %v", err)
-	}
-	if id == "" {
-		t.Fatal("expected non-empty stash ID")
-	}
-
-	entry, err := stash.Get(id)
-	if err != nil {
-		t.Fatalf("Stash.Get: %v", err)
-	}
-	if entry.Input.Title != "stashed task" {
-		t.Errorf("expected 'stashed task', got %q", entry.Input.Title)
-	}
-}
-
 // --- DetectOverlaps ---
 
 // --- DetectOrphans ---
@@ -1863,56 +1836,6 @@ func TestDetectOrphans_RefWithoutDocuments(t *testing.T) {
 	if report.TotalOrphans == 0 {
 		t.Error("expected at least 1 orphan for ref without documents link")
 	}
-}
-
-// --- ConformanceError ---
-
-func TestCreateArtifact_ConformanceErrorHasStashID(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	proto := setupTemplateProtoForConformance(t)
-
-	// Create bug without required "observed" section.
-	// New behavior: succeeds as draft with a warning (no hard error at create time).
-	// Template conformance fires when promoting out of draft.
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "missing observed",
-
-		Labels: []string{"kind:bug"},})
-	if err != nil {
-		t.Fatalf("create with missing sections should succeed as draft, got error: %v", err)
-	}
-	if art == nil {
-		t.Fatal("expected artifact, got nil")
-	}
-	if len(art.Warnings) == 0 {
-		t.Error("expected Warnings to be non-empty when required sections are missing")
-	}
-	for _, w := range art.Warnings {
-		if strings.Contains(w, "does not conform") || strings.Contains(w, "missing") {
-			return // found expected warning
-		}
-	}
-	t.Errorf("warning should mention conformance/missing sections, got: %v", art.Warnings)
-}
-
-// setupTemplateProtoForConformance creates a protocol with a bug template
-// that requires an "observed" section (MustSection for bug kind).
-func setupTemplateProtoForConformance(t *testing.T) *parchment.Protocol {
-	t.Helper()
-	store := parchment.NewMemoryStore()
-	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
-	ctx := context.Background()
-
-	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
-		ID: "TPL-BUG-1", Labels: []string{"kind:template", "work.active", "scope:test"}, Title: "Bug Template",
-		Sections: []parchment.Section{
-			{Name: "content", Text: "raw markdown"},
-			{Name: "observed", Text: "Observed vs expected behavior"},
-			{Name: "reproduction", Text: "Steps to reproduce"},
-			{Name: "root_cause", Text: "Component and code path"},
-		},
-	})
-	return proto
 }
 
 // ============================================================

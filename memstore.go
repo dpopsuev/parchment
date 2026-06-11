@@ -151,11 +151,6 @@ func (m *MemoryStore) List(_ context.Context, f Filter) ([]*Artifact, error) { /
 		if !f.Matches(art) {
 			continue
 		}
-		if f.Parent != "" {
-			if _, ok := m.edges[edgeKey(f.Parent, RelParentOf, art.ID)]; !ok {
-				continue
-			}
-		}
 		c := *art
 		result = append(result, &c)
 	}
@@ -670,11 +665,6 @@ func (m *MemoryStore) ListPage(_ context.Context, f Filter) (Page, error) { //no
 	for _, art := range m.artifacts {
 		if !f.Matches(art) {
 			continue
-		}
-		if f.Parent != "" {
-			if _, ok := m.edges[edgeKey(f.Parent, RelParentOf, art.ID)]; !ok {
-				continue
-			}
 		}
 		cp := *art
 		results = append(results, &cp)

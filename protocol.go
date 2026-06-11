@@ -4,17 +4,6 @@ import (
 	"context"
 )
 
-// ConformanceError is returned when an artifact fails template conformance
-// during creation or promotion. It carries the stash ID so callers can
-// recover the partial artifact without parsing the error string.
-type ConformanceError struct {
-	Err     error
-	StashID string
-}
-
-func (e *ConformanceError) Error() string { return e.Err.Error() }
-func (e *ConformanceError) Unwrap() error { return e.Err }
-
 // Config key constants for sticky filter defaults.
 const (
 	configKeyDefaultScope         = "default_scope"
@@ -77,7 +66,6 @@ type Protocol struct {
 	mutableCreatedAt bool
 	defaults         DefaultsProvider
 	scopePolicies    map[string]ScopePolicy
-	stash            *StashStore
 	gates            []QualityGate
 	embedFunc        EmbeddingFunc
 	embedModel       string
@@ -127,7 +115,6 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 		p.defaults = defaultDefaults
 	}
 	p.scopePolicies = idc.ScopePolicies
-	p.stash = NewStashStore(0, 0) // use defaults
 	p.embedFunc = idc.EmbedFunc
 	p.embedModel = idc.EmbedModel
 	if p.embedFunc != nil && p.embedModel == "" {
@@ -136,9 +123,8 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 	return p
 }
 
-func (p *Protocol) Schema() *Schema    { return p.schema }
-func (p *Protocol) Store() Store       { return p.store }
-func (p *Protocol) Stash() *StashStore { return p.stash }
+func (p *Protocol) Schema() *Schema { return p.schema }
+func (p *Protocol) Store() Store    { return p.store }
 
 // LabelTrait returns the merged trait profile for the given label set.
 func (p *Protocol) LabelTrait(labels []string) LabelTrait {
@@ -152,4 +138,4 @@ func (p *Protocol) stampCompliance(art *Artifact) {
 	StampCompliance(p.labelTraits, art)
 }
 
-// PromoteStash merges patch into a stashed artifact and creates it.
+

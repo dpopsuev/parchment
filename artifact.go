@@ -111,7 +111,6 @@ type Filter struct {
 	// It maps to `scope IN (...)` — ANDed with all other predicates, OR within the group.
 	// Not exposed on ListInput; callers express scope via Labels: ["scope:X"].
 	ScopesOr []string
-	Parent   string
 	Labels         []string
 	LabelsOr       []string
 	ExcludeLabels  []string

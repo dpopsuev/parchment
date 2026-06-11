@@ -56,33 +56,6 @@ func (p *Protocol) StoreEmbedding(ctx context.Context, artifactID, model, conten
 	return p.store.PutEmbedding(ctx, artifactID, model, contentHash, vec)
 }
 
-func (p *Protocol) PromoteStash(ctx context.Context, stashID string, patch CreateInput) (*Artifact, error) { //nolint:gocritic // hugeParam: value semantics intentional, changing to pointer would require updating all callers including MCP handlers
-	stashed, err := p.stash.Get(stashID)
-	if err != nil {
-		return nil, err
-	}
-	merged := MergeInput(stashed.Input, patch)
-	art, err := p.CreateArtifact(ctx, merged)
-	if err != nil {
-		// Re-stash with merged state (update in place)
-		p.stash.Delete(stashID)
-		newID, stashErr := p.stash.Put(merged)
-		if stashErr != nil {
-			return nil, fmt.Errorf("%w (stash unavailable: %w)", err, stashErr) //nolint:errorlint // inherent complexity; splitting would reduce clarity or add call overhead
-		}
-		// If the underlying error is already a ConformanceError, update its StashID.
-		// Otherwise wrap in a new ConformanceError.
-		var ce *ConformanceError
-		if errors.As(err, &ce) {
-			ce.StashID = newID
-			return nil, ce
-		}
-		return nil, &ConformanceError{Err: err, StashID: newID}
-	}
-	p.stash.Delete(stashID)
-	return art, nil
-}
-
 // --- CRUD ---
 
 type CreateInput struct {
@@ -355,7 +328,6 @@ func (p *Protocol) DeleteArtifact(ctx context.Context, id string, force bool) er
 
 type ListInput struct {
 	Family         string   `json:"family,omitempty"` // filter by kind family: intent, effort, knowledge, support
-	Parent         string   `json:"parent,omitempty"`
 	IDPrefix       string   `json:"id_prefix,omitempty"`
 	Labels         []string `json:"labels,omitempty"`
 	LabelsOr       []string `json:"labels_or,omitempty"`
@@ -396,7 +368,6 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 
 	f := Filter{
 		Family:         in.Family,
-		Parent:         in.Parent,
 		IDPrefix:       in.IDPrefix,
 		Labels:         in.Labels,
 		LabelsOr:       in.LabelsOr,
@@ -436,7 +407,6 @@ func (p *Protocol) ListPage(ctx context.Context, in ListInput) (Page, error) { /
 
 	f := Filter{
 		Family:         in.Family,
-		Parent:         in.Parent,
 		IDPrefix:       in.IDPrefix,
 		Labels:         in.Labels,
 		LabelsOr:       in.LabelsOr,

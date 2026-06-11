@@ -180,9 +180,9 @@ func ParseResourceFile(data []byte) ([]*Resource, error) {
 // For kind=Artifact, use ApplyArtifactResource instead (requires a Protocol).
 func ApplyResource(ctx context.Context, s Store, r *Resource) error {
 	switch r.Kind {
-	case "LabelDefinition":
+	case "Label", "LabelDefinition":
 		return applyLabelDefinition(ctx, s, r)
-	case "EdgeTypeDefinition":
+	case "EdgeType", "EdgeTypeDefinition":
 		return applyEdgeTypeDefinition(ctx, s, r)
 	default:
 		return fmt.Errorf("%w: %s", errUnsupportedKind, r.Kind)

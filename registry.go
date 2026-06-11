@@ -13,8 +13,10 @@ import (
 )
 
 const (
-	crdKindLabelDefinition    = "LabelDefinition"
-	crdKindEdgeTypeDefinition = "EdgeTypeDefinition"
+	crdKindLabel          = "Label"
+	crdKindEdgeType       = "EdgeType"
+	crdKindLabelLegacy    = "LabelDefinition"
+	crdKindEdgeTypeLegacy = "EdgeTypeDefinition"
 )
 
 //go:embed registry/kinds/*.yaml registry/edge_types/*.yaml registry/labels/*.yaml
@@ -231,7 +233,7 @@ func loadRegistryKinds() []kindYAML {
 			continue
 		}
 		for _, r := range resources {
-			if r.Kind != crdKindLabelDefinition {
+			if r.Kind != crdKindLabel && r.Kind != crdKindLabelLegacy {
 				continue
 			}
 			k := crdResourceToKindYAML(r)
@@ -264,7 +266,7 @@ func loadRegistryEdgeTypes() []edgeTypeYAML { //nolint:dupl // parallel structur
 			continue
 		}
 		for _, r := range resources {
-			if r.Kind != crdKindEdgeTypeDefinition {
+			if r.Kind != crdKindEdgeType && r.Kind != crdKindEdgeTypeLegacy {
 				continue
 			}
 			et := crdResourceToEdgeTypeYAML(r)
@@ -297,7 +299,7 @@ func loadRegistryLabels() []labelYAML { //nolint:dupl // parallel to loadRegistr
 			continue
 		}
 		for _, r := range resources {
-			if r.Kind != crdKindLabelDefinition {
+			if r.Kind != crdKindLabel && r.Kind != crdKindLabelLegacy {
 				continue
 			}
 			l := crdResourceToLabelYAML(r)

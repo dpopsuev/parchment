@@ -1,5 +1,5 @@
 apiVersion: scribe/v1
-kind: LabelDefinition
+kind: Label
 metadata:
   name: kind.goal
 spec:

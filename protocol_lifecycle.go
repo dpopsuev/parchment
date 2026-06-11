@@ -206,7 +206,10 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, value)
 	case FieldDependsOn:
 		if value == "" {
-			art.DependsOn = nil
+			existing, _ := p.store.Neighbors(ctx, id, RelDependsOn, Outgoing)
+			for _, e := range existing {
+				_ = p.store.RemoveEdge(ctx, e)
+			}
 		} else {
 			newDeps := strings.Split(value, ",")
 			for i := range newDeps {
@@ -216,9 +219,10 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 				if cycle, path := p.wouldCycle(ctx, RelDependsOn, id, dep); cycle {
 					return Result{ID: id, Error: fmt.Sprintf("depends_on cycle detected: %s", strings.Join(path, " → "))}
 				}
+				_ = p.store.AddEdge(ctx, Edge{From: id, To: dep, Relation: RelDependsOn})
 			}
-			art.DependsOn = newDeps
 		}
+		return Result{ID: id, OK: true}
 	case "labels":
 		if value == "" {
 			art.Labels = nil

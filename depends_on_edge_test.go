@@ -35,8 +35,8 @@ func TestGuardDependsOnComplete_ReadsEdge(t *testing.T) {
 	}
 }
 
-// DependsOn field populated from edges: GetArtifact returns DependsOn
-// derived from the depends_on edge even when the field was not explicitly set.
+// depends_on edge persisted: after CreateArtifact with DependsOn, the edge
+// is queryable via Neighbors even though Artifact no longer carries the field.
 func TestGetArtifact_DependsOnFromEdge(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{})
@@ -47,11 +47,11 @@ func TestGetArtifact_DependsOnFromEdge(t *testing.T) {
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "work", DependsOn: []string{dep.ID},
 		Labels: []string{"kind:task"},})
 
-	fetched, err := proto.GetArtifact(ctx, art.ID)
+	edges, err := store.Neighbors(ctx, art.ID, parchment.RelDependsOn, parchment.Outgoing)
 	if err != nil {
-		t.Fatalf("get: %v", err)
+		t.Fatalf("Neighbors: %v", err)
 	}
-	if len(fetched.DependsOn) != 1 || fetched.DependsOn[0] != dep.ID {
-		t.Errorf("expected DependsOn=[%s], got %v", dep.ID, fetched.DependsOn)
+	if len(edges) != 1 || edges[0].To != dep.ID {
+		t.Errorf("expected one depends_on edge to %s, got %v", dep.ID, edges)
 	}
 }

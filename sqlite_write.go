@@ -98,7 +98,6 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	status := statusFromLabels(art.Labels)
 	priority := labelValue(art.Labels, LabelPrefixPriority)
 	sprint := labelValue(art.Labels, LabelPrefixSprint)
-	dependsOn, _ := json.Marshal(art.DependsOn)
 	labels, _ := json.Marshal(art.Labels)
 	sections, _ := json.Marshal(art.Sections)
 	features := []byte("[]")
@@ -120,7 +119,7 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 			extra=excluded.extra,
 			annotations=excluded.annotations, updated_at=excluded.updated_at`,
 		uid, art.ID, art.Alias, kind, scope, status, art.Parent, art.Title, art.Goal(),
-		string(dependsOn), string(labels), priority, sprint,
+		"[]", string(labels), priority, sprint,
 		string(sections), string(features), string(criteria), string(links), string(extra),
 		string(annotations),
 		art.CreatedAt.Format(time.RFC3339Nano), art.UpdatedAt.Format(time.RFC3339Nano),
@@ -212,7 +211,6 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 		status := statusFromLabels(art.Labels)
 		priority := labelValue(art.Labels, LabelPrefixPriority)
 		sprint := labelValue(art.Labels, LabelPrefixSprint)
-		dependsOn, _ := json.Marshal(art.DependsOn)
 		labels, _ := json.Marshal(art.Labels)
 		sections, _ := json.Marshal(art.Sections)
 		features := []byte("[]")
@@ -223,7 +221,7 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 
 		_, execErr := stmt.ExecContext(ctx,
 			uid, art.ID, art.Alias, kind, scope, status, art.Parent,
-			art.Title, art.Goal(), string(dependsOn), string(labels), priority, sprint,
+			art.Title, art.Goal(), "[]", string(labels), priority, sprint,
 			string(sections), string(features), string(criteria), string(links), string(extra),
 			string(annotations),
 			art.CreatedAt.Format(time.RFC3339Nano),
@@ -294,7 +292,6 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 	status := statusFromLabels(art.Labels)
 	priority := labelValue(art.Labels, LabelPrefixPriority)
 	sprint := labelValue(art.Labels, LabelPrefixSprint)
-	dependsOn, _ := json.Marshal(art.DependsOn)
 	labels, _ := json.Marshal(art.Labels)
 	sections, _ := json.Marshal(art.Sections)
 	features := []byte("[]")
@@ -313,7 +310,7 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 			extra=?, annotations=?, updated_at=?
 		WHERE id=?`,
 		art.Alias, kind, scope, status, art.Parent, art.Title, art.Goal(),
-		string(dependsOn), string(labels), priority, sprint,
+		"[]", string(labels), priority, sprint,
 		string(sections), string(features), string(criteria), string(links),
 		string(extra), string(annotations),
 		art.UpdatedAt.Format(time.RFC3339Nano),
@@ -449,36 +446,7 @@ func (s *SQLiteStore) RenameID(ctx context.Context, oldID, newID string) error {
 		return fmt.Errorf("rename parent refs: %w", err)
 	}
 
-	// 5. Update depends_on JSON arrays that reference oldID.
-	// SQLite JSON_REPLACE can't do array element replace; do it in a subquery that
-	// rebuilds the array by replacing the string token.
-	rows, err := tx.QueryContext(ctx,
-		"SELECT id, depends_on FROM artifacts WHERE depends_on LIKE ?", "%"+oldID+"%")
-	if err != nil {
-		return fmt.Errorf("query depends_on: %w", err)
-	}
-	type depsRow struct {
-		id, deps string
-	}
-	var toUpdate []depsRow
-	for rows.Next() {
-		var r depsRow
-		if serr := rows.Scan(&r.id, &r.deps); serr == nil {
-			toUpdate = append(toUpdate, r)
-		}
-	}
-	_ = rows.Close()
-	for _, r := range toUpdate {
-		updated := strings.ReplaceAll(r.deps, `"`+oldID+`"`, `"`+newID+`"`)
-		if updated == r.deps {
-			continue
-		}
-		if _, serr := tx.ExecContext(ctx, "UPDATE artifacts SET depends_on = ? WHERE id = ?", updated, r.id); serr != nil {
-			return fmt.Errorf("update depends_on for %s: %w", r.id, serr)
-		}
-	}
-
-	// 6. Register old ID as alias for backward-compat lookup.
+	// 5. Register old ID as alias for backward-compat lookup.
 	if _, err := tx.ExecContext(ctx, "UPDATE artifacts SET alias = ? WHERE id = ?", oldID, newID); err != nil {
 		return fmt.Errorf("set alias: %w", err)
 	}
@@ -486,49 +454,33 @@ func (s *SQLiteStore) RenameID(ctx context.Context, oldID, newID string) error {
 	return tx.Commit()
 }
 
-// cleanDanglingRefs removes a deleted ID from other artifacts' DependsOn and Links JSON fields.
+// cleanDanglingRefs removes a deleted ID from other artifacts' Links JSON field.
 func (s *SQLiteStore) cleanDanglingRefs(ctx context.Context, tx *sql.Tx, deletedID string) error {
-	// Find artifacts referencing this ID in depends_on or links
 	rows, err := tx.QueryContext(ctx,
-		"SELECT id, depends_on, links FROM artifacts WHERE depends_on LIKE ? OR links LIKE ?",
-		"%"+deletedID+"%", "%"+deletedID+"%")
+		"SELECT id, links FROM artifacts WHERE links LIKE ?",
+		"%"+deletedID+"%")
 	if err != nil {
 		return err
 	}
-	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed //nolint:errcheck // rows.Close only fails when already closed
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
 
 	type refUpdate struct {
 		id    string
-		deps  string
 		links string
 	}
 	var updates []refUpdate
 	for rows.Next() {
 		var u refUpdate
-		if err := rows.Scan(&u.id, &u.deps, &u.links); err != nil {
+		if err := rows.Scan(&u.id, &u.links); err != nil {
 			continue
 		}
 		updates = append(updates, u)
 	}
 
 	for _, u := range updates {
-		changed := false
-
-		// Clean DependsOn
-		var deps []string
-		_ = json.Unmarshal([]byte(u.deps), &deps) // malformed JSON → empty slice; safe fallback
-		var cleanDeps []string
-		for _, d := range deps {
-			if d != deletedID {
-				cleanDeps = append(cleanDeps, d)
-			} else {
-				changed = true
-			}
-		}
-
-		// Clean Links
 		var links map[string][]string
 		_ = json.Unmarshal([]byte(u.links), &links) // malformed JSON → nil map; safe fallback
+		changed := false
 		for rel, targets := range links {
 			var clean []string
 			for _, t := range targets {
@@ -546,11 +498,10 @@ func (s *SQLiteStore) cleanDanglingRefs(ctx context.Context, tx *sql.Tx, deleted
 		}
 
 		if changed {
-			depsJSON, _ := json.Marshal(cleanDeps)
 			linksJSON, _ := json.Marshal(links)
 			if _, err := tx.ExecContext(ctx,
-				"UPDATE artifacts SET depends_on = ?, links = ? WHERE id = ?",
-				string(depsJSON), string(linksJSON), u.id); err != nil {
+				"UPDATE artifacts SET links = ? WHERE id = ?",
+				string(linksJSON), u.id); err != nil {
 				return fmt.Errorf("clean refs in %s: %w", u.id, err)
 			}
 		}
@@ -599,7 +550,6 @@ func scanRow(s rowScanner) (*Artifact, error) {
 		dst  any
 		name string
 	}{
-		{dependsOn, &art.DependsOn, "depends_on"},
 		{labels, &art.Labels, "labels"},
 		{sections, &art.Sections, "sections"},
 		{links, &art.Links, "links"},
@@ -730,26 +680,6 @@ func reconcileEdgesSQL(ctx context.Context, tx *sql.Tx, old, cur *Artifact) erro
 		if cur.Parent != "" {
 			if err := addEdge(ctx, tx, cur.Parent, RelParentOf, cur.ID); err != nil {
 				return fmt.Errorf("add parent edge: %w", err)
-			}
-		}
-	}
-
-	oldDeps := toSet(nil)
-	if old != nil {
-		oldDeps = toSet(old.DependsOn)
-	}
-	newDeps := toSet(cur.DependsOn)
-	for d := range oldDeps {
-		if !newDeps[d] {
-			if err := deleteEdge(ctx, tx, cur.ID, RelDependsOn, d); err != nil {
-				return fmt.Errorf("delete dep edge %s: %w", d, err)
-			}
-		}
-	}
-	for d := range newDeps {
-		if !oldDeps[d] {
-			if err := addEdge(ctx, tx, cur.ID, RelDependsOn, d); err != nil {
-				return fmt.Errorf("add dep edge %s: %w", d, err)
 			}
 		}
 	}

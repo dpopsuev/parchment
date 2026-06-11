@@ -187,9 +187,9 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	}
 	art := &Artifact{
 		ID: id, Alias: in.Alias, Parent: in.Parent,
-		Title: in.Title,
-		DependsOn: in.DependsOn, Labels: seedLabels,
-		Links: in.Links, Extra: in.Extra,
+		Title:    in.Title,
+		Labels:   seedLabels,
+		Links:    in.Links, Extra: in.Extra,
 		Sections: in.Sections,
 	}
 	if in.Goal != "" {
@@ -279,6 +279,9 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	p.stripEncodedIfStale(ctx, art)
 	if err := p.store.Put(ctx, art); err != nil {
 		return nil, err
+	}
+	for _, dep := range in.DependsOn {
+		_ = p.store.AddEdge(ctx, Edge{From: art.ID, To: dep, Relation: RelDependsOn})
 	}
 
 	// Execute template hooks (prefix/suffix auto-generation)
@@ -761,17 +764,6 @@ func (p *Protocol) UpsertArtifact(ctx context.Context, in CreateInput) (UpsertRe
 		}
 	}
 
-	// DependsOn: union.
-	depSet := make(map[string]struct{}, len(existing.DependsOn))
-	for _, d := range existing.DependsOn {
-		depSet[d] = struct{}{}
-	}
-	for _, d := range in.DependsOn {
-		if _, ok := depSet[d]; !ok {
-			existing.DependsOn = append(existing.DependsOn, d)
-		}
-	}
-
 	// Links: merge per relation key — union of targets per relation.
 	if len(in.Links) > 0 {
 		if existing.Links == nil {
@@ -786,6 +778,9 @@ func (p *Protocol) UpsertArtifact(ctx context.Context, in CreateInput) (UpsertRe
 	p.stripEncodedIfStale(ctx, existing)
 	if err := p.store.Put(ctx, existing); err != nil {
 		return UpsertResult{}, err
+	}
+	for _, dep := range in.DependsOn {
+		_ = p.store.AddEdge(ctx, Edge{From: existing.ID, To: dep, Relation: RelDependsOn})
 	}
 	return UpsertResult{Artifact: existing, Created: false}, nil
 }

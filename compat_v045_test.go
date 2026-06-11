@@ -32,10 +32,9 @@ func buildV044DB(t *testing.T, path string) {
 			Sections: []Section{{Name: "context", Text: "do it"}},
 		},
 		{ID: "SCR-TSK-2", Labels: []string{"kind:task", "status:active", "scope:scribe"},
-			Title:     "Task beta",
-			Parent:    "SCR-CAM-1",
-			DependsOn: []string{"SCR-TSK-1"},
-			Sections:  []Section{{Name: "context", Text: "after alpha"}},
+			Title:    "Task beta",
+			Parent:   "SCR-CAM-1",
+			Sections: []Section{{Name: "context", Text: "after alpha"}},
 		},
 	}
 	for _, a := range artifacts {
@@ -44,6 +43,9 @@ func buildV044DB(t *testing.T, path string) {
 		}
 	}
 	if err := s.AddEdge(ctx, Edge{From: "SCR-CAM-1", To: "SCR-TSK-1", Relation: RelParentOf}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddEdge(ctx, Edge{From: "SCR-TSK-2", To: "SCR-TSK-1", Relation: RelDependsOn}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {

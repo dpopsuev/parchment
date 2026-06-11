@@ -325,10 +325,11 @@ func (p *Protocol) TopoSort(ctx context.Context, rootID string) ([]TopoEntry, er
 	for id := range arts {
 		_ = g.AddVertex(id)
 	}
-	for id, art := range arts {
-		for _, dep := range art.DependsOn {
-			if _, ok := arts[dep]; ok {
-				_ = g.AddEdge(dep, id)
+	for id := range arts {
+		depEdges, _ := p.store.Neighbors(ctx, id, RelDependsOn, Outgoing)
+		for _, e := range depEdges {
+			if _, ok := arts[e.To]; ok {
+				_ = g.AddEdge(e.To, id)
 			}
 		}
 	}

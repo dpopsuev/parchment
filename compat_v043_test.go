@@ -39,9 +39,8 @@ func buildV042DB(t *testing.T, path string) {
 			},
 		},
 		{ID: "SCR-TSK-2", Labels: []string{"kind:task", "status:active", "scope:scribe"},
-			Title:     "Implement feature B",
-			Parent:    "SCR-CAM-1",
-			DependsOn: []string{"SCR-TSK-1"},
+			Title:  "Implement feature B",
+			Parent: "SCR-CAM-1",
 			Sections: []Section{
 				{Name: "context", Text: "blocked on A"},
 			},
@@ -60,6 +59,9 @@ func buildV042DB(t *testing.T, path string) {
 		t.Fatal(err)
 	}
 	if err := s.AddEdge(ctx, Edge{From: "SCR-CAM-1", To: "SCR-TSK-2", Relation: RelParentOf}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddEdge(ctx, Edge{From: "SCR-TSK-2", To: "SCR-TSK-1", Relation: RelDependsOn}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {
@@ -132,13 +134,13 @@ func TestV043_CrossRefsIntactAfterOpen(t *testing.T) {
 		t.Errorf("SCR-TSK-1.Parent = %q, want SCR-CAM-1", tsk1.Parent)
 	}
 
-	// depends_on
-	tsk2, err := s.Get(ctx, "SCR-TSK-2")
+	// depends_on edge
+	depEdges, err := s.Neighbors(ctx, "SCR-TSK-2", RelDependsOn, Outgoing)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tsk2.DependsOn) != 1 || tsk2.DependsOn[0] != "SCR-TSK-1" {
-		t.Errorf("SCR-TSK-2.DependsOn = %v, want [SCR-TSK-1]", tsk2.DependsOn)
+	if len(depEdges) != 1 || depEdges[0].To != "SCR-TSK-1" {
+		t.Errorf("SCR-TSK-2 depends_on edges = %v, want [{To: SCR-TSK-1}]", depEdges)
 	}
 
 	// links

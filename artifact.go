@@ -11,7 +11,6 @@ type Artifact struct {
 	Alias       string              `json:"alias,omitempty"`
 	Parent      string              `json:"parent,omitempty"`
 	Title       string              `json:"title"`
-	DependsOn   []string            `json:"depends_on,omitempty"`
 	Labels      []string            `json:"labels,omitempty"`
 	Sections    []Section           `json:"sections,omitempty"`
 	Links       map[string][]string `json:"links,omitempty"`

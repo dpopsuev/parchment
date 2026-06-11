@@ -26,9 +26,6 @@ func RenderMarkdown(art *Artifact) string { //nolint:gocyclo // display logic is
 	if labelValue(art.Labels, LabelPrefixSprint) != "" {
 		renderWriteField(&b, "Sprint", labelValue(art.Labels, LabelPrefixSprint))
 	}
-	if len(art.DependsOn) > 0 {
-		renderWriteField(&b, "Depends On", strings.Join(art.DependsOn, ", "))
-	}
 	if len(art.Labels) > 0 {
 		renderWriteField(&b, "Labels", strings.Join(art.Labels, ", "))
 	}
@@ -64,7 +61,6 @@ func RenderTable(arts []*Artifact) string {
 
 	hasSprint := false
 	hasParent := false
-	hasDeps := false
 	for _, a := range arts {
 		if labelValue(a.Labels, LabelPrefixSprint) != "" {
 			hasSprint = true
@@ -72,13 +68,10 @@ func RenderTable(arts []*Artifact) string {
 		if a.Parent != "" {
 			hasParent = true
 		}
-		if len(a.DependsOn) > 0 {
-			hasDeps = true
-		}
 	}
 
 	var b strings.Builder
-	writeRow := func(id, kind, scope, status, sprint, parent, deps, title string) {
+	writeRow := func(id, kind, scope, status, sprint, parent, title string) {
 		fmt.Fprintf(&b, "%-16s %-12s %-10s %-10s", id, kind, scope, status)
 		if hasSprint {
 			fmt.Fprintf(&b, " %-14s", sprint)
@@ -86,17 +79,13 @@ func RenderTable(arts []*Artifact) string {
 		if hasParent {
 			fmt.Fprintf(&b, " %-16s", parent)
 		}
-		if hasDeps {
-			fmt.Fprintf(&b, " %-20s", deps)
-		}
 		fmt.Fprintf(&b, " %s\n", title)
 	}
 
-	writeRow("ID", "KIND", "SCOPE", "STATUS", "SPRINT", "PARENT", "DEPENDS_ON", "TITLE")
-	writeRow("----", "----", "-----", "------", "------", "------", "----------", "-----")
+	writeRow("ID", "KIND", "SCOPE", "STATUS", "SPRINT", "PARENT", "TITLE")
+	writeRow("----", "----", "-----", "------", "------", "------", "-----")
 	for _, a := range arts {
-		deps := strings.Join(a.DependsOn, ",")
-		writeRow(a.ID, labelValue(a.Labels, LabelPrefixKind), labelValue(a.Labels, LabelPrefixScope), statusFromLabels(a.Labels), labelValue(a.Labels, LabelPrefixSprint), a.Parent, deps, a.Title)
+		writeRow(a.ID, labelValue(a.Labels, LabelPrefixKind), labelValue(a.Labels, LabelPrefixScope), statusFromLabels(a.Labels), labelValue(a.Labels, LabelPrefixSprint), a.Parent, a.Title)
 	}
 
 	fmt.Fprintf(&b, "\n(%d artifacts)\n", len(arts))

@@ -121,14 +121,7 @@ func ParseMDFile(path string) (*Artifact, error) { //nolint:gosec,gocyclo,cyclop
 							art.Labels = append(art.Labels, l)
 						}
 					}
-				case "depends_on":
-					val = strings.Trim(val, "[]")
-					for _, d := range strings.Split(val, ",") {
-						if d = strings.TrimSpace(strings.Trim(d, `"'`)); d != "" {
-							art.DependsOn = append(art.DependsOn, d)
-						}
-					}
-				}
+			}
 			}
 		}
 	}

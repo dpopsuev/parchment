@@ -99,10 +99,6 @@ func (m *MemoryStore) Put(_ context.Context, art *Artifact) error {
 	if art.Parent != "" {
 		m.edges[edgeKey(art.Parent, RelParentOf, art.ID)] = Edge{From: art.Parent, To: art.ID, Relation: RelParentOf}
 	}
-	// Reconcile depends_on edges.
-	for _, dep := range art.DependsOn {
-		m.edges[edgeKey(art.ID, RelDependsOn, dep)] = Edge{From: art.ID, To: dep, Relation: RelDependsOn}
-	}
 
 	clone := *art
 	m.artifacts[art.ID] = &clone
@@ -763,15 +759,10 @@ func (m *MemoryStore) RenameID(_ context.Context, oldID, newID string) error {
 		}
 	}
 
-	// 3. Update parent fields and depends_on.
+	// 3. Update parent fields.
 	for _, a := range m.artifacts {
 		if a.Parent == oldID {
 			a.Parent = newID
-		}
-		for i, dep := range a.DependsOn {
-			if dep == oldID {
-				a.DependsOn[i] = newID
-			}
 		}
 	}
 

@@ -121,15 +121,18 @@ func TestMigrateID_UpdatesDependsOn(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dependent, _ := proto.GetArtifact(ctx, d.ID)
+	edges, err := s.Neighbors(ctx, d.ID, parchment.RelDependsOn, parchment.Outgoing)
+	if err != nil {
+		t.Fatalf("Neighbors: %v", err)
+	}
 	found := false
-	for _, dep := range dependent.DependsOn {
-		if dep == "TST-NEW" {
+	for _, e := range edges {
+		if e.To == "TST-NEW" {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("depends_on not updated: %v", dependent.DependsOn)
+		t.Errorf("depends_on edge not updated to TST-NEW, edges: %v", edges)
 	}
 }
 

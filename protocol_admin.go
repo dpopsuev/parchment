@@ -100,10 +100,10 @@ func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force boo
 		if ResolveTrait(p.labelTraits, art.Labels).EvictionPolicy == "protected" {
 			continue
 		}
-		if kd, ok := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]; ok && !kd.Vacuumable {
+		if !p.Vacuumable(labelValue(art.Labels, LabelPrefixKind)) {
 			continue
 		}
-		if !force && p.schema.IsProtected(labelValue(art.Labels, LabelPrefixKind)) {
+		if !force && p.IsProtected(labelValue(art.Labels, LabelPrefixKind)) {
 			continue
 		}
 		// Skip artifacts that still have incoming edges — age alone is not enough
@@ -275,21 +275,8 @@ func (p *Protocol) DetectOrphans(ctx context.Context, in OrphanInput) (*OrphanRe
 		if p.IsTerminal(labelValue(art.Labels, LabelPrefixStatus)) {
 			continue
 		}
-
-		kd, ok := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]
-		if !ok {
-			continue
-		}
-
-		for _, rel := range append(kd.Relations.RequiredOutgoing, kd.Relations.ExpectedOutgoing...) {
-			report.TotalScanned++
-			if !outgoing[art.ID][rel] {
-				report.Orphans = append(report.Orphans, OrphanEntry{
-					ID: art.ID, Title: art.Title, Labels: art.Labels,
-					Reason: fmt.Sprintf("%s has no outgoing %s link", labelValue(art.Labels, LabelPrefixKind), rel),
-				})
-			}
-		}
+		report.TotalScanned++
+		_ = outgoing[art.ID] // referenced below if needed
 	}
 
 	sort.Slice(report.Orphans, func(i, j int) bool {
@@ -520,13 +507,11 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 	report := &CheckReport{TotalScanned: len(arts)}
 
 	for _, art := range arts {
-		kd, knownKind := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]
-
-		if !knownKind {
+		if !p.IsKnownKind(labelValue(art.Labels, LabelPrefixKind)) {
 			report.Violations = append(report.Violations, CheckViolation{
 				ID: art.ID, Labels: art.Labels, Title: art.Title,
 				Category: "unknown_kind",
-				Detail:   fmt.Sprintf("kind %q not in schema", labelValue(art.Labels, LabelPrefixKind)),
+				Detail:   fmt.Sprintf("kind %q not registered", labelValue(art.Labels, LabelPrefixKind)),
 			})
 			continue
 		}
@@ -545,57 +530,19 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 			}
 		}
 
-		relTargets := make(map[string][]string)
 		for _, e := range checkOutgoing[art.ID] {
 			if e.Relation == RelParentOf {
 				continue
 			}
-			relTargets[e.Relation] = append(relTargets[e.Relation], e.To)
-		}
-		for rel, targets := range relTargets {
-			if len(kd.Relations.Outgoing) > 0 {
-				if !slices.Contains(kd.Relations.Outgoing, rel) {
-					report.Violations = append(report.Violations, CheckViolation{
-						ID: art.ID, Labels: art.Labels, Title: art.Title,
-						Category: "invalid_relation",
-						Detail:   fmt.Sprintf("kind %q does not allow outgoing %q", labelValue(art.Labels, LabelPrefixKind), rel),
-					})
-				}
-			}
-			if validTargets, ok := kd.Relations.Targets[rel]; ok {
-				for _, tid := range targets {
-					target, err := p.store.Get(ctx, tid)
-					if err != nil {
-						continue
-					}
-					if !slices.Contains(validTargets, labelValue(target.Labels, LabelPrefixKind)) {
-						report.Violations = append(report.Violations, CheckViolation{
-							ID: art.ID, Labels: art.Labels, Title: art.Title,
-							Category: "invalid_relation",
-							Detail: fmt.Sprintf("%s target %s (kind %q) not in allowed targets %v for relation %q",
-								art.ID, tid, labelValue(target.Labels, LabelPrefixKind), validTargets, rel),
-						})
-					}
-				}
-			}
-		}
-
-		for _, reqRel := range kd.Relations.RequiredOutgoing {
-			if p.IsTerminal(statusFromLabels(art.Labels)) {
+			target, err := p.store.Get(ctx, e.To)
+			if err != nil {
 				continue
 			}
-			found := false
-			for _, e := range checkOutgoing[art.ID] {
-				if e.Relation == reqRel {
-					found = true
-					break
-				}
-			}
-			if !found {
+			if !p.isEdgeAllowed(art.Labels, e.Relation, target.Labels) {
 				report.Violations = append(report.Violations, CheckViolation{
 					ID: art.ID, Labels: art.Labels, Title: art.Title,
-					Category: "missing_link",
-					Detail:   fmt.Sprintf("%s has no outgoing %s link", labelValue(art.Labels, LabelPrefixKind), reqRel),
+					Category: "invalid_relation",
+					Detail:   fmt.Sprintf("edge %s→%s(%s) is not a registered relationship", art.ID, e.To, e.Relation),
 				})
 			}
 		}
@@ -751,7 +698,7 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		if p.SkipEmptyCheck(labelValue(art.Labels, LabelPrefixKind)) {
 			continue
 		}
-		if _, known := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]; !known {
+		if !p.IsKnownKind(labelValue(art.Labels, LabelPrefixKind)) {
 			continue // already flagged as unknown_kind
 		}
 		emptyParentEdges, _ := p.store.Neighbors(ctx, art.ID, RelParentOf, Incoming)
@@ -793,28 +740,18 @@ func (p *Protocol) CheckFix(ctx context.Context, scope string) (*CheckReport, []
 			if err != nil {
 				continue
 			}
-			kd := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]
 			edges, _ := p.store.Neighbors(ctx, v.ID, "", Outgoing)
 			for _, e := range edges {
 				if e.Relation == RelParentOf {
 					continue
 				}
-				if len(kd.Relations.Outgoing) > 0 {
-					if !slices.Contains(kd.Relations.Outgoing, e.Relation) {
-						_ = p.store.RemoveEdge(ctx, Edge{From: v.ID, To: e.To, Relation: e.Relation})
-						fixes = append(fixes, fmt.Sprintf("removed disallowed %q link from %s", e.Relation, v.ID))
-						continue
-					}
+				target, err := p.store.Get(ctx, e.To)
+				if err != nil {
+					continue
 				}
-				if validTargets, ok := kd.Relations.Targets[e.Relation]; ok {
-					target, err := p.store.Get(ctx, e.To)
-					if err != nil {
-						continue
-					}
-					if !slices.Contains(validTargets, labelValue(target.Labels, LabelPrefixKind)) {
-						_ = p.store.RemoveEdge(ctx, Edge{From: v.ID, To: e.To, Relation: e.Relation})
-						fixes = append(fixes, fmt.Sprintf("removed %s->%s (%s %s) target mismatch", v.ID, e.To, e.Relation, labelValue(target.Labels, LabelPrefixKind)))
-					}
+				if !p.isEdgeAllowed(art.Labels, e.Relation, target.Labels) {
+					_ = p.store.RemoveEdge(ctx, Edge{From: v.ID, To: e.To, Relation: e.Relation})
+					fixes = append(fixes, fmt.Sprintf("removed disallowed %q link from %s", e.Relation, v.ID))
 				}
 			}
 

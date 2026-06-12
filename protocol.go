@@ -2,6 +2,7 @@ package parchment
 
 import (
 	"context"
+	"sort"
 )
 
 // Config key constants for sticky filter defaults.
@@ -76,29 +77,30 @@ type Protocol struct {
 // optional vocabulary for kind enforcement, and ID generation config.
 func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *Protocol {
 	if schema == nil {
-		if s != nil {
-			SeedDefinitions(context.Background(), s)
-			schema, _ = loadSchema(context.Background(), s)
-		}
-		if schema == nil {
-			schema = KnowledgeSchema()
-		}
-	}
-	if len(vocab) == 0 {
-		vocab = schema.KindNames()
+		schema = DefaultSchema()
 	}
 	scopeLabels := make([]string, len(scopes))
 	for i, sc := range scopes {
 		scopeLabels[i] = LabelPrefixScope + sc
 	}
-	p := &Protocol{store: s, schema: schema, scopeLabels: scopeLabels, vocab: vocab}
+	p := &Protocol{store: s, schema: schema, scopeLabels: scopeLabels}
 	if s != nil {
 		SeedLabelTraits(context.Background(), s)
 		SeedRules(context.Background(), s)
 		seedRelationshipsFromRegistry(context.Background(), s)
 		p.labelTraits = loadLabelTraits(context.Background(), s)
 		p.relationships = loadRelationships(context.Background(), s)
+		// Compute vocab from registered kind traits when not provided by caller.
+		if len(vocab) == 0 {
+			for key := range p.labelTraits {
+				if len(key) > 5 && key[:5] == "kind:" {
+					vocab = append(vocab, key[5:])
+				}
+			}
+			sort.Strings(vocab)
+		}
 		// Unified TraitStore — bridges from the existing map (Step 2 strangler seam).
+		p.vocab = vocab
 		p.traits = NewTraitStore()
 		for k, v := range p.labelTraits {
 			p.traits.PutLabel(k, v)

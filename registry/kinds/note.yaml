@@ -19,7 +19,7 @@ spec:
       - from: archived
         to: []
   sections:
-    could: [body, summary, source]
+    should: [body]
   whenToCreate: |
     Create a note to capture an idea, observation, or piece of knowledge during
     a session. Start as note.fleeting (draft in transit). Promote to note.evergreen when

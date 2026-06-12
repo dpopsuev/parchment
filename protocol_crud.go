@@ -189,10 +189,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		}
 	}
 	// Skip template, edge enforcement, and duplicate checks for SkipGuards kinds (e.g. mirror)
-	skipGuards := false
-	if kd, ok := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]; ok {
-		skipGuards = kd.SkipGuards
-	}
+	skipGuards := p.SkipGuards(labelValue(art.Labels, LabelPrefixKind))
 
 	// Determine template auto-link ID before store.Put.
 	autoTplID := ""
@@ -202,25 +199,6 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 				autoTplID = tplID
 				slog.DebugContext(ctx, "auto-linked template",
 					slog.String("artifact_kind", labelValue(art.Labels, LabelPrefixKind)), slog.String("scope", scope), slog.String("template_id", tplID)) //nolint:sloglint // artifact_kind/scope/template_id have no LogKey constants
-			}
-		}
-		// Check mandatory outgoing edges
-		if kd, ok := p.schema.Kinds[labelValue(art.Labels, LabelPrefixKind)]; ok {
-			for _, reqRel := range kd.Relations.RequiredOutgoing {
-				hasEdge := false
-				if targets, ok := in.Links[reqRel]; ok && len(targets) > 0 {
-					hasEdge = true
-				}
-				if reqRel == RelDependsOn && len(in.DependsOn) > 0 {
-					hasEdge = true
-				}
-				if !hasEdge {
-				hint := fmt.Sprintf("links: {%q: [\"<target-id>\"]}", reqRel)
-				if reqRel == RelDependsOn {
-					hint = fmt.Sprintf("depends_on: [\"<target-id>\"] or links: {%q: [\"<target-id>\"]}", reqRel)
-				}
-					return nil, fmt.Errorf("%s requires a %s edge — add it at creation time via %s", labelValue(art.Labels, LabelPrefixKind), reqRel, hint) //nolint:err113 // runtime values required in message; no static sentinel possible
-				}
 			}
 		}
 

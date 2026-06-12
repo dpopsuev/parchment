@@ -145,7 +145,6 @@ const (
 	CheckTemplateConformanceComplete = "template_conformance_complete" // checkTemplateConformance (complete)
 	CheckChildrenComplete            = "children_complete"            // all children in terminal status
 	CheckDependsOnComplete           = "depends_on_complete"          // all depends_on artifacts in terminal status
-	CheckCompletionGates             = "completion_gates"             // schema.MissingCompletionGates
 	CheckWorkerIDRequired            = "worker_id_required"           // extra["worker_id"] must be set
 	CheckStampsRequired              = "stamps_required"              // stamps section must be present
 )
@@ -225,21 +224,40 @@ func matchesTerm(term string, art *Artifact, toStatus string) bool {
 	return fieldValue(field, art, toStatus) == value
 }
 
+// missingSections returns names from required that are absent in have.
+func missingSections(have []Section, required []string) []string {
+	if len(required) == 0 {
+		return nil
+	}
+	present := make(map[string]bool, len(have))
+	for _, s := range have {
+		present[s.Name] = true
+	}
+	var missing []string
+	for _, name := range required {
+		if !present[name] {
+			missing = append(missing, name)
+		}
+	}
+	return missing
+}
+
 // evaluateBuiltinCheck runs a named built-in check against art + schema.
 // Returns a non-nil RuleResult to block, nil to allow.
 // Used for checks that require schema or store access beyond simple field predicates.
 func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResult {
 	switch rule.Check {
 	case CheckActivationSections:
-		if !p.schema.ActivationRequiresSections(labelValue(art.Labels, LabelPrefixKind)) {
+		kind := labelValue(art.Labels, LabelPrefixKind)
+		if !p.ActivationRequiresSections(kind) {
 			return nil
 		}
-		if shouldMissing := p.schema.MissingShouldSections(labelValue(art.Labels, LabelPrefixKind), art.Sections); len(shouldMissing) > 0 {
+		if shouldMissing := missingSections(art.Sections, p.ShouldSections(kind)); len(shouldMissing) > 0 {
 			msg := rule.Message + " (recommended: " + strings.Join(shouldMissing, ", ") + ")"
 			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: msg}
 		}
-		if expMissing := p.schema.MissingSections(labelValue(art.Labels, LabelPrefixKind), art.Sections); len(expMissing) > 0 {
-			msg := rule.Message + " (expected: " + strings.Join(expMissing, ", ") + ")"
+		if mustMissing := missingSections(art.Sections, p.MustSections(kind)); len(mustMissing) > 0 {
+			msg := rule.Message + " (expected: " + strings.Join(mustMissing, ", ") + ")"
 			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: msg}
 		}
 	case CheckTemplateConformancePromote:
@@ -257,11 +275,6 @@ func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResul
 	case CheckDependsOnComplete:
 		if err := p.guardDependsOnComplete(context.Background(), art); err != nil {
 			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: rule.Message + ": " + err.Error()}
-		}
-	case CheckCompletionGates:
-		if missing := p.schema.MissingCompletionGates(art); len(missing) > 0 {
-			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock,
-				Message: rule.Message + " (" + strings.Join(missing, ", ") + ")"}
 		}
 	case CheckWorkerIDRequired:
 		if art.Extra == nil {

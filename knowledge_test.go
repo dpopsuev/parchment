@@ -8,6 +8,7 @@ import (
 // are registered with correct prefixes and defaults.
 func TestKnowledgeSchema_HasKnowledgeKinds(t *testing.T) {
 	s := KnowledgeSchema()
+	p := New(NewMemoryStore(), s, []string{"test"}, nil, ProtocolConfig{})
 
 	cases := []struct {
 		kind        string
@@ -22,15 +23,10 @@ func TestKnowledgeSchema_HasKnowledgeKinds(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		kd, ok := s.Kinds[tc.kind]
-		if !ok {
-			t.Errorf("kind %q missing from KnowledgeSchema", tc.kind)
-			continue
+		if got := p.Prefix(tc.kind); got != tc.wantPrefix {
+			t.Errorf("kind %q: prefix = %q, want %q", tc.kind, got, tc.wantPrefix)
 		}
-		if kd.Prefix != tc.wantPrefix {
-			t.Errorf("kind %q: prefix = %q, want %q", tc.kind, kd.Prefix, tc.wantPrefix)
-		}
-		if got := s.DefaultStatus(tc.kind); got != tc.wantDefault {
+		if got := p.DefaultStatus(tc.kind); got != tc.wantDefault {
 			t.Errorf("kind %q: default status = %q, want %q", tc.kind, got, tc.wantDefault)
 		}
 	}
@@ -50,20 +46,15 @@ func TestKnowledgeSchema_HasKnowledgeRelations(t *testing.T) {
 	}
 }
 
-// TestKnowledgeSchema_HasKnowledgeStatuses verifies note.fleeting and note.evergreen
-// are registered statuses.
+// TestKnowledgeSchema_HasKnowledgeStatuses verifies note lifecycle statuses have traits.
 func TestKnowledgeSchema_HasKnowledgeStatuses(t *testing.T) {
-	s := KnowledgeSchema()
+	p := New(NewMemoryStore(), nil, []string{"test"}, nil, ProtocolConfig{})
 
-	statusSet := make(map[string]bool, len(s.Statuses))
-	for _, st := range s.Statuses {
-		statusSet[st] = true
+	if p.IsTerminal("note.fleeting") {
+		t.Error("note.fleeting must not be terminal")
 	}
-
-	for _, want := range []string{"note.fleeting", "note.evergreen"} {
-		if !statusSet[want] {
-			t.Errorf("status %q missing from KnowledgeSchema.Statuses", want)
-		}
+	if !p.IsTerminal("note.evergreen") {
+		t.Error("note.evergreen must be terminal")
 	}
 }
 
@@ -79,8 +70,9 @@ func TestKnowledgeSchema_NoteLifecycle(t *testing.T) {
 		{"note.evergreen", "note.mature"}, // demotion allowed
 	}
 
+	p := New(NewMemoryStore(), s, []string{"test"}, nil, ProtocolConfig{})
 	for _, tc := range transitions {
-		reason, ok := s.ValidTransition(KindNote, tc.from, tc.to)
+		reason, ok := p.ValidTransition(KindNote, tc.from, tc.to)
 		if !ok {
 			t.Errorf("note: transition %s→%s blocked: %s", tc.from, tc.to, reason)
 		}
@@ -105,11 +97,12 @@ func TestKnowledgeSchema_EvergreenNotReadonly(t *testing.T) {
 func TestKnowledgeSchema_PreservesWorkKinds(t *testing.T) {
 	s := KnowledgeSchema()
 
+	p := New(NewMemoryStore(), s, []string{"test"}, nil, ProtocolConfig{})
 	for _, kind := range []string{
 		KindTask, KindSpec, KindBug, KindGoal,
 		KindCampaign, "need", "doc", "ref", "decision",
 	} {
-		if _, ok := s.Kinds[kind]; !ok {
+		if !p.IsKnownKind(kind) {
 			t.Errorf("work kind %q missing — KnowledgeSchema must be additive", kind)
 		}
 	}
@@ -146,13 +139,9 @@ func TestKnowledgeSchema_LintClean(t *testing.T) {
 
 // TestKnowledgeSchema_NoteSections verifies note has expected sections defined.
 func TestKnowledgeSchema_NoteSections(t *testing.T) {
-	s := KnowledgeSchema()
+	p := New(NewMemoryStore(), KnowledgeSchema(), []string{"test"}, nil, ProtocolConfig{})
 
-	sections := s.GetExpectedSections(KindNote)
-	if len(sections) == 0 {
-		t.Error("note kind should have expected sections defined")
-	}
-
+	sections := append(p.MustSections(KindNote), p.ShouldSections(KindNote)...)
 	has := make(map[string]bool, len(sections))
 	for _, sec := range sections {
 		has[sec] = true
@@ -165,13 +154,12 @@ func TestKnowledgeSchema_NoteSections(t *testing.T) {
 // TestKnowledgeSchema_SourceSections verifies source has the provenance
 // sections agents use when ingesting external material.
 func TestKnowledgeSchema_SourceSections(t *testing.T) {
-	s := KnowledgeSchema()
+	p := New(NewMemoryStore(), KnowledgeSchema(), []string{"test"}, nil, ProtocolConfig{})
 
-	sections := s.GetExpectedSections(KindSource)
+	sections := append(p.MustSections(KindSource), p.ShouldSections(KindSource)...)
 	if len(sections) == 0 {
-		t.Error("source kind should have expected sections defined")
+		t.Error("source kind should have sections defined")
 	}
-
 	has := make(map[string]bool, len(sections))
 	for _, sec := range sections {
 		has[sec] = true
@@ -186,9 +174,9 @@ func TestKnowledgeSchema_SourceSections(t *testing.T) {
 // TestKnowledgeSchema_ConceptSections verifies concept has the definitional
 // sections that make atomic knowledge notes useful.
 func TestKnowledgeSchema_ConceptSections(t *testing.T) {
-	s := KnowledgeSchema()
+	p := New(NewMemoryStore(), KnowledgeSchema(), []string{"test"}, nil, ProtocolConfig{})
 
-	sections := s.GetExpectedSections(KindConcept)
+	sections := append(p.MustSections(KindConcept), p.ShouldSections(KindConcept)...)
 	has := make(map[string]bool, len(sections))
 	for _, sec := range sections {
 		has[sec] = true

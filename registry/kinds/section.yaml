@@ -5,6 +5,7 @@ metadata:
 spec:
   prefix: SEC
   code: SEC
+  skipEmptyCheck: true
   family: support
   children: ["*"]
   lifecycle:

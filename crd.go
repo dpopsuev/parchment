@@ -44,7 +44,7 @@ type ResourceSpec struct {
 	Sections         *SectionsSpec   `yaml:"sections,omitempty"`
 	Properties       *PropertiesSpec `yaml:"properties,omitempty"`
 	Family           string          `yaml:"family,omitempty"`
-	AllowedChildren  []string        `yaml:"allowedChildren,omitempty"`
+
 	IsContainerKind  bool            `yaml:"isContainerKind,omitempty"`
 	Vacuumable       bool            `yaml:"vacuumable,omitempty"`
 	WhenToUse        string          `yaml:"whenToUse,omitempty"`
@@ -58,19 +58,14 @@ type ResourceSpec struct {
 	SkipGuards bool   `yaml:"skipGuards,omitempty"`
 
 	// Extended kind lifecycle.
-	ActiveStatus               string   `yaml:"activeStatus,omitempty"`
-	TriggerStatus              string   `yaml:"triggerStatus,omitempty"`
-	IsGoalKind                 bool     `yaml:"isGoalKind,omitempty"`
-	TrackInBrief               bool     `yaml:"trackInBrief,omitempty"`
-	ActivationRequiresSections bool     `yaml:"activationRequiresSections,omitempty"`
-	CompletionGates            []string `yaml:"completionGates,omitempty"`
+	ActiveStatus               string `yaml:"activeStatus,omitempty"`
+	IsGoalKind                 bool   `yaml:"isGoalKind,omitempty"`
+	TrackInBrief               bool   `yaml:"trackInBrief,omitempty"`
+	ActivationRequiresSections bool   `yaml:"activationRequiresSections,omitempty"`
+	RequiresImplementation     bool   `yaml:"requiresImplementation,omitempty"`
+	SkipEmptyCheck             bool   `yaml:"skipEmptyCheck,omitempty"`
 
-	// Kind sections extension.
-	RequiredFields   []string `yaml:"requiredFields,omitempty"`
-	ExpectedSections []string `yaml:"expectedSections,omitempty"`
-
-	// Kind structure.
-	Children  []string       `yaml:"children,omitempty"`
+	// Kind structure — children handled via Relationship CRDs.
 	Relations *RelationsSpec `yaml:"relations,omitempty"`
 
 	// Label trait fields.
@@ -129,11 +124,9 @@ type PropertiesSpec struct {
 }
 
 type RelationsSpec struct {
-	Outgoing         []string            `yaml:"outgoing,omitempty"`
-	Incoming         []string            `yaml:"incoming,omitempty"`
-	ExpectedOutgoing []string            `yaml:"expectedOutgoing,omitempty"`
-	RequiredOutgoing []string            `yaml:"requiredOutgoing,omitempty"`
-	Targets          map[string][]string `yaml:"targets,omitempty"`
+	Outgoing []string            `yaml:"outgoing,omitempty"`
+	Incoming []string            `yaml:"incoming,omitempty"`
+	Targets  map[string][]string `yaml:"targets,omitempty"`
 }
 
 // ParseResource parses a single YAML document into a Resource.
@@ -215,9 +208,8 @@ func applyLabelDefinition(ctx context.Context, s Store, r *Resource) error {
 		HalfLifeDays:     int(r.Spec.HalfLifeDays),
 		AlwaysApply:      r.Spec.AlwaysApply,
 		RequiredSections: r.Spec.RequiredSections,
-		Family:           r.Spec.Family,
-		AllowedChildren:  r.Spec.AllowedChildren,
-		IsContainerKind:  r.Spec.IsContainerKind,
+		Family:          r.Spec.Family,
+		IsContainerKind: r.Spec.IsContainerKind,
 		Vacuumable:       r.Spec.Vacuumable,
 	}
 	if r.Spec.Lifecycle != nil {

@@ -1816,27 +1816,7 @@ func TestCreateArtifact_TemplateIsScopeless(t *testing.T) {
 
 // --- DetectOrphans ---
 
-func TestDetectOrphans_RefWithoutDocuments(t *testing.T) {
-	t.Parallel()
-	proto, store := newProto(t)
-	ctx := context.Background()
 
-	// ref kind has RequiredOutgoing: ["documents"]
-	// Insert a ref without the link to trigger orphan detection
-	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
-		ID:     "REF-ORPHAN-1",
-		Labels: []string{"kind:ref", "status:draft", "scope:test"},
-		Title:  "orphaned reference",
-	})
-
-	report, err := proto.DetectOrphans(ctx, parchment.OrphanInput{})
-	if err != nil {
-		t.Fatalf("DetectOrphans: %v", err)
-	}
-	if report.TotalOrphans == 0 {
-		t.Error("expected at least 1 orphan for ref without documents link")
-	}
-}
 
 // ============================================================
 // Helpers

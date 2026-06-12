@@ -7,6 +7,7 @@ spec:
   code: TPL
   family: support
   protected: true
+  skipEmptyCheck: true
   skipGuards: true
   lifecycle:
     defaultStatus: work.active

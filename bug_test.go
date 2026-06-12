@@ -106,16 +106,13 @@ func TestTopoSort_ShouldRespectParentGoalDependencies(t *testing.T) {
 
 func TestDefaultSchema_BugKindIsRegistered_DefectIsNot(t *testing.T) {
 	t.Parallel()
-	schema := parchment.DefaultSchema()
+	p := parchment.New(parchment.NewMemoryStore(), nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	// "bug" must be registered
-	if _, ok := schema.Kinds["bug"]; !ok {
-		t.Error("DefaultSchema is missing KindDef for \"bug\"")
+	if !p.IsKnownKind("bug") {
+		t.Error("bug kind not registered")
 	}
-
-	// "defect" must NOT be registered — ADR-002 chose "bug" as the canonical name
-	if _, ok := schema.Kinds["defect"]; ok {
-		t.Error("DefaultSchema has KindDef for \"defect\" — ADR-002 requires \"bug\" as the canonical kind name, not \"defect\"")
+	if p.IsKnownKind("defect") {
+		t.Error("defect kind must not be registered — ADR-002 requires \"bug\" as canonical")
 	}
 }
 
@@ -126,21 +123,16 @@ func TestDefaultSchema_BugKindIsRegistered_DefectIsNot(t *testing.T) {
 
 func TestDefaultSchema_BugKindHasIntentSections(t *testing.T) {
 	t.Parallel()
-	schema := parchment.DefaultSchema()
-
-	bugDef, ok := schema.Kinds["bug"]
-	if !ok {
-		t.Fatal("DefaultSchema is missing KindDef for \"bug\" — cannot verify sections")
-	}
+	p := parchment.New(parchment.NewMemoryStore(), parchment.DefaultSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
 
 	// MustSections should contain "observed" (filing-time requirement)
-	if !containsString(bugDef.MustSections, "observed") {
-		t.Errorf("bug KindDef.MustSections = %v; want it to contain \"observed\"", bugDef.MustSections)
+	if !containsString(p.MustSections(parchment.KindBug), "observed") {
+		t.Errorf("bug MustSections = %v; want it to contain \"observed\"", p.MustSections(parchment.KindBug))
 	}
 
 	// ShouldSections should contain "reproduction" (investigation-time recommendation)
-	if !containsString(bugDef.ShouldSections, "reproduction") {
-		t.Errorf("bug KindDef.ShouldSections = %v; want it to contain \"reproduction\"", bugDef.ShouldSections)
+	if !containsString(p.ShouldSections(parchment.KindBug), "reproduction") {
+		t.Errorf("bug ShouldSections = %v; want it to contain \"reproduction\"", p.ShouldSections(parchment.KindBug))
 	}
 }
 

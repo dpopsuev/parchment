@@ -3,25 +3,24 @@ package parchment
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // IsTerminal reports whether status is a terminal state.
 // Checks domain status traits (work.draft, note.evergreen, etc.) first,
-// then status:-prefixed system traits (status:retired), then schema fallback.
+// then status:-prefixed system traits (status:retired).
 func (p *Protocol) IsTerminal(status string) bool {
-	// Domain statuses are stored as raw labels in labelTraits.
 	if lt, ok := p.labelTraits[status]; ok {
 		return lt.Terminal
 	}
-	// System statuses (retired, archived) are stored as status:X in labelTraits.
 	if lt, ok := p.labelTraits["status:"+status]; ok {
 		return lt.Terminal
 	}
-	return p.schema.IsTerminal(status)
+	return false
 }
 
 // IsReadonly reports whether status prohibits mutation.
-// Checks domain status traits first, then status:-prefixed system traits, then schema.
+// Checks domain status traits first, then status:-prefixed system traits.
 func (p *Protocol) IsReadonly(status string) bool {
 	if lt, ok := p.labelTraits[status]; ok {
 		return lt.Readonly
@@ -29,48 +28,36 @@ func (p *Protocol) IsReadonly(status string) bool {
 	if lt, ok := p.labelTraits["status:"+status]; ok {
 		return lt.Readonly
 	}
-	return p.schema.IsReadonly(status)
+	return false
 }
 
 // DefaultStatus returns the default status for a kind.
-// Consults label traits first; falls back to schema.
 func (p *Protocol) DefaultStatus(kind string) string {
 	if lt, ok := p.labelTraits["kind:"+kind]; ok && lt.DefaultStatus != "" {
 		return lt.DefaultStatus
 	}
-	return p.schema.DefaultStatus(kind)
+	return ""
 }
 
 // ValidChild checks whether childKind can be a direct child of parentKind.
-// Consults label traits first; falls back to schema.
+// Delegates to isEdgeAllowed — Relationship CRDs are the single source of truth
+// for valid parent_of edges.
 func (p *Protocol) ValidChild(parentKind, childKind string) (string, bool) {
-	if lt, ok := p.labelTraits["kind:"+parentKind]; ok && len(lt.AllowedChildren) > 0 {
-		for _, c := range lt.AllowedChildren {
-			if c == ChildrenWildcard || c == childKind {
-				return "", true
-			}
-		}
-		return parentKind + " does not allow child of kind " + childKind, false
+	if p.isEdgeAllowed([]string{LabelPrefixKind + parentKind}, RelParentOf, []string{LabelPrefixKind + childKind}) {
+		return "", true
 	}
-	return p.schema.ValidChild(parentKind, childKind)
+	return parentKind + " does not allow child of kind " + childKind, false
 }
 
 // MustSections returns sections required at creation time for the kind.
-// Consults label traits first; falls back to schema.
 func (p *Protocol) MustSections(kind string) []string {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok && len(lt.MustSections) > 0 {
+	if lt, ok := p.labelTraits["kind:"+kind]; ok {
 		return lt.MustSections
 	}
-	return p.schema.GetMustSections(kind)
-}
-
-// ShouldSections returns sections recommended for activation for the kind.
-func (p *Protocol) ShouldSections(kind string) []string {
-	return p.schema.GetShouldSections(kind)
+	return nil
 }
 
 // KindsForFamily returns all kind names with the given family, sorted.
-// Scans label traits first; falls back to schema when result is empty.
 func (p *Protocol) KindsForFamily(family string) []string {
 	var out []string
 	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
@@ -78,11 +65,8 @@ func (p *Protocol) KindsForFamily(family string) []string {
 			out = append(out, key[5:])
 		}
 	}
-	if len(out) > 0 {
-		sort.Strings(out)
-		return out
-	}
-	return p.schema.KindsForFamily(family)
+	sort.Strings(out)
+	return out
 }
 
 // IsContainerKind reports whether kind is a container (goal, campaign).
@@ -110,6 +94,106 @@ func (p *Protocol) SkipEmptyCheck(kind string) bool {
 		return lt.SkipEmptyCheck
 	}
 	return false
+}
+
+// Vacuumable reports whether archived artifacts of this kind may be hard-deleted.
+func (p *Protocol) Vacuumable(kind string) bool {
+	if lt, ok := p.labelTraits["kind:"+kind]; ok {
+		return lt.Vacuumable
+	}
+	return false
+}
+
+// IsProtected reports whether the kind is protected from vacuum deletion.
+func (p *Protocol) IsProtected(kind string) bool {
+	if lt, ok := p.labelTraits["kind:"+kind]; ok {
+		return lt.Protected
+	}
+	return false
+}
+
+// SkipGuards reports whether transition guards are bypassed for this kind.
+func (p *Protocol) SkipGuards(kind string) bool {
+	if lt, ok := p.labelTraits["kind:"+kind]; ok {
+		return lt.SkipGuards
+	}
+	return false
+}
+
+// IsGoalKind reports whether the kind serves as the current-goal container.
+func (p *Protocol) IsGoalKind(kind string) bool {
+	if lt, ok := p.labelTraits["kind:"+kind]; ok {
+		return lt.IsGoalKind
+	}
+	return false
+}
+
+// TrackInBrief reports whether artifacts of this kind appear in brief summaries.
+func (p *Protocol) TrackInBrief(kind string) bool {
+	if lt, ok := p.labelTraits["kind:"+kind]; ok {
+		return lt.TrackInBrief
+	}
+	return false
+}
+
+// ActiveStatus returns the "in-flight" status label for a kind (e.g. "work.active").
+func (p *Protocol) ActiveStatus(kind string) string {
+	if lt, ok := p.labelTraits["kind:"+kind]; ok {
+		return lt.ActiveStatus
+	}
+	return ""
+}
+
+// ActivationRequiresSections reports whether the kind requires sections before activating.
+func (p *Protocol) ActivationRequiresSections(kind string) bool {
+	if lt, ok := p.labelTraits["kind:"+kind]; ok {
+		return lt.ActivationRequiresSections
+	}
+	return false
+}
+
+// ShouldSections returns sections recommended for the kind.
+func (p *Protocol) ShouldSections(kind string) []string {
+	if lt, ok := p.labelTraits["kind:"+kind]; ok {
+		return lt.ShouldSections
+	}
+	return nil
+}
+
+// IsKnownKind reports whether kind has a registered label trait.
+func (p *Protocol) IsKnownKind(kind string) bool {
+	_, ok := p.labelTraits["kind:"+kind]
+	return ok
+}
+
+// BriefKindEntry carries the fields needed for Brief and Inventory displays.
+type BriefKindEntry struct {
+	ActiveStatus string
+	IsGoalKind   bool
+}
+
+// BriefKinds returns all kinds with TrackInBrief=true, keyed by kind name.
+func (p *Protocol) BriefKinds() map[string]BriefKindEntry {
+	out := make(map[string]BriefKindEntry)
+	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
+		lt := p.labelTraits[key]
+		if len(key) > 5 && key[:5] == "kind:" && lt.TrackInBrief {
+			out[key[5:]] = BriefKindEntry{ActiveStatus: lt.ActiveStatus, IsGoalKind: lt.IsGoalKind}
+		}
+	}
+	return out
+}
+
+// GoalKind returns the kind name and active status for the kind marked IsGoalKind.
+// Returns ("", "") if none is marked.
+func (p *Protocol) GoalKind() (kindName, activeStatus string) {
+	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
+		lt := p.labelTraits[key]
+		if len(key) > 5 && key[:5] == "kind:" && lt.IsGoalKind {
+			return key[5:], lt.ActiveStatus
+		}
+	}
+	return "", ""
 }
 
 // isEdgeAllowed reports whether any Relationship permits this source→relation→target edge.
@@ -154,6 +238,36 @@ func (p *Protocol) maxParentsFor(labels []string) int {
 		}
 	}
 	return 0
+}
+
+// ValidTransition reports whether transitioning kind from→to is allowed.
+// Returns ("", true) if allowed; (reason, false) if rejected.
+func (p *Protocol) ValidTransition(kind, from, to string) (string, bool) {
+	valid, reason := p.isValidTransition(kind, from, to)
+	return reason, valid
+}
+
+// Prefix returns the ID prefix for a kind (e.g. "TASK" for task).
+func (p *Protocol) Prefix(kind string) string {
+	if lt, ok := p.labelTraits["kind:"+kind]; ok && lt.Prefix != "" {
+		return lt.Prefix
+	}
+	if len(kind) >= 3 {
+		return strings.ToUpper(kind[:3])
+	}
+	return strings.ToUpper(kind)
+}
+
+// KindCode returns the short code for a kind (e.g. "TSK" for task).
+func (p *Protocol) KindCode(kind string) string {
+	if lt, ok := p.labelTraits["kind:"+kind]; ok && lt.Code != "" {
+		return lt.Code
+	}
+	upper := strings.ToUpper(kind)
+	if len(upper) >= 3 {
+		return upper[:3]
+	}
+	return upper
 }
 
 // RegisteredRelations returns the sorted schema relations list.

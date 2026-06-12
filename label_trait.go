@@ -36,17 +36,24 @@ type LabelTrait struct {
 	Readonly bool `json:"readonly,omitempty"`
 
 	// Kind fields — for kind:X label definitions.
-	DefaultStatus          string   `json:"default_status,omitempty"`
-	ActiveStatus           string   `json:"active_status,omitempty"`
-	Transitions            []string `json:"trait_transitions,omitempty"`
-	AllowedChildren        []string `json:"allowed_children,omitempty"`
-	Family                 string   `json:"family,omitempty"`
-	MustSections           []string `json:"must_sections,omitempty"`
-	Properties             []string `json:"properties,omitempty"`
-	IsContainerKind        bool     `json:"is_container_kind,omitempty"`
-	RequiresImplementation bool     `json:"requires_implementation,omitempty"`
-	SkipEmptyCheck         bool     `json:"skip_empty_check,omitempty"`
-	Vacuumable             bool     `json:"vacuumable,omitempty"`
+	Prefix                    string   `json:"prefix,omitempty"`
+	Code                      string   `json:"code,omitempty"`
+	DefaultStatus             string   `json:"default_status,omitempty"`
+	ActiveStatus              string   `json:"active_status,omitempty"`
+	Transitions               []string `json:"trait_transitions,omitempty"`
+	Family                    string   `json:"family,omitempty"`
+	MustSections              []string `json:"must_sections,omitempty"`
+	ShouldSections            []string `json:"should_sections,omitempty"`
+	Properties                []string `json:"properties,omitempty"`
+	IsContainerKind           bool     `json:"is_container_kind,omitempty"`
+	RequiresImplementation    bool     `json:"requires_implementation,omitempty"`
+	SkipEmptyCheck            bool     `json:"skip_empty_check,omitempty"`
+	Vacuumable                bool     `json:"vacuumable,omitempty"`
+	Protected                 bool     `json:"protected,omitempty"`
+	SkipGuards                bool     `json:"skip_guards,omitempty"`
+	IsGoalKind                bool     `json:"is_goal_kind,omitempty"`
+	TrackInBrief              bool     `json:"track_in_brief,omitempty"`
+	ActivationRequiresSections bool    `json:"activation_requires_sections,omitempty"`
 
 }
 
@@ -156,7 +163,6 @@ func LoadLabelTraitsWithComposition(ctx context.Context, s Store) map[string]Lab
 				own.Family = p.Family
 			}
 		own.Transitions = unionStrings(own.Transitions, p.Transitions)
-		own.AllowedChildren = unionStrings(own.AllowedChildren, p.AllowedChildren)
 		own.MustSections = unionStrings(own.MustSections, p.MustSections)
 		own.Properties = unionStrings(own.Properties, p.Properties)
 	}
@@ -220,7 +226,6 @@ func ResolveTrait(traits map[string]LabelTrait, labels []string) LabelTrait {
 			merged.Family = lt.Family
 		}
 		merged.Transitions = unionStrings(merged.Transitions, lt.Transitions)
-		merged.AllowedChildren = unionStrings(merged.AllowedChildren, lt.AllowedChildren)
 		merged.MustSections = unionStrings(merged.MustSections, lt.MustSections)
 		merged.Properties = unionStrings(merged.Properties, lt.Properties)
 	}
@@ -322,52 +327,23 @@ var defaultLabelTraits = []struct {
 		"Apply to artifacts representing a source file.",
 		"Requires Extra fields: file, language. Missing any triggers compliance:violation."},
 
-	// Kind lifecycle traits.
-	{"kind:task", LabelTrait{
-		Family: "work", DefaultStatus: "work.draft", Vacuumable: true,
-	}, "Create a task when work is discrete, time-bounded, and directly actionable — a concrete unit of effort with a clear done condition. Use for implementation, review, or operational steps.", ""},
-	{"kind:spec", LabelTrait{
-		Family: "work", DefaultStatus: "work.draft", RequiresImplementation: true, Vacuumable: true,
-	}, "Create a spec when you need to capture intent, requirements, or a design decision before implementation begins. A spec requires at least one implementing task to be considered complete.", ""},
-	{"kind:bug", LabelTrait{
-		Family: "work", DefaultStatus: "work.draft", RequiresImplementation: true, Vacuumable: true,
-	}, "Create a bug when observed behavior deviates from expected behavior in a shipped or deployed system. A bug requires at least one implementing task (the fix) to be considered resolved.", ""},
-	{"kind:goal", LabelTrait{
-		Family: "work", DefaultStatus: "work.draft", IsContainerKind: true, SkipEmptyCheck: true, Vacuumable: true,
-	}, "Create a goal to capture a high-level outcome — a desired end state, OKR, or strategic target. Goals are containers: they are complete when all child artifacts reach terminal status.", ""},
-	{"kind:campaign", LabelTrait{
-		Family: "work", DefaultStatus: "work.draft", IsContainerKind: true, SkipEmptyCheck: true, Vacuumable: true,
-	}, "Create a campaign to group a set of related specs, tasks, and bugs under a single coordinating effort. Campaigns are containers: they are complete when all child artifacts reach terminal status.", ""},
-	{"kind:note", LabelTrait{
-		Family: "knowledge", DefaultStatus: "note.fleeting", Vacuumable: true,
-	}, "Create a note to capture an observation, idea, or finding that does not yet warrant a task or decision. Notes start fleeting and are promoted to mature or evergreen as they gain supporting evidence.", ""},
-	{"kind:concept", LabelTrait{
-		Family: "knowledge", DefaultStatus: "work.active", Vacuumable: true,
-	}, "", ""},
-	{"kind:source", LabelTrait{
-		Family: "knowledge", DefaultStatus: "work.active", Vacuumable: true,
-	}, "", ""},
-	{"kind:context", LabelTrait{
-		Family: "knowledge", DefaultStatus: "work.active",
-	}, "", ""},
-	{"kind:template", LabelTrait{
-		Family: "support", DefaultStatus: "work.active", SkipEmptyCheck: true,
-	}, "", ""},
-	{"kind:decision", LabelTrait{
-		Family: "support", DefaultStatus: "decision.proposed",
-	}, "Create a decision (ADR) when a significant architectural or design choice must be recorded for future reference. Decisions progress through proposed → accepted/rejected/deferred and are readonly once accepted.", ""},
-	{"kind:config", LabelTrait{
-		Family: "support", DefaultStatus: "work.active", SkipEmptyCheck: true,
-	}, "", ""},
-	{"kind:need", LabelTrait{
-		Family: "work", DefaultStatus: "work.draft",
-	}, "", ""},
-	{"kind:ref", LabelTrait{
-		Family: "work", DefaultStatus: "work.active", SkipEmptyCheck: true,
-	}, "", ""},
-	{"kind:doc", LabelTrait{
-		Family: "work", DefaultStatus: "work.active", SkipEmptyCheck: true,
-	}, "", ""},
+	// Work lifecycle traits.
+	{"inv.open", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"inv.investigating", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"inv.resolved", LabelTrait{Terminal: true, Readonly: false}, "", ""},
+	{"inv.withdrawn", LabelTrait{Terminal: true, Readonly: false}, "", ""},
+	// Observation lifecycle traits.
+	{"obs.open", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"obs.explained", LabelTrait{Terminal: true, Readonly: false}, "", ""},
+	{"obs.dismissed", LabelTrait{Terminal: true, Readonly: false}, "", ""},
+	// Cause lifecycle traits.
+	{"cause.proposed", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"cause.confirmed", LabelTrait{Terminal: true, Readonly: false}, "", ""},
+	{"cause.ruled-out", LabelTrait{Terminal: true, Readonly: false}, "", ""},
+
+	// Kind traits are seeded from registry/kinds/*.yaml via seedKindLabelTraitsFromRegistry.
+	// Entries here are intentionally absent — YAML is the authoritative source.
+
 	{"code:function", LabelTrait{Properties: []string{"signature", "file", "line"}},
 		"Apply to function/method nodes from code intelligence spokes.", ""},
 	{"code:component", LabelTrait{Properties: []string{"package", "language"}},
@@ -380,12 +356,14 @@ var defaultLabelTraits = []struct {
 // Idempotent — skips any label whose artifact already exists.
 // Called from Protocol.New after loadLabelTraits.
 func SeedLabelTraits(ctx context.Context, s Store) {
-	// Primary path: seed from embedded YAML registry.
+	// Kind traits — always PUT from YAML registry (authoritative source).
+	seedKindLabelTraitsFromRegistry(ctx, s)
+	// Non-kind label traits — from labels/*.yaml.
 	seedLabelsFromRegistry(ctx, s)
-	// Migration: add guidance sections to pre-registry artifacts.
+	// Migration: add guidance sections to pre-registry label artifacts.
 	migrateLabelSections(ctx, s)
 
-	// Fallback: seed any labels in defaultLabelTraits not covered by the registry.
+	// Fallback: seed any labels in defaultLabelTraits not already seeded.
 	for _, entry := range defaultLabelTraits {
 		id := "LDEF-" + entry.label
 		if _, err := s.Get(ctx, id); err == nil {

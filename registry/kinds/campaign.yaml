@@ -7,6 +7,8 @@ spec:
   code: CMP
   family: effort
   protected: true
+  isContainerKind: true
+  skipEmptyCheck: true
   children: [goal]
   lifecycle:
     defaultStatus: work.draft

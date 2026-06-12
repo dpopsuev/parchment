@@ -5,42 +5,42 @@ import (
 	"testing"
 )
 
-// TestIntentStatuses verifies domain decision statuses are registered.
+// TestIntentStatuses verifies domain decision statuses have terminal/readonly traits.
 func TestIntentStatuses(t *testing.T) {
-	s := DefaultSchema()
+	p := New(NewMemoryStore(), nil, []string{"test"}, nil, ProtocolConfig{})
 
-	statusSet := make(map[string]bool, len(s.Statuses))
-	for _, st := range s.Statuses {
-		statusSet[st] = true
+	if !p.IsTerminal("decision.accepted") {
+		t.Error("decision.accepted must be terminal")
 	}
-
-	for _, want := range []string{
-		"decision.proposed", "decision.accepted", "decision.rejected", "decision.deferred",
-	} {
-		if !statusSet[want] {
-			t.Errorf("intent status %q missing from DefaultSchema.Statuses", want)
-		}
+	if !p.IsTerminal("decision.rejected") {
+		t.Error("decision.rejected must be terminal")
+	}
+	if p.IsTerminal("decision.proposed") {
+		t.Error("decision.proposed must not be terminal")
+	}
+	if p.IsTerminal("decision.deferred") {
+		t.Error("decision.deferred must not be terminal")
 	}
 }
 
 // TestIntentLifecycle_Need verifies need follows the decision lifecycle.
 func TestIntentLifecycle_Need(t *testing.T) {
-	s := DefaultSchema()
+	p := New(NewMemoryStore(), nil, []string{"test"}, nil, ProtocolConfig{})
 
 	// proposed → accepted (happy path)
-	if reason, ok := s.ValidTransition("need", "decision.proposed", "decision.accepted"); !ok {
+	if reason, ok := p.ValidTransition("need", "decision.proposed", "decision.accepted"); !ok {
 		t.Errorf("need: decision.proposed→decision.accepted blocked: %s", reason)
 	}
 	// proposed → rejected
-	if reason, ok := s.ValidTransition("need", "decision.proposed", "decision.rejected"); !ok {
+	if reason, ok := p.ValidTransition("need", "decision.proposed", "decision.rejected"); !ok {
 		t.Errorf("need: decision.proposed→decision.rejected blocked: %s", reason)
 	}
 	// proposed → deferred
-	if reason, ok := s.ValidTransition("need", "decision.proposed", "decision.deferred"); !ok {
+	if reason, ok := p.ValidTransition("need", "decision.proposed", "decision.deferred"); !ok {
 		t.Errorf("need: decision.proposed→decision.deferred blocked: %s", reason)
 	}
 	// accepted → archived (terminal)
-	if reason, ok := s.ValidTransition("need", "decision.accepted", "archived"); !ok {
+	if reason, ok := p.ValidTransition("need", "decision.accepted", "archived"); !ok {
 		t.Errorf("need: decision.accepted→archived blocked: %s", reason)
 	}
 }
@@ -64,10 +64,10 @@ func TestIntentLifecycle_AcceptedIsReadonly(t *testing.T) {
 // TestIntentLifecycle_DraftToProposed verifies the draft→proposed transition
 // is the entry into the intent lifecycle.
 func TestIntentLifecycle_DraftToProposed(t *testing.T) {
-	s := DefaultSchema()
+	p := New(NewMemoryStore(), nil, []string{"test"}, nil, ProtocolConfig{})
 
 	for _, kind := range []string{"need", KindSpec, KindBug, "decision"} {
-		if reason, ok := s.ValidTransition(kind, "work.draft", "decision.proposed"); !ok {
+		if reason, ok := p.ValidTransition(kind, "work.draft", "decision.proposed"); !ok {
 			t.Errorf("%s: work.draft→decision.proposed blocked: %s", kind, reason)
 		}
 	}

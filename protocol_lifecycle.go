@@ -270,17 +270,18 @@ func (p *Protocol) setStatus(ctx context.Context, art *Artifact, status string) 
 
 
 func (p *Protocol) isValidTransition(kind, from, to string) (valid bool, reason string) {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok && len(lt.Transitions) > 0 {
-		for _, t := range lt.Transitions {
-			parts := strings.SplitN(t, "→", 2)
-			if len(parts) == 2 && parts[0] == from && parts[1] == to {
-				return true, ""
-			}
-		}
-		return false, fmt.Sprintf("cannot transition %s from %q to %q; valid next: %v", kind, from, to, p.validNextStatuses(kind, from))
+	lt, ok := p.labelTraits["kind:"+kind]
+	if !ok || len(lt.Transitions) == 0 {
+		// Unknown kind or no transitions declared — open state machine.
+		return true, ""
 	}
-	reason, valid = p.schema.ValidTransition(kind, from, to)
-	return valid, reason
+	for _, t := range lt.Transitions {
+		parts := strings.SplitN(t, "→", 2)
+		if len(parts) == 2 && parts[0] == from && parts[1] == to {
+			return true, ""
+		}
+	}
+	return false, fmt.Sprintf("cannot transition %s from %q to %q; valid next: %v", kind, from, to, p.validNextStatuses(kind, from))
 }
 
 func (p *Protocol) validNextStatuses(kind, from string) []string {

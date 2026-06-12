@@ -8,65 +8,34 @@ import (
 	"github.com/dpopsuev/parchment"
 )
 
-func TestKindDef_GuidanceIsNotOnStruct(t *testing.T) {
-	// Agent guidance (when_to_create, agent_note) must NOT be KindDef struct fields.
-	// They live only in kind_definition artifact sections — queryable data, not Go state.
-	// This test verifies the registry architecture by checking that task still exists
-	// in the schema (loaded from YAML) while guidance is absent from the struct.
+func TestKindTrait_GuidanceInArtifactSections(t *testing.T) {
+	// Agent guidance (when_to_create, agent_note) lives in LDEF-kind:task sections,
+	// not in LabelTrait struct fields — queryable data, not compiled state.
 	t.Parallel()
-	schema := parchment.KnowledgeSchema()
-	if _, ok := schema.Kinds[parchment.KindTask]; !ok {
-		t.Fatal("task kind missing from schema — registry YAML not loaded")
-	}
-	// Guidance is verified via artifact sections in TestSeedDefinitions_KindArtifact_HasGuidanceSections.
-}
-
-func TestSeedDefinitions_KindArtifact_HasGuidanceSections(t *testing.T) {
-	// kind_definition artifacts in _schema carry when_to_create and agent_note sections.
-	t.Parallel()
-	dir := t.TempDir()
-	s, err := parchment.OpenSQLite(dir + "/test.db")
+	s, err := parchment.OpenSQLite(t.TempDir() + "/test.db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer s.Close() //nolint:errcheck // deferred close in test
 
 	ctx := context.Background()
-	parchment.SeedDefinitions(ctx, s)
+	parchment.SeedLabelTraits(ctx, s)
 
-	// Find the task kind_definition artifact.
-	arts, err := s.List(ctx, parchment.Filter{
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, parchment.LabelPrefixScope + parchment.SchemaScope},
-	})
+	art, err := s.Get(ctx, "LDEF-kind:task")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("LDEF-kind:task not found")
 	}
-
-	var taskDef *parchment.Artifact
-	for _, a := range arts {
-		if a.Title == parchment.KindTask {
-			taskDef = a
-			break
-		}
+	sections := make(map[string]string)
+	for _, sec := range art.Sections {
+		sections[sec.Name] = sec.Text
 	}
-	if taskDef == nil {
-		t.Fatal("task kind_definition artifact not found in _schema")
+	if _, ok := sections["when_to_create"]; !ok {
+		t.Error("LDEF-kind:task should have when_to_create section")
 	}
-
-	sectionNames := make(map[string]string)
-	for _, sec := range taskDef.Sections {
-		sectionNames[sec.Name] = sec.Text
+	if _, ok := sections["agent_note"]; !ok {
+		t.Error("LDEF-kind:task should have agent_note section")
 	}
-
-	if _, ok := sectionNames["when_to_create"]; !ok {
-		t.Error("task kind_definition should have when_to_create section")
-	}
-	if _, ok := sectionNames["agent_note"]; !ok {
-		t.Error("task kind_definition should have agent_note section")
-	}
-	if text := sectionNames["when_to_create"]; !strings.Contains(text, "task") && !strings.Contains(text, "work") {
+	if text := sections["when_to_create"]; !strings.Contains(text, "task") && !strings.Contains(text, "work") {
 		t.Errorf("when_to_create text should mention task or work, got: %q", text)
 	}
 }
-
-

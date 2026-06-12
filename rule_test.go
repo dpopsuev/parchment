@@ -9,11 +9,11 @@ import (
 )
 
 func TestRule_ArtifactKindExists(t *testing.T) {
-	// kind=rule is in KnowledgeSchema and registerable via registry.
+	// kind=rule is registered via label traits.
 	t.Parallel()
-	schema := parchment.KnowledgeSchema()
-	if _, ok := schema.Kinds[parchment.KindRule]; !ok {
-		t.Fatalf("kind=rule not in schema — registry YAML not loaded")
+	p := parchment.New(parchment.NewMemoryStore(), nil, []string{"test"}, nil, parchment.ProtocolConfig{})
+	if !p.IsKnownKind(parchment.KindRule) {
+		t.Fatalf("kind=rule not registered — registry YAML not loaded")
 	}
 }
 

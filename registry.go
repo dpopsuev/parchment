@@ -26,44 +26,35 @@ var rulesFS embed.FS
 func crdResourceToKindYAML(r *Resource) kindYAML {
 	name := strings.TrimPrefix(r.Metadata.Name, "kind.")
 	k := kindYAML{
-		Name:       name,
-		Prefix:     r.Spec.Prefix,
-		Code:       r.Spec.Code,
-		Family:     r.Spec.Family,
-		Protected:  r.Spec.Protected,
-		Vacuumable: r.Spec.Vacuumable,
-		SkipGuards: r.Spec.SkipGuards,
-		Children:   r.Spec.Children,
-		WhenToCreate: r.Spec.WhenToCreate,
-		AgentNote:    r.Spec.AgentNote,
+		Name:                      name,
+		Prefix:                    r.Spec.Prefix,
+		Code:                      r.Spec.Code,
+		Family:                    r.Spec.Family,
+		Protected:                 r.Spec.Protected,
+		Vacuumable:                r.Spec.Vacuumable,
+		SkipGuards:                r.Spec.SkipGuards,
+		IsGoalKind:                r.Spec.IsGoalKind,
+		TrackInBrief:              r.Spec.TrackInBrief,
+		IsContainerKind:           r.Spec.IsContainerKind,
+		ActivationRequiresSections: r.Spec.ActivationRequiresSections,
+		RequiresImplementation:    r.Spec.RequiresImplementation,
+		SkipEmptyCheck:            r.Spec.SkipEmptyCheck,
+		WhenToCreate:              r.Spec.WhenToCreate,
+		AgentNote:                 r.Spec.AgentNote,
 	}
 	if r.Spec.Lifecycle != nil {
-		k.Lifecycle.DefaultStatus = r.Spec.Lifecycle.DefaultStatus
+		k.DefaultStatus = r.Spec.Lifecycle.DefaultStatus
 		if len(r.Spec.Lifecycle.Transitions) > 0 {
-			k.Lifecycle.Transitions = make(map[string][]string, len(r.Spec.Lifecycle.Transitions))
+			k.Transitions = make(map[string][]string, len(r.Spec.Lifecycle.Transitions))
 			for _, t := range r.Spec.Lifecycle.Transitions {
-				k.Lifecycle.Transitions[t.From] = t.To
+				k.Transitions[t.From] = t.To
 			}
 		}
 	}
-	k.Lifecycle.ActiveStatus = r.Spec.ActiveStatus
-	k.Lifecycle.TriggerStatus = r.Spec.TriggerStatus
-	k.Lifecycle.IsGoalKind = r.Spec.IsGoalKind
-	k.Lifecycle.TrackInBrief = r.Spec.TrackInBrief
-	k.Lifecycle.ActivationRequiresSections = r.Spec.ActivationRequiresSections
-	k.Lifecycle.CompletionGates = r.Spec.CompletionGates
+	k.ActiveStatus = r.Spec.ActiveStatus
 	if r.Spec.Sections != nil {
-		k.Sections.Must = r.Spec.Sections.Must
-		k.Sections.Should = r.Spec.Sections.Should
-		k.Sections.Could = r.Spec.Sections.Could
-	}
-	k.Sections.RequiredFields = r.Spec.RequiredFields
-	if r.Spec.Relations != nil {
-		k.Relations.Outgoing = r.Spec.Relations.Outgoing
-		k.Relations.Incoming = r.Spec.Relations.Incoming
-		k.Relations.ExpectedOutgoing = r.Spec.Relations.ExpectedOutgoing
-		k.Relations.RequiredOutgoing = r.Spec.Relations.RequiredOutgoing
-		k.Relations.Targets = r.Spec.Relations.Targets
+		k.MustSections = r.Spec.Sections.Must
+		k.ShouldSections = r.Spec.Sections.Should
 	}
 	return k
 }
@@ -81,84 +72,57 @@ func crdResourceToLabelYAML(r *Resource) labelYAML {
 	}
 }
 
-// kindYAML is the internal kind representation, populated from CRD files.
+// kindYAML is the flat internal kind representation, populated from CRD files.
+// All fields map directly to LabelTrait; no KindDef conversion needed.
 type kindYAML struct {
-	Name     string `yaml:"name"`
-	Prefix   string `yaml:"prefix"`
-	Code     string `yaml:"code"`
-	Family   string `yaml:"family"`
-
-	Protected  bool `yaml:"protected"`
-	Vacuumable bool `yaml:"vacuumable"`
-	SkipGuards bool `yaml:"skip_guards"`
-
-	Lifecycle struct {
-		DefaultStatus                string              `yaml:"default_status"`
-		ActiveStatus                 string              `yaml:"active_status"`
-		TriggerStatus                string              `yaml:"trigger_status"`
-		IsGoalKind                   bool                `yaml:"is_goal_kind"`
-		TrackInBrief                 bool                `yaml:"track_in_brief"`
-		ActivationRequiresSections   bool                `yaml:"activation_requires_sections"`
-		Transitions                  map[string][]string `yaml:"transitions"`
-		CompletionGates              []string            `yaml:"completion_gates"`
-	} `yaml:"lifecycle"`
-
-	Sections struct {
-		Must           []string `yaml:"must"`
-		Should         []string `yaml:"should"`
-		Could          []string `yaml:"could"`
-		Expected       []string `yaml:"expected"`
-		RequiredFields []string `yaml:"required_fields"`
-	} `yaml:"sections"`
-
-	Children  []string `yaml:"children"`
-	Relations struct {
-		Outgoing         []string            `yaml:"outgoing"`
-		Incoming         []string            `yaml:"incoming"`
-		ExpectedOutgoing []string            `yaml:"expected_outgoing"`
-		RequiredOutgoing []string            `yaml:"required_outgoing"`
-		Targets          map[string][]string `yaml:"targets"`
-	} `yaml:"relations"`
-
-	WhenToCreate string `yaml:"when_to_create"`
-	AgentNote    string `yaml:"agent_note"`
+	Name                      string
+	Prefix                    string
+	Code                      string
+	Family                    string
+	DefaultStatus             string
+	ActiveStatus              string
+	Protected                 bool
+	Vacuumable                bool
+	SkipGuards                bool
+	IsGoalKind                bool
+	TrackInBrief              bool
+	IsContainerKind           bool
+	ActivationRequiresSections bool
+	RequiresImplementation    bool
+	SkipEmptyCheck            bool
+	Transitions               map[string][]string
+	MustSections              []string
+	ShouldSections            []string
+	WhenToCreate              string
+	AgentNote                 string
 }
 
-func (k *kindYAML) toKindDef() KindDef {
-	return KindDef{
-		KindIdentity: KindIdentity{
-			Family:     k.Family,
-			Prefix:     k.Prefix,
-			Code:       k.Code,
-			Protected:  k.Protected,
-			SkipGuards: k.SkipGuards,
-			Vacuumable: k.Vacuumable,
-		},
-		KindLifecycle: KindLifecycle{
-			DefaultStatus:              k.Lifecycle.DefaultStatus,
-			ActiveStatus:               k.Lifecycle.ActiveStatus,
-			TriggerStatus:              k.Lifecycle.TriggerStatus,
-			IsGoalKind:                 k.Lifecycle.IsGoalKind,
-			TrackInBrief:               k.Lifecycle.TrackInBrief,
-			ActivationRequiresSections: k.Lifecycle.ActivationRequiresSections,
-			Transitions:                k.Lifecycle.Transitions,
-			CompletionGates:            k.Lifecycle.CompletionGates,
-		},
-		KindSections: KindSections{
-			ExpectedSections: k.Sections.Expected,
-			MustSections:     k.Sections.Must,
-			ShouldSections:   k.Sections.Should,
-			CouldSections:    k.Sections.Could,
-			RequiredFields:   k.Sections.RequiredFields,
-		},
-		Children: k.Children,
-		Relations: KindRelations{
-			Outgoing:         k.Relations.Outgoing,
-			Incoming:         k.Relations.Incoming,
-			ExpectedOutgoing: k.Relations.ExpectedOutgoing,
-			RequiredOutgoing: k.Relations.RequiredOutgoing,
-			Targets:          k.Relations.Targets,
-		},
+// toLabelTrait converts kindYAML to the LabelTrait stored in the DB.
+func (k *kindYAML) toLabelTrait() LabelTrait {
+	var transitions []string
+	for from, tos := range k.Transitions {
+		for _, to := range tos {
+			transitions = append(transitions, from+"→"+to)
+		}
+	}
+	return LabelTrait{
+		Prefix:                    k.Prefix,
+		Code:                      k.Code,
+		Family:                    k.Family,
+		DefaultStatus:             k.DefaultStatus,
+		ActiveStatus:              k.ActiveStatus,
+		Protected:                 k.Protected,
+		Vacuumable:                k.Vacuumable,
+		SkipGuards:                k.SkipGuards,
+		IsGoalKind:                k.IsGoalKind,
+		TrackInBrief:              k.TrackInBrief,
+		IsContainerKind:           k.IsContainerKind,
+		ActivationRequiresSections: k.ActivationRequiresSections,
+		RequiresImplementation:    k.RequiresImplementation,
+		SkipEmptyCheck:            k.SkipEmptyCheck,
+		Transitions:               transitions,
+		MustSections:              k.MustSections,
+		ShouldSections:            k.ShouldSections,
 	}
 }
 
@@ -241,25 +205,25 @@ func loadRegistryLabels() []labelYAML { //nolint:dupl // parallel to loadRegistr
 	return labels
 }
 
-// seedKindsFromRegistry writes kind_definition artifacts to the store from the embedded CRD registry.
-func seedKindsFromRegistry(ctx context.Context, s Store) {
+// seedKindLabelTraitsFromRegistry writes kind:X label_definition artifacts from
+// the embedded kind CRD registry. Always PUT — kind traits are derived from YAML
+// and stay in sync with the registry on every startup.
+func seedKindLabelTraitsFromRegistry(ctx context.Context, s Store) {
 	now := time.Now().UTC()
-	allKinds := loadRegistryKinds()
-	for i := range allKinds { //nolint:gocritic // rangeValCopy avoided by indexing
-		k := &allKinds[i]
-		id := "DEF-" + k.Name
-		if _, err := s.Get(ctx, id); err == nil {
-			continue
-		}
-		kd := k.toKindDef()
-		extra, err := kindDefToExtra(&kd)
+	for _, k := range loadRegistryKinds() { //nolint:gocritic // rangeValCopy: indexing avoids copy
+		trait := k.toLabelTrait()
+		b, err := json.Marshal(trait)
 		if err != nil {
 			continue
 		}
+		var extra map[string]any
+		if err := json.Unmarshal(b, &extra); err != nil {
+			continue
+		}
 		art := &Artifact{
-			ID:         id,
-			Labels:     []string{LabelPrefixKind + KindLabelDefinition, "work.active", LabelPrefixScope + SchemaScope}, // collapsed: kind_definition → label_definition
-			Title:      k.Name,
+			ID:         "LDEF-kind:" + k.Name,
+			Labels:     []string{LabelPrefixKind + KindLabelDefinition, "work.active", LabelPrefixScope + SchemaScope},
+			Title:      "kind:" + k.Name,
 			Extra:      extra,
 			CreatedAt:  now,
 			UpdatedAt:  now,
@@ -272,7 +236,7 @@ func seedKindsFromRegistry(ctx context.Context, s Store) {
 			art.Sections = append(art.Sections, Section{Name: "agent_note", Text: strings.TrimSpace(k.AgentNote)})
 		}
 		if err := s.Put(ctx, art); err != nil {
-			slog.WarnContext(ctx, "registry: seed kind failed",
+			slog.WarnContext(ctx, "registry: seed kind trait failed",
 				slog.String(LogKeyKind, k.Name), slog.Any(LogKeyError, err))
 		}
 	}
@@ -318,36 +282,7 @@ func seedLabelsFromRegistry(ctx context.Context, s Store) {
 	}
 }
 
-// migrateKindSections updates existing kind_definition artifacts in the store
-// by adding any guidance sections present in the registry CRD but absent from
-// the stored artifact. Existing sections are never overwritten.
-func migrateKindSections(ctx context.Context, s Store) {
-	allKinds := loadRegistryKinds()
-	for i := range allKinds {
-		k := &allKinds[i]
-		id := "DEF-" + k.Name
-		art, err := s.Get(ctx, id)
-		if err != nil {
-			continue
-		}
-		existing := make(map[string]bool, len(art.Sections))
-		for _, sec := range art.Sections {
-			existing[sec.Name] = true
-		}
-		var added bool
-		if k.WhenToCreate != "" && !existing["when_to_create"] {
-			art.Sections = append(art.Sections, Section{Name: "when_to_create", Text: strings.TrimSpace(k.WhenToCreate)})
-			added = true
-		}
-		if k.AgentNote != "" && !existing["agent_note"] {
-			art.Sections = append(art.Sections, Section{Name: "agent_note", Text: strings.TrimSpace(k.AgentNote)})
-			added = true
-		}
-		if added {
-			_ = s.Put(ctx, art)
-		}
-	}
-}
+
 
 // migrateLabelSections updates existing label_definition artifacts similarly.
 func migrateLabelSections(ctx context.Context, s Store) { //nolint:dupl // parallel to migrateEdgeTypeSections; different types prevent a shared generic
@@ -486,13 +421,4 @@ func seedRelationshipsFromRegistry(ctx context.Context, s Store) {
 	}
 }
 
-// registrySchema builds a Schema from the embedded kind registry CRD files.
-func registrySchema() map[string]KindDef {
-	kinds := make(map[string]KindDef)
-	registryKinds := loadRegistryKinds()
-	for i := range registryKinds { //nolint:gocritic // rangeValCopy avoided by indexing
-		k := &registryKinds[i]
-		kinds[k.Name] = k.toKindDef()
-	}
-	return kinds
-}
+

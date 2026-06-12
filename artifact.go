@@ -73,6 +73,14 @@ const (
 	RelRemembers   = "remembers"   // context → note/concept (agent bookmarked this)
 )
 
+// Well-known edge relations — investigation layer.
+const (
+	RelExplains    = "explains"    // cause → observation (a cause accounts for an observed symptom)
+	RelCauses      = "causes"      // cause → cause (causal chain; cycle-guarded)
+	RelResolves    = "resolves"    // cause → investigation (root cause closes the investigation)
+	RelEvidencedBy = "evidenced_by" // observation → ref (links symptom to external evidence)
+)
+
 // Annotation is operator feedback on an artifact without mutating core fields.
 type Annotation struct {
 	Kind    string `json:"kind"` // "+", "-", "~"

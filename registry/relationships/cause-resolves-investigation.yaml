@@ -1,0 +1,9 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: cause-resolves-investigation
+spec:
+  from: kind:cause
+  relation: resolves
+  to: kind:investigation
+  maxIncoming: 1

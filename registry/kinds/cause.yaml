@@ -1,0 +1,39 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.cause
+spec:
+  prefix: CSE
+  code: cse
+  family: investigation
+  children: []
+  lifecycle:
+    defaultStatus: cause.proposed
+    transitions:
+      - from: cause.proposed
+        to: [cause.confirmed, cause.ruled-out]
+      - from: cause.confirmed
+        to: [archived]
+      - from: cause.ruled-out
+        to: [cause.proposed]
+  sections:
+    must: [explanation]
+    should: [evidence, mitigation]
+  relations:
+    incoming: [parent_of, causes]
+    outgoing: [explains, causes, resolves]
+    targets:
+      explains: [observation]
+      causes: [cause, observation]
+      resolves: [investigation]
+  whenToCreate: |
+    Create a cause to record a causal hypothesis during an investigation. One
+    cause per distinct contributing factor. Confirmed causes link via explains
+    to the observations they account for. The root cause is the confirmed cause
+    with no incoming causes edges — it resolves the investigation via resolves.
+  agentNote: |
+    Causes form a directed acyclic graph via causes edges (cycleGuard enforced).
+    The terminal node — a confirmed cause with no upstream cause — is the root
+    cause. Confirm it by adding a resolves edge to the parent investigation.
+    A cause with cause.ruled-out status can be re-proposed if new evidence
+    contradicts the ruling.

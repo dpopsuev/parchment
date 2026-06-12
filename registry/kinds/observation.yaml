@@ -1,0 +1,35 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.observation
+spec:
+  prefix: OBS
+  code: obs
+  family: investigation
+  children: []
+  lifecycle:
+    defaultStatus: obs.open
+    transitions:
+      - from: obs.open
+        to: [obs.explained, obs.dismissed]
+      - from: obs.explained
+        to: [obs.open, archived]
+      - from: obs.dismissed
+        to: [obs.open]
+  sections:
+    must: [observed]
+    could: [evidence, timeline]
+  relations:
+    incoming: [parent_of, explains]
+    outgoing: [evidenced_by]
+    targets:
+      evidenced_by: [ref]
+  whenToCreate: |
+    Create an observation to record a symptom or signal seen during an
+    investigation. One observation per distinct symptom. Link it to the parent
+    investigation via parent_of. Attach a cause via explains when identified.
+  agentNote: |
+    Observations are the leaf nodes in an investigation. An observation moves
+    to obs.explained when at least one confirmed cause links to it via explains.
+    Do not conflate multiple symptoms into one observation — keep them atomic
+    for accurate causal mapping.

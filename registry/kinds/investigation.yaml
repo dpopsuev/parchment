@@ -1,0 +1,36 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.investigation
+spec:
+  prefix: INV
+  code: inv
+  family: investigation
+  children: [observation, cause]
+  lifecycle:
+    defaultStatus: inv.open
+    transitions:
+      - from: inv.open
+        to: [inv.investigating, inv.withdrawn]
+      - from: inv.investigating
+        to: [inv.resolved, inv.open, inv.withdrawn]
+      - from: inv.resolved
+        to: [archived]
+      - from: inv.withdrawn
+        to: []
+  sections:
+    must: [summary]
+    should: [timeline, impact]
+  relations:
+    outgoing: [parent_of]
+    targets:
+      parent_of: [observation, cause]
+  whenToCreate: |
+    Create an investigation when an unexpected system behavior needs structured
+    RCA. An investigation groups observations (symptoms) and causes (hypotheses
+    through confirmed root cause) into a traceable causal chain.
+  agentNote: |
+    An investigation is resolved when a confirmed cause links via resolves.
+    Observations record what was seen; causes record why. The root cause is
+    the confirmed cause with no incoming causes edges — terminal node in the
+    causal chain.

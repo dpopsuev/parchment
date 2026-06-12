@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: investigation-parent_of-observation
+spec:
+  from: kind:investigation
+  relation: parent_of
+  to: kind:observation

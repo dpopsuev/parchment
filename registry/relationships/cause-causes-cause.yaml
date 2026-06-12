@@ -1,0 +1,9 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: cause-causes-cause
+spec:
+  from: kind:cause
+  relation: causes
+  to: kind:cause
+  cycleGuard: true

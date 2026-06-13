@@ -309,6 +309,8 @@ var defaultLabelTraits = []struct {
 	{"ctx.ephemeral", LabelTrait{Terminal: false, Readonly: false}, "", ""},
 	{"ctx.promoted", LabelTrait{Terminal: false, Readonly: false}, "", ""},
 	{"ctx.permanent", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"ctx.active", LabelTrait{Terminal: false, Readonly: false}, "", ""},
+	{"ctx.archived", LabelTrait{Terminal: true, Readonly: true}, "", ""},
 
 	// Code intelligence lifecycle traits.
 	{"code.indexed", LabelTrait{Terminal: false, Readonly: false}, "", ""},

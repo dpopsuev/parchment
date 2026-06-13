@@ -1,0 +1,28 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.ctx-session
+spec:
+  prefix: SES
+  code: ses
+  family: ctx
+  children: [ctx-turn]
+  lifecycle:
+    defaultStatus: ctx.active
+    transitions:
+      - from: ctx.active
+        to: [ctx.archived]
+      - from: ctx.archived
+        to: []
+  sections:
+    must: [model]
+    should: [summary, usage]
+  whenToCreate: |
+    Create a ctx-session artifact to record a complete agent session — one
+    session per agent run. Carries model identity, token usage, and a
+    summary of what the agent accomplished. Child ctx-turn artifacts hold
+    the individual message exchanges.
+  agentNote: |
+    Session artifacts are the provenance layer. They answer "who did this,
+    with what model, when, and at what cost." Link sessions to the tasks
+    and specs they produced via produced_by edges.

@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: any-clones-any
+spec:
+  from: "*"
+  relation: clones
+  to: "*"

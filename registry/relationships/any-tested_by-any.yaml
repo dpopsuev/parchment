@@ -1,0 +1,9 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: any-tested_by-any
+spec:
+  from: "*"
+  relation: tested_by
+  to: "*"
+  cycleGuard: true

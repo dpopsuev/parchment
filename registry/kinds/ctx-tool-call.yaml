@@ -1,0 +1,27 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.ctx-tool-call
+spec:
+  prefix: TCL
+  code: tcl
+  family: ctx
+  children: []
+  lifecycle:
+    defaultStatus: ctx.active
+    transitions:
+      - from: ctx.active
+        to: [ctx.archived]
+      - from: ctx.archived
+        to: []
+  sections:
+    must: [input]
+    should: [output]
+  whenToCreate: |
+    Create a ctx-tool-call artifact for each tool invocation within a session
+    turn. Carries the tool name, input parameters, and output. Links back to
+    artifacts created or modified by the tool call via produced_by edges.
+  agentNote: |
+    Tool calls are the bridge between agent reasoning and artifact mutations.
+    A tool_call that creates a task should have a produced_by edge to that task.
+    This makes the provenance chain complete: session → turn → tool_call → artifact.

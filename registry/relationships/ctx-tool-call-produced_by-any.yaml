@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: ctx-tool-call-produced_by-any
+spec:
+  from: "*"
+  relation: produced_by
+  to: kind:ctx-tool-call

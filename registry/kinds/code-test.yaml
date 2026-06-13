@@ -1,0 +1,28 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.code-test
+spec:
+  prefix: TST
+  code: tst
+  family: code
+  children: []
+  lifecycle:
+    defaultStatus: code.indexed
+    transitions:
+      - from: code.indexed
+        to: [code.current, code.stale]
+      - from: code.current
+        to: [code.stale, code.outdated]
+      - from: code.stale
+        to: [code.current, code.outdated]
+      - from: code.outdated
+        to: []
+  sections:
+    should: [coverage]
+  whenToCreate: |
+    Create a code-test artifact for a test file or test suite. Use tested_by
+    edges to link the tested functions and components to this artifact.
+  agentNote: |
+    Test artifacts anchor coverage information. A code:function with no
+    incoming tested_by edge is untested — lint can surface this.

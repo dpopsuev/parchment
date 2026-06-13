@@ -118,6 +118,7 @@ func DefaultSchema() *Schema {
 			RelImplements, RelDocuments, RelSatisfies,
 			RelCites, RelElaborates, RelContradicts, RelSynthesises, RelRemembers,
 			RelExplains, RelCauses, RelResolves, RelEvidencedBy,
+			RelBlocks, RelDuplicates, RelRelatesTo, RelClones, RelMentions, RelTestedBy, RelSupersedes,
 		},
 		Priorities:      []string{"critical", "high", "medium", "low", "none"},
 		DefaultPriority: "medium",

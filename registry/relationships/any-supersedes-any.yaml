@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: any-supersedes-any
+spec:
+  from: "*"
+  relation: supersedes
+  to: "*"

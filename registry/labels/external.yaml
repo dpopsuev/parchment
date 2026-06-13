@@ -1,0 +1,63 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: linear
+spec:
+  evictionPolicy: protected
+  whenToApply: |
+    Apply linear:TEAM-NNN to artifacts that mirror a Linear issue. The value
+    is the full issue identifier (e.g. linear:ENG-42). Enables bidirectional
+    traceability between Scribe artifacts and Linear issues.
+  implies: |
+    Protected from eviction. The Linear identifier is the canonical external
+    key — do not change it once set.
+---
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: jira
+spec:
+  evictionPolicy: protected
+  whenToApply: |
+    Apply jira:PROJECT-NNN to artifacts that mirror a Jira issue. The value
+    is the full issue key (e.g. jira:PROJ-42). Enables bidirectional
+    traceability between Scribe artifacts and Jira issues.
+  implies: |
+    Protected from eviction. Jira issue keys are stable identifiers.
+---
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: github
+spec:
+  evictionPolicy: protected
+  whenToApply: |
+    Apply github:owner/repo#NNN to artifacts that mirror a GitHub issue or PR.
+    (e.g. github:dpopsuev/locus#42). Enables traceability to GitHub items.
+  implies: |
+    Protected from eviction.
+---
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: vault
+spec:
+  whenToApply: |
+    Apply vault:NAME to artifacts ingested from a knowledge vault (e.g.
+    vault:obsidian for notes from an Obsidian vault). Identifies the source
+    system for provenance queries.
+  implies: |
+    Marks the artifact as originating from an external knowledge base.
+---
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: sprint
+spec:
+  whenToApply: |
+    Apply sprint:YYYY.wNN or sprint:YYYY.qN to link an artifact to a
+    planning iteration. (e.g. sprint:2026.w24, sprint:2026.q2). Aligns with
+    TimeDetector labels for consistent temporal queries.
+  implies: |
+    Used for iteration-scoped queries: "what was in scope this sprint?"
+    Multiple sprint labels allowed if an artifact spans iterations.

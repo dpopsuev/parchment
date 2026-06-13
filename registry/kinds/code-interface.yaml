@@ -1,0 +1,30 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.code-interface
+spec:
+  prefix: IFC
+  code: ifc
+  family: code
+  children: []
+  lifecycle:
+    defaultStatus: code.indexed
+    transitions:
+      - from: code.indexed
+        to: [code.current, code.stale]
+      - from: code.current
+        to: [code.stale, code.outdated]
+      - from: code.stale
+        to: [code.current, code.outdated]
+      - from: code.outdated
+        to: []
+  sections:
+    should: [methods]
+  whenToCreate: |
+    Create a code-interface artifact for a Go interface, TypeScript interface,
+    abstract class, or protocol. Use implements edges to link concrete
+    implementations to this interface.
+  agentNote: |
+    Interfaces define contracts. A code:function implementing an interface
+    carries an implements edge to the code:interface artifact. This enables
+    queries like "what implements io.Reader?"

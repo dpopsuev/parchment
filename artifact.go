@@ -75,10 +75,21 @@ const (
 
 // Well-known edge relations — investigation layer.
 const (
-	RelExplains    = "explains"    // cause → observation (a cause accounts for an observed symptom)
-	RelCauses      = "causes"      // cause → cause (causal chain; cycle-guarded)
-	RelResolves    = "resolves"    // cause → investigation (root cause closes the investigation)
+	RelExplains    = "explains"     // cause → observation (a cause accounts for an observed symptom)
+	RelCauses      = "causes"       // cause → cause (causal chain; cycle-guarded)
+	RelResolves    = "resolves"     // cause → investigation (root cause closes the investigation)
 	RelEvidencedBy = "evidenced_by" // observation → ref (links symptom to external evidence)
+)
+
+// Well-known edge relations — extended graph layer.
+const (
+	RelBlocks     = "blocks"     // X prevents Y from proceeding (stronger than depends_on)
+	RelDuplicates = "duplicates" // X and Y describe the same thing
+	RelRelatesTo  = "relates_to" // generic symmetric relationship
+	RelClones     = "clones"     // X is a structural copy of Y
+	RelMentions   = "mentions"   // X weakly references Y (softer than cites)
+	RelTestedBy   = "tested_by"  // code:function → code:test
+	RelSupersedes = "supersedes" // X replaces Y (ADR evolution, decision history)
 )
 
 // Annotation is operator feedback on an artifact without mutating core fields.

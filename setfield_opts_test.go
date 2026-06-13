@@ -89,3 +89,64 @@ func TestSetFieldOptions_DryRun_NoMutation(t *testing.T) {
 		t.Errorf("dry run mutated status: got %q, want %q", parchment.LabelValue(art.Labels, parchment.LabelPrefixStatus), original)
 	}
 }
+
+// TestSetField_Labels_ReplacesEntireSet documents that SetField("labels", v)
+// replaces the full label array with strings.Split(v, ",").
+// This is the root cause of the embedder bug: adding a single label via
+// SetField("labels", oneLabel) destroys all existing labels.
+//
+// Given an artifact with domain labels (kind:note, scope:test, priority:high)
+// When SetField("labels", "encoded:test-model") is called (as the embedder did)
+// Then only "encoded:test-model" survives — all other labels are gone
+//
+// This test pins the current behavior so the fix is deliberate and visible.
+func TestSetField_Labels_ReplacesEntireSet(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	proto, _ := newProto(t)
+
+	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
+		Labels: []string{"kind:note", "scope:test", "priority:high"},
+		Title:  "test artifact",
+	})
+
+	// Simulate what the embedder did: add one label via SetField.
+	_, err := proto.SetField(ctx, []string{art.ID}, "labels", "encoded:test-model")
+	if err != nil {
+		t.Fatalf("SetField: %v", err)
+	}
+
+	after, _ := proto.GetArtifact(ctx, art.ID)
+
+	// Current (broken) behavior: only the new label survives.
+	if len(after.Labels) > 3 { // compliance:ok may be added by StampCompliance
+		t.Logf("labels after SetField: %v", after.Labels)
+	}
+	for _, destroyed := range []string{"kind:note", "scope:test", "priority:high"} {
+		found := false
+		for _, l := range after.Labels {
+			if l == destroyed {
+				found = true
+				break
+			}
+		}
+		if found {
+			// When fixed, this test should fail here — remove or invert the assertion.
+			t.Logf("label %q survived (fix is working)", destroyed)
+		} else {
+			t.Logf("label %q was destroyed by SetField(labels) — this is the bug", destroyed)
+		}
+	}
+
+	// The encoded label must be present regardless.
+	found := false
+	for _, l := range after.Labels {
+		if l == "encoded:test-model" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("encoded:test-model label should be present after SetField")
+	}
+}

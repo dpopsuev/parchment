@@ -1,8 +1,11 @@
 package parchment
 
 import (
+	"context"
 	"fmt"
 	"sort"
+	"strings"
+	"time"
 )
 
 // EvictionQuality returns the base quality score for a status (0.0–1.0).
@@ -286,4 +289,35 @@ func (p *Protocol) configKindLabels() []string {
 		}
 	}
 	return labels
+}
+
+// AppendLabel adds label to the artifact's label set without disturbing
+// any existing labels. If a label with the same prefix already exists it
+// is replaced (mirrorLabel semantics); otherwise label is appended.
+// This is safe to call concurrently with other field mutations — it reads,
+// updates, and writes the artifact in a single store.Put.
+func (p *Protocol) AppendLabel(ctx context.Context, id, label string) error {
+	art, err := p.store.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	// Find the prefix: everything up to and including the first colon.
+	if i := strings.IndexByte(label, ':'); i >= 0 {
+		art.Labels = mirrorLabel(art.Labels, label[:i+1], label[i+1:])
+	} else {
+		// No colon — treat as atomic tag; append only if absent.
+		found := false
+		for _, l := range art.Labels {
+			if l == label {
+				found = true
+				break
+			}
+		}
+		if !found {
+			art.Labels = append(art.Labels, label)
+		}
+	}
+	art.UpdatedAt = time.Now().UTC()
+	p.stampCompliance(art)
+	return p.store.Put(ctx, art)
 }

@@ -39,6 +39,9 @@ func crdResourceToKindYAML(r *Resource) kindYAML {
 		ActivationRequiresSections: r.Spec.ActivationRequiresSections,
 		RequiresImplementation:    r.Spec.RequiresImplementation,
 		SkipEmptyCheck:            r.Spec.SkipEmptyCheck,
+		IsTemplate:                r.Spec.IsTemplate,
+		IsRule:                    r.Spec.IsRule,
+		IsConfig:                  r.Spec.IsConfig,
 		WhenToCreate:              r.Spec.WhenToCreate,
 		AgentNote:                 r.Spec.AgentNote,
 	}
@@ -90,6 +93,9 @@ type kindYAML struct {
 	ActivationRequiresSections bool
 	RequiresImplementation    bool
 	SkipEmptyCheck            bool
+	IsTemplate                bool
+	IsRule                    bool
+	IsConfig                  bool
 	Transitions               map[string][]string
 	MustSections              []string
 	ShouldSections            []string
@@ -120,6 +126,9 @@ func (k *kindYAML) toLabelTrait() LabelTrait {
 		ActivationRequiresSections: k.ActivationRequiresSections,
 		RequiresImplementation:    k.RequiresImplementation,
 		SkipEmptyCheck:            k.SkipEmptyCheck,
+		IsTemplate:                k.IsTemplate,
+		IsRule:                    k.IsRule,
+		IsConfig:                  k.IsConfig,
 		Transitions:               transitions,
 		MustSections:              k.MustSections,
 		ShouldSections:            k.ShouldSections,

@@ -165,7 +165,7 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 	// Conformance check for satisfies relation: add edge, verify, rollback on failure.
 	if relation == RelSatisfies {
 		for _, tpl := range targets {
-			if labelValue(tpl.Labels, LabelPrefixKind) != KindTemplate {
+			if !p.IsTemplateKind(labelValue(tpl.Labels, LabelPrefixKind)) {
 				slog.WarnContext(ctx, "satisfies link target is not a template", slog.String("source_id", sourceID), slog.String("target_id", tpl.ID), slog.String("target_kind", labelValue(tpl.Labels, LabelPrefixKind))) //nolint:sloglint // source_id/target_id/target_kind have no LogKey constants
 				return nil, fmt.Errorf("satisfies target %s is not a template (kind=%s)", tpl.ID, labelValue(tpl.Labels, LabelPrefixKind)) //nolint:err113 // sentinel; no caller uses errors.Is on this
 			}

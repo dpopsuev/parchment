@@ -8,6 +8,7 @@ spec:
   family: support
   protected: true
   skipEmptyCheck: true
+  isTemplate: true
   skipGuards: true
   lifecycle:
     defaultStatus: work.active

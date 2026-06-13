@@ -112,6 +112,33 @@ func (p *Protocol) IsProtected(kind string) bool {
 	return false
 }
 
+// IsTemplatekind reports whether artifacts of this kind serve as templates
+// that are auto-linked to new artifacts of matching kinds via satisfies edges.
+func (p *Protocol) IsTemplateKind(kind string) bool {
+	if lt, ok := p.labelTraits["kind:"+kind]; ok {
+		return lt.IsTemplate
+	}
+	return false
+}
+
+// IsRuleKind reports whether artifacts of this kind are evaluated by the
+// rules engine during status transitions.
+func (p *Protocol) IsRuleKind(kind string) bool {
+	if lt, ok := p.labelTraits["kind:"+kind]; ok {
+		return lt.IsRule
+	}
+	return false
+}
+
+// IsConfigKind reports whether artifacts of this kind serve as key-value
+// configuration stores queryable via GetConfig.
+func (p *Protocol) IsConfigKind(kind string) bool {
+	if lt, ok := p.labelTraits["kind:"+kind]; ok {
+		return lt.IsConfig
+	}
+	return false
+}
+
 // SkipGuards reports whether transition guards are bypassed for this kind.
 func (p *Protocol) SkipGuards(kind string) bool {
 	if lt, ok := p.labelTraits["kind:"+kind]; ok {
@@ -280,3 +307,40 @@ func (p *Protocol) RegisteredRelations() []string {
 
 // Registry returns the ComponentRegistry for hot-reload of traits and rules.
 func (p *Protocol) Registry() *ComponentRegistry { return p.registry }
+
+// templateKindLabels returns all "kind:X" labels where X has IsTemplate=true.
+// Used to find template artifacts without hardcoding the kind name.
+func (p *Protocol) templateKindLabels() []string {
+	var labels []string
+	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
+		lt := p.labelTraits[key]
+		if len(key) > 5 && key[:5] == "kind:" && lt.IsTemplate {
+			labels = append(labels, key)
+		}
+	}
+	return labels
+}
+
+// ruleKindLabels returns all "kind:X" labels where X has IsRule=true.
+func (p *Protocol) ruleKindLabels() []string {
+	var labels []string
+	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
+		lt := p.labelTraits[key]
+		if len(key) > 5 && key[:5] == "kind:" && lt.IsRule {
+			labels = append(labels, key)
+		}
+	}
+	return labels
+}
+
+// configKindLabels returns all "kind:X" labels where X has IsConfig=true.
+func (p *Protocol) configKindLabels() []string {
+	var labels []string
+	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
+		lt := p.labelTraits[key]
+		if len(key) > 5 && key[:5] == "kind:" && lt.IsConfig {
+			labels = append(labels, key)
+		}
+	}
+	return labels
+}

@@ -6,6 +6,7 @@ spec:
   prefix: CFG
   code: CFG
   family: support
+  isConfig: true
   protected: true
   skipEmptyCheck: true
   children: []

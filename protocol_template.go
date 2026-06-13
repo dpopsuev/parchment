@@ -105,7 +105,13 @@ func (p *Protocol) findTemplateForKind(ctx context.Context, kind, scope string) 
 		return ""
 	}
 
-	tplLabels := []string{LabelPrefixKind + KindTemplate, "work.active"}
+	tplKinds := p.templateKindLabels()
+	if len(tplKinds) == 0 {
+		return ""
+	}
+	tplLabels := make([]string, 0, len(tplKinds)+1)
+	tplLabels = append(tplLabels, tplKinds...)
+	tplLabels = append(tplLabels, "work.active")
 	if scope != "" {
 		scopedLabels := append(tplLabels, LabelPrefixScope+scope) //nolint:gocritic // intentional append to new slice; tplLabels is a local literal
 		templates, err := p.store.List(ctx, Filter{Labels: scopedLabels})
@@ -136,8 +142,8 @@ func (p *Protocol) resolveTemplate(ctx context.Context, art *Artifact) *Artifact
 		slog.DebugContext(ctx, "failed to resolve template", slog.String("artifact_id", art.ID), slog.String("template_id", satisfies[0].To), slog.Any(LogKeyError, err)) //nolint:sloglint // artifact_id/template_id have no LogKey constants
 		return nil
 	}
-	if labelValue(tpl.Labels, LabelPrefixKind) != KindTemplate {
-		slog.WarnContext(ctx, "satisfies link target is not a template", slog.String("artifact_id", art.ID), slog.String("target_id", tpl.ID), slog.String("target_kind", labelValue(tpl.Labels, LabelPrefixKind))) //nolint:sloglint // artifact_id/target_id/target_kind have no LogKey constants
+	if !p.IsTemplateKind(labelValue(tpl.Labels, LabelPrefixKind)) {
+		slog.WarnContext(ctx, "satisfies link target is not a template", slog.String("artifact_id", art.ID), slog.String("template_id", tpl.ID), slog.String("target_kind", labelValue(tpl.Labels, LabelPrefixKind))) //nolint:sloglint // artifact_id/template_id/target_kind have no LogKey constants
 		return nil
 	}
 	slog.DebugContext(ctx, "template resolved", slog.String("artifact_id", art.ID), slog.String("template_id", tpl.ID), slog.Int("template_sections", len(tpl.Sections))) //nolint:sloglint // artifact_id/template_id/template_sections have no LogKey constants

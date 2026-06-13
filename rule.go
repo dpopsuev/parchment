@@ -26,8 +26,11 @@ type RuleDef struct {
 // ParseRule parses a kind=rule artifact into a RuleDef.
 // Returns an error if required sections (trigger, when, action, message) are missing.
 func ParseRule(art *Artifact) (*RuleDef, error) {
-	if labelValue(art.Labels, LabelPrefixKind) != KindRule {
-		return nil, fmt.Errorf("artifact %s is kind=%s, want kind=rule", art.ID, labelValue(art.Labels, LabelPrefixKind)) //nolint:err113 // user-facing hint
+	// ParseRule is a standalone function without Protocol access.
+	// Rules self-identify by having trigger/when/action/message sections.
+	// Kind check uses the literal "rule" — IsRuleKind() is available on Protocol.
+	if kind := labelValue(art.Labels, LabelPrefixKind); kind != "rule" {
+		return nil, fmt.Errorf("artifact %s is kind=%s, want a rule kind", art.ID, kind) //nolint:err113 // user-facing hint
 	}
 	sections := make(map[string]string, len(art.Sections))
 	for _, sec := range art.Sections {
@@ -77,8 +80,12 @@ func SeedRules(ctx context.Context, s Store) {
 // Called by Protocol.New to populate the rule cache.
 // Invalid rule artifacts are logged and skipped — they never block startup.
 func (p *Protocol) LoadRules(ctx context.Context) ([]*RuleDef, error) {
+	ruleKinds := p.ruleKindLabels()
+	if len(ruleKinds) == 0 {
+		return nil, nil
+	}
 	arts, err := p.store.List(ctx, Filter{
-		Labels: []string{LabelPrefixKind + KindRule, LabelPrefixScope + SchemaScope},
+		Labels: append(ruleKinds, LabelPrefixScope+SchemaScope),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("load rules: %w", err)
@@ -106,7 +113,7 @@ func seedRulesFromRegistry(ctx context.Context, s Store) {
 		}
 		art := &Artifact{
 			ID:     id,
-			Labels: []string{LabelPrefixKind + KindRule, "work.active", LabelPrefixScope + SchemaScope},
+			Labels: []string{LabelPrefixKind + "rule", statusWorkActive, LabelPrefixScope + SchemaScope},
 			Title:  r.Name,
 			CreatedAt:  now,
 			UpdatedAt:  now,

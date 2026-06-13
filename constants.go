@@ -16,14 +16,11 @@ var (
 // explicitly filters scope=SchemaScope.
 const SchemaScope = "_schema"
 
-// Infrastructure kind identifiers — used by parchment's own machinery.
-// Domain kinds (task, note, goal, etc.) are data defined in registry/kinds/*.yaml,
-// not compiled constants. Callers use string literals or the YAML-seeded LabelTrait.
-const (
-	KindTemplate        = "template"         // auto-linked to artifacts on creation
-	KindConfig          = "config"           // scope-level configuration store
-	KindRule            = "rule"             // lifecycle rule evaluated on status transition
-)
+// All kind names are data, not compiled constants.
+// Domain kinds live in registry/kinds/*.yaml (task, note, goal, etc.).
+// Infrastructure kinds (template, rule, config) are identified by LabelTrait flags
+// (IsTemplate, IsRule, IsConfig) and accessed via Protocol.IsTemplateKind(),
+// Protocol.IsRuleKind(), Protocol.IsConfigKind().
 
 // Artifact field names (for SetField, update, etc.).
 const (
@@ -78,3 +75,8 @@ const (
 	DirOutgoing = "outgoing"
 	DirIncoming = "incoming"
 )
+
+// statusWorkActive is used internally by parchment's seeding and rule machinery.
+// It is the default active status for infrastructure artifacts (rules, configs, templates).
+// Application-defined statuses are data in registry/kinds/*.yaml, not compiled constants.
+const statusWorkActive = "work.active" //nolint:unused // used in rule.go, seed.go

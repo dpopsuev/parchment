@@ -416,7 +416,13 @@ func (p *Protocol) Import(ctx context.Context, r io.Reader) (int, error) {
 // scoped config > global config > empty string.
 // Config artifacts use sections as key-value pairs (section name = key, text = value).
 func (p *Protocol) GetConfig(ctx context.Context, key, scope string) string {
-	kindStatusLabels := []string{LabelPrefixKind + KindConfig, "work.active"}
+	cfgKinds := p.configKindLabels()
+	if len(cfgKinds) == 0 {
+		return ""
+	}
+	kindStatusLabels := make([]string, 0, len(cfgKinds)+1)
+	kindStatusLabels = append(kindStatusLabels, cfgKinds...)
+	kindStatusLabels = append(kindStatusLabels, "work.active")
 	// 1. Try scoped config
 	if scope != "" {
 		scopedLabels := append(kindStatusLabels, LabelPrefixScope+scope) //nolint:gocritic // intentional append to new slice; kindStatusLabels is a local literal

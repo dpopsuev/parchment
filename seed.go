@@ -163,7 +163,7 @@ func parseTemplateFile(path string) (*Artifact, error) {
 	if err != nil {
 		return nil, err
 	}
-	art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, KindTemplate)
+	art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, "template")
 	art.Labels = setStatusLabel(art.Labels, "work.active")
 	if art.ID == "" {
 		base := strings.TrimSuffix(filepath.Base(path), ".md")
@@ -190,7 +190,7 @@ func parseConfigFile(path string) (*Artifact, error) {
 		scope = ""
 	}
 
-	labels := []string{LabelPrefixKind + KindConfig, "work.active"}
+	labels := []string{LabelPrefixKind + "config", statusWorkActive}
 	if scope != "" {
 		labels = append(labels, LabelPrefixScope+scope)
 	}

@@ -610,8 +610,8 @@ func (p *Protocol) inferScope(ctx context.Context, explicit, parentID, kind stri
 	if explicit != "" {
 		return explicit, nil
 	}
-	// Templates and config artifacts can be global (scopeless)
-	if kind == KindTemplate || kind == KindConfig {
+	// Template and config kinds can be global (scopeless)
+	if p.IsTemplateKind(kind) || p.IsConfigKind(kind) {
 		if parentID != "" {
 			if parent, err := p.store.Get(ctx, parentID); err == nil && labelValue(parent.Labels, LabelPrefixScope) != "" {
 				return labelValue(parent.Labels, LabelPrefixScope), nil

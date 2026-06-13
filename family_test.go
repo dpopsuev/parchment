@@ -38,8 +38,8 @@ func TestProtocol_KindsForFamily(t *testing.T) {
 		{"bug", "intent"},
 		{"note", "knowledge"},
 		{"source", "knowledge"},
-		{KindTemplate, "support"},
-		{KindConfig, "support"},
+		{"template", "support"},
+		{"config", "support"},
 	}
 	for _, tc := range cases {
 		kinds := p.KindsForFamily(tc.family)

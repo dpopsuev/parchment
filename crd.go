@@ -64,6 +64,9 @@ type ResourceSpec struct {
 	ActivationRequiresSections bool   `yaml:"activationRequiresSections,omitempty"`
 	RequiresImplementation     bool   `yaml:"requiresImplementation,omitempty"`
 	SkipEmptyCheck             bool   `yaml:"skipEmptyCheck,omitempty"`
+	IsTemplate                 bool   `yaml:"isTemplate,omitempty"`
+	IsRule                     bool   `yaml:"isRule,omitempty"`
+	IsConfig                   bool   `yaml:"isConfig,omitempty"`
 
 	// Kind structure — children handled via Relationship CRDs.
 	Relations *RelationsSpec `yaml:"relations,omitempty"`

@@ -54,6 +54,9 @@ type LabelTrait struct {
 	IsGoalKind                bool     `json:"is_goal_kind,omitempty"`
 	TrackInBrief              bool     `json:"track_in_brief,omitempty"`
 	ActivationRequiresSections bool    `json:"activation_requires_sections,omitempty"`
+	IsTemplate                 bool    `json:"is_template,omitempty"`   // artifacts of this kind auto-link to new artifacts via satisfies
+	IsRule                     bool    `json:"is_rule,omitempty"`       // artifacts of this kind are evaluated by the rules engine on status transitions
+	IsConfig                   bool    `json:"is_config,omitempty"`     // artifacts of this kind serve as key-value config stores (GetConfig)
 
 }
 

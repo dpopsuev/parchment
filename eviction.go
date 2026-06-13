@@ -115,30 +115,9 @@ func (v ValueTensor) Label() EvictionLabel {
 
 // ─── Tensor computation ───────────────────────────────────────────────────────
 
-// qualityByStatus maps lifecycle status strings to quality scores.
-var qualityByStatus = map[string]float64{
-	"note.evergreen":    1.0,
-	"retired":           0.8,
-	"note.mature":       0.7,
-	"decision.accepted": 0.7,
-	"work.complete":     0.6,
-	"work.active":       0.5,
-	"work.draft":        0.3,
-	"work.blocked":      0.3,
-	"note.fleeting":     0.2,
-	"archived":          0.1,
-	"cancelled":         0.1, //nolint:misspell // British spelling; changing the value would break stored status strings
-	"decision.rejected": 0.1,
-}
-
-// statusToQuality returns the quality score for a status string.
-// Unknown statuses return 0.5 (neutral).
-func statusToQuality(status string) float64 {
-	if q, ok := qualityByStatus[status]; ok {
-		return q
-	}
-	return 0.5
-}
+// Quality scores are now trait-driven via LabelTrait.EvictionQuality.
+// Protocol.EvictionQuality(status) is the entry point; ComputeTensor
+// accepts the pre-computed score so it stays a pure function.
 
 // halfLifeDays is the half-life for access heat decay (30 days).
 // Access heat halves every 30 days without a new access.
@@ -186,13 +165,14 @@ func structuralHeatFromCount(incomingEdges int) float64 {
 }
 
 // ComputeTensor computes a ValueTensor from an artifact's current state.
+// qualityScore: caller supplies this from Protocol.EvictionQuality(status).
 // incomingEdges: count of incoming graph edges for structural heat.
 // recencyWindowDays: days over which recency decays to near-zero (default 90).
-func ComputeTensor(art *Artifact, metrics ArtifactMetrics, incomingEdges, recencyWindowDays int) ValueTensor {
+func ComputeTensor(art *Artifact, metrics ArtifactMetrics, qualityScore float64, incomingEdges, recencyWindowDays int) ValueTensor {
 	return ValueTensor{
 		AccessHeat:     computeAccessHeat(metrics.AccessCount, metrics.LastAccessed),
 		StructuralHeat: structuralHeatFromCount(incomingEdges),
-		QualityScore:   statusToQuality(statusFromLabels(art.Labels)),
+		QualityScore:   qualityScore,
 		Recency:        computeRecency(art.UpdatedAt, recencyWindowDays),
 		ComputedAt:     time.Now().UTC(),
 	}
@@ -290,7 +270,8 @@ func (p *Protocol) DetectEvictionCandidates(ctx context.Context, policy Eviction
 			recencyWindow = trait.HalfLifeDays
 		}
 
-		tensor := ComputeTensor(art, metrics, len(edges), recencyWindow)
+		quality := p.EvictionQuality(statusFromLabels(art.Labels))
+		tensor := ComputeTensor(art, metrics, quality, len(edges), recencyWindow)
 		label := tensor.Label()
 
 		if label == EvictionLabelEvergreen || label == EvictionLabelActive {

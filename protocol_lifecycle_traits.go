@@ -6,6 +6,19 @@ import (
 	"strings"
 )
 
+// EvictionQuality returns the base quality score for a status (0.0–1.0).
+// Higher means more valuable, less likely to be evicted. Returns 0.5 (neutral)
+// for unknown statuses. Replaces the hardcoded qualityByStatus map.
+func (p *Protocol) EvictionQuality(status string) float64 {
+	if lt, ok := p.labelTraits[status]; ok && lt.EvictionQuality > 0 {
+		return lt.EvictionQuality
+	}
+	if lt, ok := p.labelTraits["status:"+status]; ok && lt.EvictionQuality > 0 {
+		return lt.EvictionQuality
+	}
+	return 0.5 // neutral default
+}
+
 // IsTerminal reports whether status is a terminal state.
 // Checks domain status traits (work.draft, note.evergreen, etc.) first,
 // then status:-prefixed system traits (status:retired).

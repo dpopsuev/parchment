@@ -237,7 +237,7 @@ func applyLabelDefinition(ctx context.Context, s Store, r *Resource) error {
 	id := resourceID(r.Metadata.Name)
 	art := &Artifact{
 		ID:         id,
-		Labels:     []string{LabelPrefixKind + KindLabelDefinition, "work.active", LabelPrefixScope + SchemaScope},
+		Labels:     []string{LabelPrefixKind + kindLabelDefinition, statusWorkActive, LabelPrefixScope + SchemaScope},
 		Title:      r.Metadata.Name,
 		Extra:      extra,
 		CreatedAt:  now,
@@ -278,7 +278,7 @@ func applyRelationship(ctx context.Context, s Store, r *Resource) error {
 	id := "REL-" + sanitized
 	art := &Artifact{
 		ID:         id,
-		Labels:     []string{LabelPrefixKind + KindRelationship, "work.active", LabelPrefixScope + SchemaScope},
+		Labels:     []string{LabelPrefixKind + kindRelationship, statusWorkActive, LabelPrefixScope + SchemaScope},
 		Title:      r.Metadata.Name,
 		Extra:      extra,
 		CreatedAt:  now,

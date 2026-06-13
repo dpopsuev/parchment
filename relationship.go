@@ -6,7 +6,7 @@ import (
 	"log/slog"
 )
 
-const KindRelationship = "relationship"
+const kindRelationship = "relationship"
 
 // RelationshipTrait carries behavioral constraints for a specific label→relation→label connection.
 type RelationshipTrait struct {
@@ -21,7 +21,7 @@ type RelationshipTrait struct {
 
 // loadRelationships reads relationship artifacts from _schema and returns a slice.
 func loadRelationships(ctx context.Context, s Store) []RelationshipTrait {
-	arts, err := s.List(ctx, Filter{Labels: []string{LabelPrefixKind + KindRelationship, LabelPrefixScope + SchemaScope}})
+	arts, err := s.List(ctx, Filter{Labels: []string{LabelPrefixKind + kindRelationship, LabelPrefixScope + SchemaScope}})
 	if err != nil {
 		slog.WarnContext(ctx, "load relationships: list failed", slog.Any(LogKeyError, err))
 		return nil

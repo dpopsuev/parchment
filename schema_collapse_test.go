@@ -17,8 +17,8 @@ func TestKindTrait_StoredAsLabelDefinition(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LDEF-kind:task not found: %v", err)
 	}
-	if parchment.LabelValue(art.Labels, parchment.LabelPrefixKind) != parchment.KindLabelDefinition {
-		t.Errorf("LDEF-kind:task Kind=%q, want %q", parchment.LabelValue(art.Labels, parchment.LabelPrefixKind), parchment.KindLabelDefinition)
+	if parchment.LabelValue(art.Labels, parchment.LabelPrefixKind) != "label_definition" {
+		t.Errorf("LDEF-kind:task Kind=%q, want %q", parchment.LabelValue(art.Labels, parchment.LabelPrefixKind), "label_definition")
 	}
 }
 

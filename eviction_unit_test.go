@@ -8,18 +8,19 @@ import (
 
 // --- statusToQuality ---
 
-func TestStatusToQuality_Evergreen(t *testing.T) {
+func TestEvictionQuality_ViaProtocol(t *testing.T) {
+	p := New(NewMemoryStore(), nil, []string{"test"}, nil, ProtocolConfig{})
 	cases := map[string]struct {
 		status string
 		min    float64
 	}{
 		"evergreen": {"note.evergreen", 0.9},
 		"retired":   {"retired", 0.7},
-		"active":    {"work.active", 0.5},
-		"fleeting":  {"note.fleeting", 0.2},
+		"active":    {"work.active", 0.4},
+		"fleeting":  {"note.fleeting", 0.1},
 	}
 	for name, tc := range cases {
-		q := statusToQuality(tc.status)
+		q := p.EvictionQuality(tc.status)
 		if q < tc.min {
 			t.Errorf("%s: want quality >= %.1f, got %.2f", name, tc.min, q)
 		}

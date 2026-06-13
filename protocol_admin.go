@@ -93,9 +93,6 @@ func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force boo
 		if !art.UpdatedAt.Before(cutoff) {
 			continue
 		}
-	if statusFromLabels(art.Labels) == "retired" {
-		continue
-	}
 		// Label trait protection overrides kind-level Vacuumable.
 		if ResolveTrait(p.labelTraits, art.Labels).EvictionPolicy == "protected" {
 			continue

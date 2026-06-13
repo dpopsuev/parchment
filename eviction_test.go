@@ -77,7 +77,7 @@ func TestComputeTensor_FleetingOrphan_LowScores(t *testing.T) {
 		AccessCount:  0,
 		LastAccessed: time.Time{},
 	}
-	v := parchment.ComputeTensor(art, metrics, 0, 90)
+	v := parchment.ComputeTensor(art, metrics, 0.2, 0, 90)
 
 	if v.AccessHeat > 0.1 {
 		t.Errorf("fleeting orphan: access_heat should be low, got %.2f", v.AccessHeat)
@@ -100,7 +100,7 @@ func TestComputeTensor_EvergreenWellLinked_HighScores(t *testing.T) {
 		AccessCount:  50,
 		LastAccessed: time.Now().Add(-1 * time.Hour),
 	}
-	v := parchment.ComputeTensor(art, metrics, 10, 90)
+	v := parchment.ComputeTensor(art, metrics, 1.0, 10, 90)
 
 	if v.QualityScore < 0.8 {
 		t.Errorf("evergreen: quality should be high, got %.2f", v.QualityScore)

@@ -231,7 +231,7 @@ func seedKindLabelTraitsFromRegistry(ctx context.Context, s Store) {
 		}
 		art := &Artifact{
 			ID:         "LDEF-kind:" + k.Name,
-			Labels:     []string{LabelPrefixKind + KindLabelDefinition, "work.active", LabelPrefixScope + SchemaScope},
+			Labels:     []string{LabelPrefixKind + kindLabelDefinition, statusWorkActive, LabelPrefixScope + SchemaScope},
 			Title:      "kind:" + k.Name,
 			Extra:      extra,
 			CreatedAt:  now,
@@ -271,7 +271,7 @@ func seedLabelsFromRegistry(ctx context.Context, s Store) {
 		_ = json.Unmarshal(b, &extra)
 		art := &Artifact{
 			ID:         id,
-			Labels:     []string{LabelPrefixKind + KindLabelDefinition, "work.active", LabelPrefixScope + SchemaScope},
+			Labels:     []string{LabelPrefixKind + kindLabelDefinition, statusWorkActive, LabelPrefixScope + SchemaScope},
 			Title:      l.Name,
 			Extra:      extra,
 			CreatedAt:  now,
@@ -415,7 +415,7 @@ func seedRelationshipsFromRegistry(ctx context.Context, s Store) {
 		}
 		art := &Artifact{
 			ID:         id,
-			Labels:     []string{LabelPrefixKind + KindRelationship, "work.active", LabelPrefixScope + SchemaScope},
+			Labels:     []string{LabelPrefixKind + kindRelationship, statusWorkActive, LabelPrefixScope + SchemaScope},
 			Title:      r.From + "-" + r.Relation + "-" + r.To,
 			Extra:      extra,
 			CreatedAt:  now,

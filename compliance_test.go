@@ -121,7 +121,7 @@ func protocolWithTrait(t *testing.T, label string, requiredSections ...string) (
 	import_ctx := t.Context()
 	store.Put(import_ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "LDEF-" + label,
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindLabelDefinition, "work.active", parchment.LabelPrefixScope + parchment.SchemaScope},
+		Labels: []string{parchment.LabelPrefixKind + "label_definition", "work.active", parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  label,
 		Extra:  map[string]any{"required_sections": requiredSections},
 	})

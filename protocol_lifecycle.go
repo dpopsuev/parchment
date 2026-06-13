@@ -348,7 +348,7 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 
 	// Soft warning: check if followed artifacts are incomplete
 	var followsWarnings []string
-	if status == "work.active" {
+	if status == p.ActiveStatus(labelValue(art.Labels, LabelPrefixKind)) && status != "" {
 		edges, _ := p.store.Neighbors(ctx, art.ID, RelFollows, Outgoing)
 		for _, e := range edges {
 			preceded, err := p.store.Get(ctx, e.To)

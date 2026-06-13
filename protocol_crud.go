@@ -235,7 +235,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	// draft is intentional "work in progress"; sections come later.
 	// When status defaults to draft, still warn so agents know what's missing.
 	if !skipGuards {
-		explicitDraft := statusFromLabels(in.Labels) == "work.draft"
+		explicitDraft := statusFromLabels(in.Labels) == p.DefaultStatus(labelValue(in.Labels, LabelPrefixKind))
 		if !explicitDraft {
 			if err := p.checkTemplateConformance(ctx, art, true); err != nil {
 				slog.WarnContext(ctx, "partial create: template sections missing",
@@ -802,8 +802,8 @@ func (p *Protocol) retireSingle(ctx context.Context, id string, cascade bool) er
 	if err != nil {
 		return err
 	}
-	if statusFromLabels(art.Labels) == "retired" {
-		return nil // idempotent
+	if p.IsTerminal(statusFromLabels(art.Labels)) {
+		return nil // idempotent — already in a terminal state
 	}
 	if p.IsReadonly(statusFromLabels(art.Labels)) {
 		return fmt.Errorf("%s is %s (readonly) — de-archive before retiring", id, statusFromLabels(art.Labels)) //nolint:err113 // domain error

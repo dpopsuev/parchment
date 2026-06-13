@@ -3,7 +3,6 @@ package parchment
 import (
 	"fmt"
 	"sort"
-	"strings"
 )
 
 // EvictionQuality returns the base quality score for a status (0.0–1.0).
@@ -198,36 +197,6 @@ func (p *Protocol) IsKnownKind(kind string) bool {
 	return ok
 }
 
-// BriefKindEntry carries the fields needed for Brief and Inventory displays.
-type BriefKindEntry struct {
-	ActiveStatus string
-	IsGoalKind   bool
-}
-
-// BriefKinds returns all kinds with TrackInBrief=true, keyed by kind name.
-func (p *Protocol) BriefKinds() map[string]BriefKindEntry {
-	out := make(map[string]BriefKindEntry)
-	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
-		lt := p.labelTraits[key]
-		if len(key) > 5 && key[:5] == "kind:" && lt.TrackInBrief {
-			out[key[5:]] = BriefKindEntry{ActiveStatus: lt.ActiveStatus, IsGoalKind: lt.IsGoalKind}
-		}
-	}
-	return out
-}
-
-// GoalKind returns the kind name and active status for the kind marked IsGoalKind.
-// Returns ("", "") if none is marked.
-func (p *Protocol) GoalKind() (kindName, activeStatus string) {
-	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
-		lt := p.labelTraits[key]
-		if len(key) > 5 && key[:5] == "kind:" && lt.IsGoalKind {
-			return key[5:], lt.ActiveStatus
-		}
-	}
-	return "", ""
-}
-
 // isEdgeAllowed reports whether any Relationship permits this source→relation→target edge.
 // Closed world: if no Relationship matches, the edge is denied.
 func (p *Protocol) isEdgeAllowed(sourceLabels []string, relation string, targetLabels []string) bool {
@@ -277,37 +246,6 @@ func (p *Protocol) maxParentsFor(labels []string) int {
 func (p *Protocol) ValidTransition(kind, from, to string) (string, bool) {
 	valid, reason := p.isValidTransition(kind, from, to)
 	return reason, valid
-}
-
-// Prefix returns the ID prefix for a kind (e.g. "TASK" for task).
-func (p *Protocol) Prefix(kind string) string {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok && lt.Prefix != "" {
-		return lt.Prefix
-	}
-	if len(kind) >= 3 {
-		return strings.ToUpper(kind[:3])
-	}
-	return strings.ToUpper(kind)
-}
-
-// KindCode returns the short code for a kind (e.g. "TSK" for task).
-func (p *Protocol) KindCode(kind string) string {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok && lt.Code != "" {
-		return lt.Code
-	}
-	upper := strings.ToUpper(kind)
-	if len(upper) >= 3 {
-		return upper[:3]
-	}
-	return upper
-}
-
-// RegisteredRelations returns the sorted schema relations list.
-func (p *Protocol) RegisteredRelations() []string {
-	out := make([]string, len(p.schema.Relations))
-	copy(out, p.schema.Relations)
-	sort.Strings(out)
-	return out
 }
 
 // Registry returns the ComponentRegistry for hot-reload of traits and rules.

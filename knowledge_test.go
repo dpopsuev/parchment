@@ -23,7 +23,7 @@ func TestKnowledgeSchema_HasKnowledgeKinds(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		if got := p.Prefix(tc.kind); got != tc.wantPrefix {
+		if got := p.labelTraits["kind:"+tc.kind].Prefix; got != tc.wantPrefix {
 			t.Errorf("kind %q: prefix = %q, want %q", tc.kind, got, tc.wantPrefix)
 		}
 		if got := p.DefaultStatus(tc.kind); got != tc.wantDefault {

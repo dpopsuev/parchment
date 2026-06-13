@@ -1191,24 +1191,7 @@ func TestWouldCycle_TransitiveCycle(t *testing.T) {
 
 // --- Cascade ---
 
-func TestCascade_FollowsDependsOn(t *testing.T) {
-	t.Parallel()
-	proto, _ := newProto(t)
-	ctx := context.Background()
 
-	a := createTask(t, proto, "changed task")
-	b := createTask(t, proto, "depends on A")
-	c := createTask(t, proto, "depends on B")
-
-	proto.LinkArtifacts(ctx, b.ID, "depends_on", []string{a.ID}, 0)
-	proto.LinkArtifacts(ctx, c.ID, "depends_on", []string{b.ID}, 0)
-
-	affected := proto.Cascade(ctx, a.ID)
-	// b and c depend on a (transitively)
-	if len(affected) != 2 {
-		t.Errorf("expected 2 affected, got %d: %v", len(affected), affected)
-	}
-}
 
 // --- GetArtifactEdges ---
 

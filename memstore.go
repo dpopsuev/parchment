@@ -2,10 +2,7 @@ package parchment
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -456,84 +453,6 @@ func (m *MemoryStore) ListScopeInfo(_ context.Context) ([]ScopeInfo, error) {
 }
 
 func (m *MemoryStore) Close() error { return nil }
-
-// --- Atomic JSON Persistence ---
-
-type memState struct {
-	Artifacts   []*Artifact         `json:"artifacts"`
-	Edges       []Edge              `json:"edges"`
-	ScopeLabels map[string][]string `json:"scope_labels,omitempty"`
-}
-
-// Save writes the store to disk as atomic JSON (tempfile + rename).
-func (m *MemoryStore) Save(path string) error {
-	m.mu.RLock()
-	arts := make([]*Artifact, 0, len(m.artifacts))
-	for _, a := range m.artifacts {
-		c := *a
-		arts = append(arts, &c)
-	}
-	edges := make([]Edge, 0, len(m.edges))
-	for _, e := range m.edges {
-		edges = append(edges, e)
-	}
-	state := memState{
-		Artifacts:   arts,
-		Edges:       edges,
-		ScopeLabels: m.scopeLabels,
-	}
-	m.mu.RUnlock()
-
-	raw, err := json.MarshalIndent(state, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal: %w", err)
-	}
-
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // store dir; 0755 is intentional for user readability
-		return fmt.Errorf("mkdir: %w", err)
-	}
-
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
-		return fmt.Errorf("write tmp: %w", err)
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp) //nolint:gosec // G104: best-effort cleanup of temp file after failed rename
-		return fmt.Errorf("rename: %w", err)
-	}
-	return nil
-}
-
-// Load reads store data from a JSON file, replacing current state.
-func (m *MemoryStore) Load(path string) error {
-	data, err := os.ReadFile(path) //nolint:gosec // path from controlled config
-	if err != nil {
-		return fmt.Errorf("read: %w", err)
-	}
-
-	var state memState
-	if err := json.Unmarshal(data, &state); err != nil {
-		return fmt.Errorf("unmarshal: %w", err)
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.artifacts = make(map[string]*Artifact, len(state.Artifacts))
-	for _, a := range state.Artifacts {
-		m.artifacts[a.ID] = a
-	}
-	m.edges = make(map[string]Edge, len(state.Edges))
-	for _, e := range state.Edges {
-		m.edges[edgeKey(e.From, e.Relation, e.To)] = e
-	}
-	m.scopeLabels = state.ScopeLabels
-	if m.scopeLabels == nil {
-		m.scopeLabels = make(map[string][]string)
-	}
-	return nil
-}
 
 // --- Embedding store ---
 

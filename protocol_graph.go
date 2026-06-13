@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sort"
 	"strings"
 
 	"github.com/dominikbraun/graph"
@@ -70,31 +69,6 @@ func (p *Protocol) wouldCycle(ctx context.Context, relation, from, to string) (b
 		return true, append([]string{from}, path...)
 	}
 	return false, nil
-}
-
-// Cascade finds all artifacts transitively affected by a change to changedID
-// by following incoming depends_on edges. Returns IDs of affected artifacts,
-// excluding changedID itself.
-func (p *Protocol) Cascade(ctx context.Context, changedID string) []string {
-	affected := make(map[string]bool)
-	p.cascadeDeps(ctx, changedID, affected)
-	ids := make([]string, 0, len(affected))
-	for id := range affected {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	return ids
-}
-
-func (p *Protocol) cascadeDeps(ctx context.Context, changedID string, affected map[string]bool) {
-	_ = p.store.Walk(ctx, changedID, RelDependsOn, Incoming, 0, func(_ int, e Edge) bool {
-		depID := e.From
-		if !affected[depID] {
-			affected[depID] = true
-			p.cascadeDeps(ctx, depID, affected)
-		}
-		return true
-	})
 }
 
 func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string, targetIDs []string, weight float64) ([]Result, error) { //nolint:gocyclo,cyclop // link has many validation branches; splitting would increase call depth
@@ -167,7 +141,7 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 		for _, tpl := range targets {
 			if !p.IsTemplateKind(labelValue(tpl.Labels, LabelPrefixKind)) {
 				slog.WarnContext(ctx, "satisfies link target is not a template", slog.String("source_id", sourceID), slog.String("target_id", tpl.ID), slog.String("target_kind", labelValue(tpl.Labels, LabelPrefixKind))) //nolint:sloglint // source_id/target_id/target_kind have no LogKey constants
-				return nil, fmt.Errorf("satisfies target %s is not a template (kind=%s)", tpl.ID, labelValue(tpl.Labels, LabelPrefixKind)) //nolint:err113 // sentinel; no caller uses errors.Is on this
+				return nil, fmt.Errorf("satisfies target %s is not a template (kind=%s)", tpl.ID, labelValue(tpl.Labels, LabelPrefixKind))                                                                                  //nolint:err113 // sentinel; no caller uses errors.Is on this
 			}
 			if existing[tpl.ID] {
 				continue
@@ -430,25 +404,6 @@ type EdgeSummary struct {
 		Labels []string `json:"labels,omitempty"`
 		Title  string   `json:"title"`
 	} `json:"target"`
-}
-
-// Backlinks returns all artifacts that have an outgoing edge pointing TO id
-// via the given relation. Pass relation="" to return all incoming edges
-// regardless of type. This is the inverse of LinkArtifacts.
-func (p *Protocol) Backlinks(ctx context.Context, id, relation string) ([]*Artifact, error) {
-	edges, err := p.store.Neighbors(ctx, id, relation, Incoming)
-	if err != nil {
-		return nil, err
-	}
-	arts := make([]*Artifact, 0, len(edges))
-	for _, e := range edges {
-		art, err := p.store.Get(ctx, e.From)
-		if err != nil {
-			continue
-		}
-		arts = append(arts, art)
-	}
-	return arts, nil
 }
 
 func (p *Protocol) GetArtifactEdges(ctx context.Context, id string) ([]EdgeSummary, error) {

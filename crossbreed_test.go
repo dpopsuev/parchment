@@ -42,42 +42,7 @@ func TestArtifact_Annotations_RoundTrip(t *testing.T) {
 
 // --- Cascade tests ---
 
-func TestCascade_DependencyEdges(t *testing.T) {
-	t.Parallel()
-	path := t.TempDir() + "/cascade.db"
-	s, err := OpenSQLite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.Close()
-	p := New(s, DefaultSchema(), []string{"test"}, nil, ProtocolConfig{})
-	ctx := context.Background()
 
-	// A → B → C (depends_on chain)
-	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Sections: []Section{{Name: "context", Text: "a"}},
-		Labels: []string{"kind:task", "priority:medium"},})
-	b, _ := p.CreateArtifact(ctx, CreateInput{Title: "B", DependsOn: []string{a.ID}, Sections: []Section{{Name: "context", Text: "b"}},
-		Labels: []string{"kind:task", "priority:medium"},})
-	c, _ := p.CreateArtifact(ctx, CreateInput{Title: "C", DependsOn: []string{b.ID}, Sections: []Section{{Name: "context", Text: "c"}},
-		Labels: []string{"kind:task", "priority:medium"},})
-
-	affected := p.Cascade(ctx, a.ID)
-	if len(affected) == 0 {
-		t.Fatal("expected cascade to affect B and C")
-	}
-
-	// Both B and C should be affected
-	affectedSet := make(map[string]bool)
-	for _, id := range affected {
-		affectedSet[id] = true
-	}
-	if !affectedSet[b.ID] {
-		t.Errorf("B should be affected by cascade from A")
-	}
-	if !affectedSet[c.ID] {
-		t.Errorf("C should be affected by cascade from A")
-	}
-}
 
 
 

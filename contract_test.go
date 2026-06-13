@@ -314,40 +314,4 @@ func TestSQLiteStore_ListDoesNotSilentlyDropRows(t *testing.T) {
 }
 
 // TestMemoryStore_SaveLoad verifies atomic JSON persistence round-trip.
-func TestMemoryStore_SaveLoad(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	m := NewMemoryStore()
 
-	m.Put(ctx, &Artifact{ID: "SL-1", Labels: []string{"kind:task", "status:draft"}, Title: "persist me"}) //nolint:errcheck // test seeding
-	m.AddEdge(ctx, Edge{From: "SL-1", To: "SL-2", Relation: RelDependsOn})                               //nolint:errcheck // test seeding
-	m.SetScopeLabels(ctx, "test", []string{"backend"})                                                    //nolint:errcheck // test seeding
-
-	path := t.TempDir() + "/store.json"
-	if err := m.Save(path); err != nil {
-		t.Fatal(err)
-	}
-
-	loaded := NewMemoryStore()
-	if err := loaded.Load(path); err != nil {
-		t.Fatal(err)
-	}
-
-	got, err := loaded.Get(ctx, "SL-1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Title != "persist me" {
-		t.Errorf("title = %q, want %q", got.Title, "persist me")
-	}
-
-	edges, _ := loaded.Neighbors(ctx, "SL-1", RelDependsOn, Outgoing)
-	if len(edges) != 1 {
-		t.Errorf("expected 1 edge, got %d", len(edges))
-	}
-
-	labels, _ := loaded.GetScopeLabels(ctx, "test")
-	if len(labels) != 1 || labels[0] != "backend" {
-		t.Errorf("scope labels = %v, want [backend]", labels)
-	}
-}

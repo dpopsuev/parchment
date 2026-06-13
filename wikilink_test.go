@@ -94,15 +94,15 @@ func TestBacklinks(t *testing.T) {
 	_, _ = p.LinkArtifacts(ctx, b.ID, RelJustifies, []string{a.ID}, 0)
 	_, _ = p.LinkArtifacts(ctx, c.ID, RelJustifies, []string{a.ID}, 0)
 
-	backlinks, err := p.Backlinks(ctx, a.ID, RelJustifies)
+	edges, err := p.store.Neighbors(ctx, a.ID, RelJustifies, Incoming)
 	if err != nil {
-		t.Fatalf("Backlinks: %v", err)
+		t.Fatalf("Neighbors: %v", err)
 	}
-	if len(backlinks) != 2 {
-		t.Fatalf("got %d backlinks, want 2", len(backlinks))
+	if len(edges) != 2 {
+		t.Fatalf("got %d backlinks, want 2", len(edges))
 	}
 
-	ids := map[string]bool{backlinks[0].ID: true, backlinks[1].ID: true}
+	ids := map[string]bool{edges[0].From: true, edges[1].From: true}
 	if !ids[b.ID] || !ids[c.ID] {
 		t.Errorf("unexpected backlinks: %v", ids)
 	}

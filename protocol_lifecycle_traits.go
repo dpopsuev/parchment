@@ -9,11 +9,11 @@ import (
 // Higher means more valuable, less likely to be evicted. Returns 0.5 (neutral)
 // for unknown statuses. Replaces the hardcoded qualityByStatus map.
 func (p *Protocol) EvictionQuality(status string) float64 {
-	if lt, ok := p.labelTraits[status]; ok && lt.EvictionQuality > 0 {
-		return lt.EvictionQuality
+	if trait, ok := p.labelTraits[status]; ok && trait.EvictionQuality > 0 {
+		return trait.EvictionQuality
 	}
-	if lt, ok := p.labelTraits["status:"+status]; ok && lt.EvictionQuality > 0 {
-		return lt.EvictionQuality
+	if trait, ok := p.labelTraits["status:"+status]; ok && trait.EvictionQuality > 0 {
+		return trait.EvictionQuality
 	}
 	return 0.5 // neutral default
 }
@@ -22,11 +22,11 @@ func (p *Protocol) EvictionQuality(status string) float64 {
 // Checks domain status traits (work.draft, note.evergreen, etc.) first,
 // then status:-prefixed system traits (status:retired).
 func (p *Protocol) IsTerminal(status string) bool {
-	if lt, ok := p.labelTraits[status]; ok {
-		return lt.Terminal
+	if trait, ok := p.labelTraits[status]; ok {
+		return trait.Terminal
 	}
-	if lt, ok := p.labelTraits["status:"+status]; ok {
-		return lt.Terminal
+	if trait, ok := p.labelTraits["status:"+status]; ok {
+		return trait.Terminal
 	}
 	return false
 }
@@ -34,19 +34,19 @@ func (p *Protocol) IsTerminal(status string) bool {
 // IsReadonly reports whether status prohibits mutation.
 // Checks domain status traits first, then status:-prefixed system traits.
 func (p *Protocol) IsReadonly(status string) bool {
-	if lt, ok := p.labelTraits[status]; ok {
-		return lt.Readonly
+	if trait, ok := p.labelTraits[status]; ok {
+		return trait.Readonly
 	}
-	if lt, ok := p.labelTraits["status:"+status]; ok {
-		return lt.Readonly
+	if trait, ok := p.labelTraits["status:"+status]; ok {
+		return trait.Readonly
 	}
 	return false
 }
 
 // DefaultStatus returns the default status for a kind.
 func (p *Protocol) DefaultStatus(kind string) string {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok && lt.DefaultStatus != "" {
-		return lt.DefaultStatus
+	if trait, ok := p.labelTraits["kind:"+kind]; ok && trait.DefaultStatus != "" {
+		return trait.DefaultStatus
 	}
 	return ""
 }
@@ -63,8 +63,8 @@ func (p *Protocol) ValidChild(parentKind, childKind string) (string, bool) {
 
 // MustSections returns sections required at creation time for the kind.
 func (p *Protocol) MustSections(kind string) []string {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok {
-		return lt.MustSections
+	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+		return trait.MustSections
 	}
 	return nil
 }
@@ -84,8 +84,8 @@ func (p *Protocol) KindsForFamily(family string) []string {
 // IsContainerKind reports whether kind is a container (goal, campaign).
 // Consults label traits only — no schema fallback (new flag).
 func (p *Protocol) IsContainerKind(kind string) bool {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok {
-		return lt.IsContainerKind
+	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+		return trait.IsContainerKind
 	}
 	return false
 }
@@ -93,8 +93,8 @@ func (p *Protocol) IsContainerKind(kind string) bool {
 // RequiresImplementation reports whether kind needs an incoming implements link.
 // Consults label traits only — no schema fallback (new flag).
 func (p *Protocol) RequiresImplementation(kind string) bool {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok {
-		return lt.RequiresImplementation
+	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+		return trait.RequiresImplementation
 	}
 	return false
 }
@@ -102,16 +102,16 @@ func (p *Protocol) RequiresImplementation(kind string) bool {
 // SkipEmptyCheck reports whether kind is exempt from the empty-artifact check.
 // Consults label traits only — no schema fallback (new flag).
 func (p *Protocol) SkipEmptyCheck(kind string) bool {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok {
-		return lt.SkipEmptyCheck
+	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+		return trait.SkipEmptyCheck
 	}
 	return false
 }
 
 // IsProtected reports whether the kind is protected from deletion.
 func (p *Protocol) IsProtected(kind string) bool {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok {
-		return lt.Protected
+	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+		return trait.Protected
 	}
 	return false
 }
@@ -119,8 +119,8 @@ func (p *Protocol) IsProtected(kind string) bool {
 // IsTemplatekind reports whether artifacts of this kind serve as templates
 // that are auto-linked to new artifacts of matching kinds via satisfies edges.
 func (p *Protocol) IsTemplateKind(kind string) bool {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok {
-		return lt.IsTemplate
+	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+		return trait.IsTemplate
 	}
 	return false
 }
@@ -128,8 +128,8 @@ func (p *Protocol) IsTemplateKind(kind string) bool {
 // IsRuleKind reports whether artifacts of this kind are evaluated by the
 // rules engine during status transitions.
 func (p *Protocol) IsRuleKind(kind string) bool {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok {
-		return lt.IsRule
+	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+		return trait.IsRule
 	}
 	return false
 }
@@ -137,56 +137,56 @@ func (p *Protocol) IsRuleKind(kind string) bool {
 // IsConfigKind reports whether artifacts of this kind serve as key-value
 // configuration stores queryable via GetConfig.
 func (p *Protocol) IsConfigKind(kind string) bool {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok {
-		return lt.IsConfig
+	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+		return trait.IsConfig
 	}
 	return false
 }
 
 // SkipGuards reports whether transition guards are bypassed for this kind.
 func (p *Protocol) SkipGuards(kind string) bool {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok {
-		return lt.SkipGuards
+	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+		return trait.SkipGuards
 	}
 	return false
 }
 
 // IsGoalKind reports whether the kind serves as the current-goal container.
 func (p *Protocol) IsGoalKind(kind string) bool {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok {
-		return lt.IsGoalKind
+	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+		return trait.IsGoalKind
 	}
 	return false
 }
 
 // TrackInBrief reports whether artifacts of this kind appear in brief summaries.
 func (p *Protocol) TrackInBrief(kind string) bool {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok {
-		return lt.TrackInBrief
+	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+		return trait.TrackInBrief
 	}
 	return false
 }
 
 // ActiveStatus returns the "in-flight" status label for a kind (e.g. "work.active").
 func (p *Protocol) ActiveStatus(kind string) string {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok {
-		return lt.ActiveStatus
+	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+		return trait.ActiveStatus
 	}
 	return ""
 }
 
 // ActivationRequiresSections reports whether the kind requires sections before activating.
 func (p *Protocol) ActivationRequiresSections(kind string) bool {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok {
-		return lt.ActivationRequiresSections
+	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+		return trait.ActivationRequiresSections
 	}
 	return false
 }
 
 // ShouldSections returns sections recommended for the kind.
 func (p *Protocol) ShouldSections(kind string) []string {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok {
-		return lt.ShouldSections
+	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+		return trait.ShouldSections
 	}
 	return nil
 }
@@ -256,8 +256,8 @@ func (p *Protocol) Registry() *ComponentRegistry { return p.registry }
 func (p *Protocol) templateKindLabels() []string {
 	var labels []string
 	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
-		lt := p.labelTraits[key]
-		if len(key) > 5 && key[:5] == "kind:" && lt.IsTemplate {
+		trait := p.labelTraits[key]
+		if len(key) > 5 && key[:5] == "kind:" && trait.IsTemplate {
 			labels = append(labels, key)
 		}
 	}
@@ -268,8 +268,8 @@ func (p *Protocol) templateKindLabels() []string {
 func (p *Protocol) ruleKindLabels() []string {
 	var labels []string
 	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
-		lt := p.labelTraits[key]
-		if len(key) > 5 && key[:5] == "kind:" && lt.IsRule {
+		trait := p.labelTraits[key]
+		if len(key) > 5 && key[:5] == "kind:" && trait.IsRule {
 			labels = append(labels, key)
 		}
 	}
@@ -280,8 +280,8 @@ func (p *Protocol) ruleKindLabels() []string {
 func (p *Protocol) configKindLabels() []string {
 	var labels []string
 	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
-		lt := p.labelTraits[key]
-		if len(key) > 5 && key[:5] == "kind:" && lt.IsConfig {
+		trait := p.labelTraits[key]
+		if len(key) > 5 && key[:5] == "kind:" && trait.IsConfig {
 			labels = append(labels, key)
 		}
 	}

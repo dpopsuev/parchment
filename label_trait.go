@@ -190,49 +190,49 @@ func ResolveTrait(traits map[string]LabelTrait, labels []string) LabelTrait {
 	expanded := ExpandLabels(labels)
 	var merged LabelTrait
 	for _, label := range expanded {
-		lt, ok := traits[label]
+		trait, ok := traits[label]
 		if !ok {
 			continue
 		}
-		merged.EvictionPolicy = mergeEvictionPolicy(merged.EvictionPolicy, lt.EvictionPolicy)
-		if lt.HalfLifeDays > merged.HalfLifeDays {
-			merged.HalfLifeDays = lt.HalfLifeDays
+		merged.EvictionPolicy = mergeEvictionPolicy(merged.EvictionPolicy, trait.EvictionPolicy)
+		if trait.HalfLifeDays > merged.HalfLifeDays {
+			merged.HalfLifeDays = trait.HalfLifeDays
 		}
-		if lt.World != "" && merged.World == "" {
-			merged.World = lt.World
+		if trait.World != "" && merged.World == "" {
+			merged.World = trait.World
 		}
-		merged.RequiredSections = unionStrings(merged.RequiredSections, lt.RequiredSections)
-		if lt.AlwaysApply {
+		merged.RequiredSections = unionStrings(merged.RequiredSections, trait.RequiredSections)
+		if trait.AlwaysApply {
 			merged.AlwaysApply = true
 		}
-		if lt.Terminal {
+		if trait.Terminal {
 			merged.Terminal = true
 		}
-		if lt.Readonly {
+		if trait.Readonly {
 			merged.Readonly = true
 		}
-		if lt.IsContainerKind {
+		if trait.IsContainerKind {
 			merged.IsContainerKind = true
 		}
-		if lt.RequiresImplementation {
+		if trait.RequiresImplementation {
 			merged.RequiresImplementation = true
 		}
-		if lt.SkipEmptyCheck {
+		if trait.SkipEmptyCheck {
 			merged.SkipEmptyCheck = true
 		}
 
-		if lt.DefaultStatus != "" && merged.DefaultStatus == "" {
-			merged.DefaultStatus = lt.DefaultStatus
+		if trait.DefaultStatus != "" && merged.DefaultStatus == "" {
+			merged.DefaultStatus = trait.DefaultStatus
 		}
-		if lt.ActiveStatus != "" && merged.ActiveStatus == "" {
-			merged.ActiveStatus = lt.ActiveStatus
+		if trait.ActiveStatus != "" && merged.ActiveStatus == "" {
+			merged.ActiveStatus = trait.ActiveStatus
 		}
-		if lt.Family != "" && merged.Family == "" {
-			merged.Family = lt.Family
+		if trait.Family != "" && merged.Family == "" {
+			merged.Family = trait.Family
 		}
-		merged.Transitions = unionStrings(merged.Transitions, lt.Transitions)
-		merged.MustSections = unionStrings(merged.MustSections, lt.MustSections)
-		merged.Properties = unionStrings(merged.Properties, lt.Properties)
+		merged.Transitions = unionStrings(merged.Transitions, trait.Transitions)
+		merged.MustSections = unionStrings(merged.MustSections, trait.MustSections)
+		merged.Properties = unionStrings(merged.Properties, trait.Properties)
 	}
 	return merged
 }
@@ -405,9 +405,9 @@ func extraToLabelTrait(extra map[string]any) (LabelTrait, error) {
 	if err != nil {
 		return LabelTrait{}, err
 	}
-	var lt LabelTrait
-	err = json.Unmarshal(b, &lt)
-	return lt, err
+	var trait LabelTrait
+	err = json.Unmarshal(b, &trait)
+	return trait, err
 }
 
 

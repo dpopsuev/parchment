@@ -270,12 +270,12 @@ func (p *Protocol) setStatus(ctx context.Context, art *Artifact, status string) 
 
 
 func (p *Protocol) isValidTransition(kind, from, to string) (valid bool, reason string) {
-	lt, ok := p.labelTraits["kind:"+kind]
-	if !ok || len(lt.Transitions) == 0 {
+	trait, ok := p.labelTraits["kind:"+kind]
+	if !ok || len(trait.Transitions) == 0 {
 		// Unknown kind or no transitions declared — open state machine.
 		return true, ""
 	}
-	for _, t := range lt.Transitions {
+	for _, t := range trait.Transitions {
 		parts := strings.SplitN(t, "→", 2)
 		if len(parts) == 2 && parts[0] == from && parts[1] == to {
 			return true, ""
@@ -285,9 +285,9 @@ func (p *Protocol) isValidTransition(kind, from, to string) (valid bool, reason 
 }
 
 func (p *Protocol) validNextStatuses(kind, from string) []string {
-	lt := p.labelTraits["kind:"+kind]
+	trait := p.labelTraits["kind:"+kind]
 	var next []string
-	for _, t := range lt.Transitions {
+	for _, t := range trait.Transitions {
 		parts := strings.SplitN(t, "→", 2)
 		if len(parts) == 2 && parts[0] == from {
 			next = append(next, parts[1])

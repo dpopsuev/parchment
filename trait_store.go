@@ -12,11 +12,11 @@ func NewTraitStore() *TraitStore {
 	}
 }
 
-func (ts *TraitStore) PutLabel(slug string, lt LabelTrait) { ts.labels[slug] = lt } //nolint:gocritic // hugeParam: LabelTrait; pointer would break callers across the codebase
+func (ts *TraitStore) PutLabel(slug string, trait LabelTrait) { ts.labels[slug] = trait } //nolint:gocritic // hugeParam: LabelTrait; pointer would break callers across the codebase
 
 func (ts *TraitStore) GetLabel(slug string) (LabelTrait, bool) {
-	lt, ok := ts.labels[slug]
-	return lt, ok
+	trait, ok := ts.labels[slug]
+	return trait, ok
 }
 
 // LabelMap returns the raw label map. Callers must not mutate the returned map.

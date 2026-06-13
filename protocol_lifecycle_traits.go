@@ -194,6 +194,42 @@ func (p *Protocol) ShouldSections(kind string) []string {
 	return nil
 }
 
+// RegisteredRelations returns all relations registered in the schema, sorted.
+func (p *Protocol) RegisteredRelations() []string {
+	out := make([]string, len(p.schema.Relations))
+	copy(out, p.schema.Relations)
+	sort.Strings(out)
+	return out
+}
+
+// AllStatuses returns all registered lifecycle status labels, sorted.
+// Status labels are identified by containing a dot (work.active, note.fleeting)
+// or having the status: prefix (status:retired). All other labelTrait keys
+// are metadata labels (kind:, code:, always, rule, etc.).
+func (p *Protocol) AllStatuses() []string {
+	var statuses []string
+	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
+		if strings.Contains(key, ".") || strings.HasPrefix(key, "status:") {
+			statuses = append(statuses, key)
+		}
+	}
+	sort.Strings(statuses)
+	return statuses
+}
+
+// AllKinds returns all registered kind names, sorted.
+// Drawn from labelTraits — reflects whatever is seeded in the store.
+func (p *Protocol) AllKinds() []string {
+	var kinds []string
+	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
+		if len(key) > 5 && key[:5] == "kind:" {
+			kinds = append(kinds, key[5:])
+		}
+	}
+	sort.Strings(kinds)
+	return kinds
+}
+
 // IsKnownKind reports whether kind has a registered label trait.
 func (p *Protocol) IsKnownKind(kind string) bool {
 	_, ok := p.labelTraits["kind:"+kind]

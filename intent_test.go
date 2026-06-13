@@ -66,7 +66,7 @@ func TestIntentLifecycle_AcceptedIsReadonly(t *testing.T) {
 func TestIntentLifecycle_DraftToProposed(t *testing.T) {
 	p := New(NewMemoryStore(), nil, []string{"test"}, nil, ProtocolConfig{})
 
-	for _, kind := range []string{"need", KindSpec, KindBug, "decision"} {
+	for _, kind := range []string{"need", "spec", "bug", "decision"} {
 		if reason, ok := p.ValidTransition(kind, "work.draft", "decision.proposed"); !ok {
 			t.Errorf("%s: work.draft→decision.proposed blocked: %s", kind, reason)
 		}

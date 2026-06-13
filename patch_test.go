@@ -17,7 +17,7 @@ func TestPatchArtifact_AppendAnnotations_MemStore(t *testing.T) {
 	ctx := context.Background()
 
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "patch test",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 
 	if err := proto.PatchArtifact(ctx, art.ID, parchment.ArtifactPatch{
 		AppendAnnotations: []parchment.Annotation{{Kind: "+", Comment: "trace-1"}},
@@ -41,7 +41,7 @@ func TestPatchArtifact_AppendAnnotations_Concurrent(t *testing.T) {
 	ctx := context.Background()
 
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "concurrent patch",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 
 	if err := proto.PatchArtifact(ctx, art.ID, parchment.ArtifactPatch{
 		AppendAnnotations: []parchment.Annotation{{Kind: "+", Comment: "trace-a"}},
@@ -71,7 +71,7 @@ func TestPatchArtifact_AppendSections_MergeByName(t *testing.T) {
 
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "section patch",
 		Sections: []parchment.Section{{Name: "notes", Text: "original"}},
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 
 	if err := proto.PatchArtifact(ctx, art.ID, parchment.ArtifactPatch{
 		AppendSections: []parchment.Section{{Name: "notes", Text: "updated"}},
@@ -112,7 +112,7 @@ func TestPatchArtifact_SQLite_AppendAnnotations(t *testing.T) {
 	ctx := context.Background()
 
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "sqlite patch",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 
 	_ = proto.PatchArtifact(ctx, art.ID, parchment.ArtifactPatch{
 		AppendAnnotations: []parchment.Annotation{{Kind: "+", Comment: "v1"}},

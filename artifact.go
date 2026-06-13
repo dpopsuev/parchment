@@ -47,11 +47,14 @@ type Section struct {
 // edges). Code-mapping and stigmergy paths set Weight to coupling strength,
 // fan-in score, or traversal frequency.
 type Edge struct {
-	From     string  `json:"from"`
-	To       string  `json:"to"`
-	Relation string  `json:"relation"`
-	Weight   float64 `json:"weight,omitempty"`
+	From     string   `json:"from"`
+	To       string   `json:"to"`
+	Relation string   `json:"relation"`
+	Weight   float64  `json:"weight,omitempty"`
+	Sources  []string `json:"sources,omitempty"` // who declared this edge; empty = manual
 }
+
+
 
 // Well-known edge relations — work tracking.
 const (

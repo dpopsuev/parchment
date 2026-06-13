@@ -16,35 +16,14 @@ var (
 // explicitly filters scope=SchemaScope.
 const SchemaScope = "_schema"
 
-// Artifact kinds — work tracking.
+// Infrastructure kind identifiers — used by parchment's own machinery.
+// Domain kinds (task, note, goal, etc.) are data defined in registry/kinds/*.yaml,
+// not compiled constants. Callers use string literals or the YAML-seeded LabelTrait.
 const (
-	KindTask     = "task"
-	KindSpec     = "spec"
-	KindBug      = "bug"
-	KindGoal     = "goal"
-	KindCampaign = "campaign"
-	KindTemplate = "template"
-	KindDecision = "decision"
-	KindConfig   = "config"
+	KindTemplate        = "template"         // auto-linked to artifacts on creation
+	KindConfig          = "config"           // scope-level configuration store
+	KindRule            = "rule"             // lifecycle rule evaluated on status transition
 )
-
-
-
-// Artifact kinds — knowledge layer.
-// These extend the work kinds via KnowledgeSchema().
-const (
-	KindNote    = "note"    // core knowledge unit; fleeting → evergreen lifecycle
-	KindJournal = "journal" // daily dated entry (Obsidian: daily note)
-	KindSource  = "source"  // ingested external material: URL, book, article
-	KindConcept = "concept" // atomic definition or idea (Zettelkasten: Zettel)
-	KindContext = "context" // agent's persistent memory about a person or workflow
-)
-
-// KindRule is a schema-level artifact that encodes a lifecycle rule.
-// Rule artifacts live in SchemaScope and are evaluated by the RuleEvaluator
-// during status transitions. They replace compiled-in Go transitionGuards.
-// Sections: trigger (event type), when (predicate), action (block|warn|allow), message.
-const KindRule = "rule"
 
 // Artifact field names (for SetField, update, etc.).
 const (

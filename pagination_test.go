@@ -20,7 +20,7 @@ func TestProtocol_ListPage_PaginatesCorrectly(t *testing.T) {
 	for i := range 5 {
 		_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "artifact",
 			Goal: string(rune('a' + i)), // distinct enough to create,
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 		if err != nil {
 			t.Fatalf("create %d: %v", i, err)
 		}
@@ -75,7 +75,7 @@ func TestProtocol_ListPage_ZeroLimitReturnsAll(t *testing.T) {
 		proto.CreateArtifact(ctx, parchment.CreateInput{ //nolint:errcheck // test setup
 			Title:  "item",
 
-			Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},
+			Labels: []string{parchment.LabelPrefixKind + "task"},
 		})
 	}
 
@@ -101,11 +101,11 @@ func TestProtocol_ListPage_TitleContains_Filters(t *testing.T) {
 	ctx := context.Background()
 
 	proto.CreateArtifact(ctx, parchment.CreateInput{Title: "fix authentication bug",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})     //nolint:errcheck // test setup
+		Labels: []string{parchment.LabelPrefixKind + "task"},})     //nolint:errcheck // test setup
 	proto.CreateArtifact(ctx, parchment.CreateInput{Title: "implement caching layer",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},}) //nolint:errcheck // test setup
+		Labels: []string{parchment.LabelPrefixKind + "task"},}) //nolint:errcheck // test setup
 	proto.CreateArtifact(ctx, parchment.CreateInput{Title: "auth token refresh",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})      //nolint:errcheck // test setup
+		Labels: []string{parchment.LabelPrefixKind + "task"},})      //nolint:errcheck // test setup
 
 	page, err := proto.ListPage(ctx, parchment.ListInput{TitleContains: "auth"})
 	if err != nil {
@@ -140,7 +140,7 @@ func TestProtocol_ListPage_SQLite_Paginates(t *testing.T) {
 		proto.CreateArtifact(ctx, parchment.CreateInput{ //nolint:errcheck // test setup
 			Title:  "item",
 
-			Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},
+			Labels: []string{parchment.LabelPrefixKind + "task"},
 		})
 	}
 

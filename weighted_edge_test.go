@@ -17,9 +17,9 @@ func TestLinkArtifacts_WeightStoredOnEdge(t *testing.T) {
 	ctx := context.Background()
 
 	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "A",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "B",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 
 	_, err := proto.LinkArtifacts(ctx, a.ID, "related", []string{b.ID}, 0.75)
 	if err != nil {
@@ -43,9 +43,9 @@ func TestLinkArtifacts_ZeroWeightDefaultBehavior(t *testing.T) {
 	ctx := context.Background()
 
 	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "A",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "B",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 
 	_, err := proto.LinkArtifacts(ctx, a.ID, "related", []string{b.ID}, 0)
 	if err != nil {

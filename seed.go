@@ -85,7 +85,7 @@ func ParseMDFile(path string) (*Artifact, error) { //nolint:gosec,gocyclo,cyclop
 		return nil, err
 	}
 	content := strings.ReplaceAll(string(data), "\r\n", "\n")
-	art := &Artifact{Labels: []string{LabelPrefixKind + KindNote, "work.active"}}
+	art := &Artifact{} // kind and status set by frontmatter or caller
 
 	if strings.HasPrefix(content, "---\n") { //nolint:nestif // YAML frontmatter parsing; branching is inherent to the format
 		end := strings.Index(content[4:], "\n---")

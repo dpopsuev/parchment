@@ -65,7 +65,7 @@ func TestRegistry_Protocol_KindTaskKnown(t *testing.T) {
 	// Protocol must know about kind:task after seeding.
 	t.Parallel()
 	p := parchment.New(parchment.NewMemoryStore(), nil, []string{"test"}, nil, parchment.ProtocolConfig{})
-	if !p.IsKnownKind(parchment.KindTask) {
+	if !p.IsKnownKind("task") {
 		t.Fatal("task kind not registered — registry YAML not loaded")
 	}
 }

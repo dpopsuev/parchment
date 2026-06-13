@@ -126,13 +126,13 @@ func TestDefaultSchema_BugKindHasIntentSections(t *testing.T) {
 	p := parchment.New(parchment.NewMemoryStore(), parchment.DefaultSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
 
 	// MustSections should contain "observed" (filing-time requirement)
-	if !containsString(p.MustSections(parchment.KindBug), "observed") {
-		t.Errorf("bug MustSections = %v; want it to contain \"observed\"", p.MustSections(parchment.KindBug))
+	if !containsString(p.MustSections("bug"), "observed") {
+		t.Errorf("bug MustSections = %v; want it to contain \"observed\"", p.MustSections("bug"))
 	}
 
 	// ShouldSections should contain "reproduction" (investigation-time recommendation)
-	if !containsString(p.ShouldSections(parchment.KindBug), "reproduction") {
-		t.Errorf("bug ShouldSections = %v; want it to contain \"reproduction\"", p.ShouldSections(parchment.KindBug))
+	if !containsString(p.ShouldSections("bug"), "reproduction") {
+		t.Errorf("bug ShouldSections = %v; want it to contain \"reproduction\"", p.ShouldSections("bug"))
 	}
 }
 

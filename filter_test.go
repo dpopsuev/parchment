@@ -65,12 +65,12 @@ func TestBulkSetField_UpdatesAllMatching(t *testing.T) {
 	ctx := context.Background()
 
 	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "a",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "b",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 
 	result, err := proto.BulkSetField(ctx, parchment.BulkMutationInput{
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},}, "priority", "high")
+		Labels: []string{parchment.LabelPrefixKind + "task"},}, "priority", "high")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,10 +95,10 @@ func TestBulkSetField_DryRun_NoMutation(t *testing.T) {
 	ctx := context.Background()
 
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "c",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 
 	result, err := proto.BulkSetField(ctx, parchment.BulkMutationInput{DryRun: true,
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},}, "priority", "critical")
+		Labels: []string{parchment.LabelPrefixKind + "task"},}, "priority", "critical")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,13 +126,13 @@ func TestVocab_ContainsKindNames(t *testing.T) {
 	}
 	found := false
 	for _, k := range vocab {
-		if k == parchment.KindTask {
+		if k == "task" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("Vocab() does not contain %q: %v", parchment.KindTask, vocab)
+		t.Errorf("Vocab() does not contain %q: %v", "task", vocab)
 	}
 }
 
@@ -147,20 +147,20 @@ func TestFilter_LabelsOr(t *testing.T) {
 	p := parchment.New(s, parchment.DefaultSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
 
 	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "task", Sections: []parchment.Section{{Name: "context", Text: "x"}},
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask, parchment.LabelPrefixPriority + "none"},}); err != nil {
+		Labels: []string{parchment.LabelPrefixKind + "task", parchment.LabelPrefixPriority + "none"},}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "bug", Sections: []parchment.Section{{Name: "context", Text: "x"}},
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindBug},}); err != nil {
+		Labels: []string{parchment.LabelPrefixKind + "bug"},}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "spec",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindSpec},}); err != nil {
+		Labels: []string{parchment.LabelPrefixKind + "spec"},}); err != nil {
 		t.Fatal(err)
 	}
 
 	arts, err := p.ListArtifacts(ctx, parchment.ListInput{
-		LabelsOr: []string{"kind:" + parchment.KindTask, "kind:" + parchment.KindBug},
+		LabelsOr: []string{"kind:" + "task", "kind:" + "bug"},
 
 	})
 	if err != nil {
@@ -170,7 +170,7 @@ func TestFilter_LabelsOr(t *testing.T) {
 		t.Errorf("got %d artifacts, want 2 (task+bug)", len(arts))
 	}
 	for _, a := range arts {
-		if parchment.LabelValue(a.Labels, parchment.LabelPrefixKind) != parchment.KindTask && parchment.LabelValue(a.Labels, parchment.LabelPrefixKind) != parchment.KindBug {
+		if parchment.LabelValue(a.Labels, parchment.LabelPrefixKind) != "task" && parchment.LabelValue(a.Labels, parchment.LabelPrefixKind) != "bug" {
 			t.Errorf("unexpected kind %q in result", parchment.LabelValue(a.Labels, parchment.LabelPrefixKind))
 		}
 	}

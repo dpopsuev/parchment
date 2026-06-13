@@ -269,7 +269,7 @@ func TestProtocol_NeverAutoIndexesEmbedding(t *testing.T) {
 		Sections: []parchment.Section{
 			{Name: "body", Text: "template conformance check deferred from create to promote"},
 		},
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindNote},})
+		Labels: []string{parchment.LabelPrefixKind + "note"},})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,10 +297,10 @@ func TestProtocol_SemanticRecall_BeatsFTSOnSemantic(t *testing.T) {
 
 	conf, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "template draft on missing sections",
 		Sections: []parchment.Section{{Name: "body", Text: "template conformance deferred, artifact created in draft"}},
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindNote},})
+		Labels: []string{parchment.LabelPrefixKind + "note"},})
 	ptp, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "ptp clock holdover",
 		Sections: []parchment.Section{{Name: "body", Text: "ptp clock synchronization holdover test"}},
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindNote},})
+		Labels: []string{parchment.LabelPrefixKind + "note"},})
 
 	// Librarian sidecar supplies embeddings externally.
 	confVec, _ := embedFn(ctx, "template conformance deferred, artifact created in draft")

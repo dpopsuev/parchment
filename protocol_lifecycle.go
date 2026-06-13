@@ -389,37 +389,6 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 			info = append(info, extra)
 		}
 	}
-	// Auto-enrichment: on task completion, update implementing spec
-	if labelValue(art.Labels, LabelPrefixKind) == KindTask && status == "work.complete" { //nolint:nestif // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/
-		if implEdges, _ := p.store.Neighbors(ctx, art.ID, RelImplements, Outgoing); len(implEdges) > 0 {
-			targets := make([]string, len(implEdges))
-			for i, e := range implEdges {
-				targets[i] = e.To
-			}
-			for _, specID := range targets {
-				spec, err := p.store.Get(ctx, specID)
-				if err != nil || labelValue(spec.Labels, LabelPrefixKind) != KindSpec {
-					continue
-				}
-				entry := fmt.Sprintf("- %s: %s (completed)", art.ID, art.Title)
-				implText := ""
-				for _, sec := range spec.Sections {
-					if sec.Name == "implementation" {
-						implText = sec.Text
-						break
-					}
-				}
-				if !strings.Contains(implText, art.ID) {
-					if implText != "" {
-						implText += "\n"
-					}
-					implText += entry
-					_, _ = p.AttachSection(ctx, specID, "implementation", implText)
-					info = append(info, fmt.Sprintf("enriched %s implementation section", specID))
-				}
-			}
-		}
-	}
 	if len(info) > 0 {
 		r.Error = strings.Join(info, "\n")
 	}

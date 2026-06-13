@@ -26,7 +26,7 @@ func TestSetField_UnknownField_Errors(t *testing.T) {
 	ctx := context.Background()
 
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "guinea pig",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestSetField_UnknownField_DoesNotPollutedExtra(t *testing.T) {
 	ctx := context.Background()
 
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "no pollution",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestSetField_KnownFields_StillWork(t *testing.T) {
 	ctx := context.Background()
 
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "original",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestSetField_UnknownField_RedirectsToAttachSection(t *testing.T) {
 	ctx := context.Background()
 
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "redirect test",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -24,11 +24,11 @@ func TestMigrateID_RenamesArtifactAndEdges(t *testing.T) {
 
 	// Use goal→spec hierarchy which allows parent-child relationships.
 	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "A",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindGoal},})
+		Labels: []string{parchment.LabelPrefixKind + "goal"},})
 	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "B",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 	c, err2 := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "C", Parent: a.ID,
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindSpec},})
+		Labels: []string{parchment.LabelPrefixKind + "spec"},})
 	if err2 != nil {
 		t.Fatalf("create child: %v", err2)
 	}
@@ -80,7 +80,7 @@ func TestMigrateID_OldIDBecomesAlias(t *testing.T) {
 	ctx := context.Background()
 
 	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "alias test",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 	if err := proto.MigrateID(ctx, a.ID, "TST-ALIAS"); err != nil {
 		t.Fatal(err)
 	}
@@ -109,10 +109,10 @@ func TestMigrateID_UpdatesDependsOn(t *testing.T) {
 	ctx := context.Background()
 
 	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "A",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 	d, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "D depends on A",
 		DependsOn: []string{a.ID},
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask},})
+		Labels: []string{parchment.LabelPrefixKind + "task"},})
 
 	if err := proto.MigrateID(ctx, a.ID, "TST-NEW"); err != nil {
 		t.Fatal(err)
@@ -148,7 +148,7 @@ func TestSetField_ScopeWithRenameID_MigratesID(t *testing.T) {
 	ctx := context.Background()
 	proto := parchment.New(s, nil, []string{"alpha", "beta"}, nil, parchment.ProtocolConfig{})
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "move me",
-		Labels: []string{parchment.LabelPrefixKind + parchment.KindTask, parchment.LabelPrefixScope + "alpha"},})
+		Labels: []string{parchment.LabelPrefixKind + "task", parchment.LabelPrefixScope + "alpha"},})
 	oldID := art.ID
 
 	results, err := proto.SetField(ctx, []string{oldID}, parchment.FieldScope, "beta",

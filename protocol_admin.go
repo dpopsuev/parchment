@@ -177,12 +177,7 @@ type OverlapInput struct {
 func (p *Protocol) DetectOverlaps(ctx context.Context, in OverlapInput) (*OverlapReport, error) {
 	slog.DebugContext(ctx, "detect overlaps",
 		slog.String(LogKeyProject, in.Project))
-	labels := in.Labels
-	if len(labels) == 0 {
-		labels = []string{LabelPrefixKind + KindTask, "work.active"}
-	}
-
-	f := Filter{Labels: labels}
+	f := Filter{Labels: in.Labels}
 	if labelValue(f.Labels, LabelPrefixScope) == "" && len(p.scopeLabels) > 0 {
 		rawScopes := make([]string, len(p.scopeLabels))
 		for i, sl := range p.scopeLabels {

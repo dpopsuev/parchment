@@ -15,11 +15,11 @@ func TestKnowledgeSchema_HasKnowledgeKinds(t *testing.T) {
 		wantPrefix  string
 		wantDefault string
 	}{
-		{KindNote, "NOT", "note.fleeting"},
-		{KindJournal, "JRN", "work.active"},
-		{KindSource, "SRC", "work.active"},
-		{KindConcept, "CON", "work.active"},
-		{KindContext, "CTX", "work.active"},
+		{"note", "NOT", "note.fleeting"},
+		{"journal", "JRN", "work.active"},
+		{"source", "SRC", "work.active"},
+		{"concept", "CON", "work.active"},
+		{"context", "CTX", "work.active"},
 	}
 
 	for _, tc := range cases {
@@ -72,7 +72,7 @@ func TestKnowledgeSchema_NoteLifecycle(t *testing.T) {
 
 	p := New(NewMemoryStore(), s, []string{"test"}, nil, ProtocolConfig{})
 	for _, tc := range transitions {
-		reason, ok := p.ValidTransition(KindNote, tc.from, tc.to)
+		reason, ok := p.ValidTransition("note", tc.from, tc.to)
 		if !ok {
 			t.Errorf("note: transition %s→%s blocked: %s", tc.from, tc.to, reason)
 		}
@@ -99,8 +99,8 @@ func TestKnowledgeSchema_PreservesWorkKinds(t *testing.T) {
 
 	p := New(NewMemoryStore(), s, []string{"test"}, nil, ProtocolConfig{})
 	for _, kind := range []string{
-		KindTask, KindSpec, KindBug, KindGoal,
-		KindCampaign, "need", "doc", "ref", "decision",
+		"task", "spec", "bug", "goal",
+		"campaign", "need", "doc", "ref", "decision",
 	} {
 		if !p.IsKnownKind(kind) {
 			t.Errorf("work kind %q missing — KnowledgeSchema must be additive", kind)
@@ -141,7 +141,7 @@ func TestKnowledgeSchema_LintClean(t *testing.T) {
 func TestKnowledgeSchema_NoteSections(t *testing.T) {
 	p := New(NewMemoryStore(), KnowledgeSchema(), []string{"test"}, nil, ProtocolConfig{})
 
-	sections := append(p.MustSections(KindNote), p.ShouldSections(KindNote)...)
+	sections := append(p.MustSections("note"), p.ShouldSections("note")...)
 	has := make(map[string]bool, len(sections))
 	for _, sec := range sections {
 		has[sec] = true
@@ -156,7 +156,7 @@ func TestKnowledgeSchema_NoteSections(t *testing.T) {
 func TestKnowledgeSchema_SourceSections(t *testing.T) {
 	p := New(NewMemoryStore(), KnowledgeSchema(), []string{"test"}, nil, ProtocolConfig{})
 
-	sections := append(p.MustSections(KindSource), p.ShouldSections(KindSource)...)
+	sections := append(p.MustSections("source"), p.ShouldSections("source")...)
 	if len(sections) == 0 {
 		t.Error("source kind should have sections defined")
 	}
@@ -176,7 +176,7 @@ func TestKnowledgeSchema_SourceSections(t *testing.T) {
 func TestKnowledgeSchema_ConceptSections(t *testing.T) {
 	p := New(NewMemoryStore(), KnowledgeSchema(), []string{"test"}, nil, ProtocolConfig{})
 
-	sections := append(p.MustSections(KindConcept), p.ShouldSections(KindConcept)...)
+	sections := append(p.MustSections("concept"), p.ShouldSections("concept")...)
 	has := make(map[string]bool, len(sections))
 	for _, sec := range sections {
 		has[sec] = true

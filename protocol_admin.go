@@ -65,69 +65,7 @@ func (p *Protocol) BulkSetField(ctx context.Context, in BulkMutationInput, field
 }
 
 // VacuumResult reports which artifacts were deleted and which were skipped.
-type VacuumResult struct {
-	Deleted []string // IDs permanently removed
-	Skipped []string // IDs spared because they still have incoming edges
-}
 
-func (p *Protocol) Vacuum(ctx context.Context, days int, scope string, force bool) (VacuumResult, error) {
-	if days <= 0 {
-		days = p.defaults.GetVacuumDays()
-	}
-	slog.InfoContext(ctx, "vacuum start",
-		slog.Int(LogKeyDays, days),
-		slog.String(LogKeyScope, scope),
-		slog.Bool(LogKeyForce, force))
-	maxAge := time.Duration(days) * 24 * time.Hour
-	f := Filter{Labels: []string{LabelPrefixStatus + "archived"}}
-	if scope != "" {
-		f.Labels = append(f.Labels, LabelPrefixScope+scope)
-	}
-	arts, err := p.store.List(ctx, f)
-	if err != nil {
-		return VacuumResult{}, err
-	}
-	cutoff := time.Now().UTC().Add(-maxAge)
-	var result VacuumResult
-	for _, art := range arts {
-		if !art.UpdatedAt.Before(cutoff) {
-			continue
-		}
-		// Label trait protection overrides kind-level Vacuumable.
-		if ResolveTrait(p.labelTraits, art.Labels).EvictionPolicy == "protected" {
-			continue
-		}
-		if !p.Vacuumable(labelValue(art.Labels, LabelPrefixKind)) {
-			continue
-		}
-		if !force && p.IsProtected(labelValue(art.Labels, LabelPrefixKind)) {
-			continue
-		}
-		// Skip artifacts that still have incoming edges — age alone is not enough
-		// to justify deleting something other artifacts depend on.
-		if !force {
-			incoming, _ := p.store.Neighbors(ctx, art.ID, "", Incoming)
-			if len(incoming) > 0 {
-				slog.WarnContext(ctx, "vacuum skipping connected artifact",
-					slog.String(LogKeyID, art.ID),
-					slog.Int(LogKeyIncomingEdges, len(incoming)))
-				result.Skipped = append(result.Skipped, art.ID)
-				continue
-			}
-		}
-		if err := p.store.Delete(ctx, art.ID); err != nil {
-			slog.WarnContext(ctx, "vacuum delete failed",
-				slog.String(LogKeyID, art.ID),
-				slog.Any(LogKeyError, err))
-			return result, fmt.Errorf("vacuum %s: %w", art.ID, err)
-		}
-		result.Deleted = append(result.Deleted, art.ID)
-	}
-	slog.InfoContext(ctx, "vacuum complete",
-		slog.Int(LogKeyCount, len(result.Deleted)),
-		slog.Int(LogKeySkipped, len(result.Skipped)))
-	return result, nil
-}
 
 // componentLabelRe and extractComponentLabels are private helpers used by
 // DetectOverlaps to identify component-scope labels on artifacts.

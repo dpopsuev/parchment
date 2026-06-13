@@ -8,7 +8,6 @@ spec:
   family: intent
   protected: true
   requiresImplementation: true
-  vacuumable: true
   children: []
   lifecycle:
     defaultStatus: work.draft

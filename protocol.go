@@ -20,10 +20,9 @@ type Result struct {
 	NewID string `json:"new_id,omitempty"` // populated when SetField(scope, rename_id=true) migrates the ID
 }
 
-// DefaultsProvider supplies tunable numeric parameters (vacuum days, dashboard stale, etc.).
+// DefaultsProvider supplies tunable numeric parameters.
 // config.Defaults implements this interface.
 type DefaultsProvider interface {
-	GetVacuumDays() int
 	GetDashboardStale() int
 	GetDashboardStaleCap() int
 	GetBriefRecentHours() int
@@ -31,11 +30,10 @@ type DefaultsProvider interface {
 }
 
 // defaultDefaults is used when ProtocolConfig.Defaults is nil.
-var defaultDefaults = &staticDefaults{vacuum: 90, stale: 30, staleCap: 10, briefHours: 48, treeDepth: 10}
+var defaultDefaults = &staticDefaults{stale: 30, staleCap: 10, briefHours: 48, treeDepth: 10}
 
-type staticDefaults struct{ vacuum, stale, staleCap, briefHours, treeDepth int }
+type staticDefaults struct{ stale, staleCap, briefHours, treeDepth int }
 
-func (d *staticDefaults) GetVacuumDays() int         { return d.vacuum }
 func (d *staticDefaults) GetDashboardStale() int     { return d.stale }
 func (d *staticDefaults) GetDashboardStaleCap() int  { return d.staleCap }
 func (d *staticDefaults) GetBriefRecentHours() int   { return d.briefHours }

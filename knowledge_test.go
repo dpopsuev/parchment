@@ -87,9 +87,6 @@ func TestKnowledgeSchema_EvergreenNotReadonly(t *testing.T) {
 	if p.IsReadonly("note.evergreen") {
 		t.Error("note.evergreen should not be readonly — permanent notes remain editable")
 	}
-	if !p.IsReadonly("archived") {
-		t.Error("archived must be readonly")
-	}
 }
 
 // TestKnowledgeSchema_PreservesWorkKinds verifies knowledge kinds are additive

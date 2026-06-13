@@ -54,7 +54,7 @@ type LabelTrait struct {
 	IsContainerKind           bool     `json:"is_container_kind,omitempty"`
 	RequiresImplementation    bool     `json:"requires_implementation,omitempty"`
 	SkipEmptyCheck            bool     `json:"skip_empty_check,omitempty"`
-	Vacuumable                bool     `json:"vacuumable,omitempty"`
+
 	Protected                 bool     `json:"protected,omitempty"`
 	SkipGuards                bool     `json:"skip_guards,omitempty"`
 	IsGoalKind                bool     `json:"is_goal_kind,omitempty"`
@@ -159,9 +159,7 @@ func LoadLabelTraitsWithComposition(ctx context.Context, s Store) map[string]Lab
 			if !own.SkipEmptyCheck && p.SkipEmptyCheck {
 				own.SkipEmptyCheck = p.SkipEmptyCheck
 			}
-			if !own.Vacuumable && p.Vacuumable {
-				own.Vacuumable = p.Vacuumable
-			}
+
 			if own.DefaultStatus == "" && p.DefaultStatus != "" {
 				own.DefaultStatus = p.DefaultStatus
 			}
@@ -222,9 +220,7 @@ func ResolveTrait(traits map[string]LabelTrait, labels []string) LabelTrait {
 		if lt.SkipEmptyCheck {
 			merged.SkipEmptyCheck = true
 		}
-		if lt.Vacuumable {
-			merged.Vacuumable = true
-		}
+
 		if lt.DefaultStatus != "" && merged.DefaultStatus == "" {
 			merged.DefaultStatus = lt.DefaultStatus
 		}
@@ -293,9 +289,7 @@ var defaultLabelTraits = []struct {
 		"Apply 'decision' to notes created via admin(action=decision) — cached answers to recurring questions. Not the same as kind=decision (ADR); this is a lightweight key-value cache.",
 		"Protected from eviction. Queryable via admin(action=decision, snapshot_action=check, check=<key>)."},
 
-	// System terminal statuses — universal, not domain-specific.
-	{"status:retired", LabelTrait{Terminal: true, Readonly: false, EvictionQuality: 0.8}, "", ""},
-	{"status:archived", LabelTrait{Terminal: true, Readonly: true, EvictionQuality: 0.1}, "", ""},
+
 
 	// Work lifecycle traits.
 	{"work.draft", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.3}, "", ""},
@@ -319,7 +313,6 @@ var defaultLabelTraits = []struct {
 	{"ctx.promoted", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.5}, "", ""},
 	{"ctx.permanent", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.9}, "", ""},
 	{"ctx.active", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.5}, "", ""},
-	{"ctx.archived", LabelTrait{Terminal: true, Readonly: true, EvictionQuality: 0.1}, "", ""},
 
 	// Code intelligence lifecycle traits.
 	{"code.indexed", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.3}, "", ""},

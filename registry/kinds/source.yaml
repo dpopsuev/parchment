@@ -6,7 +6,6 @@ spec:
   prefix: SRC
   code: "s"
   family: knowledge
-  vacuumable: true
   children: []
   lifecycle:
     defaultStatus: work.active

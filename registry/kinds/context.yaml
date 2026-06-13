@@ -18,6 +18,6 @@ spec:
     Create a context artifact to store persistent agent memory about a person,
     project, or workflow — things that should survive across sessions.
   agentNote: |
-    Context artifacts are protected (not vacuumable). They bookmark notes via
+    Context artifacts are protected They bookmark notes via
     the remembers relation. scope and confidence sections help future agents
     assess reliability.

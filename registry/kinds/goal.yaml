@@ -9,7 +9,6 @@ spec:
   protected: true
   isContainerKind: true
   skipEmptyCheck: true
-  vacuumable: true
   children: [task, spec, bug, need, ref, doc, decision]
   lifecycle:
     defaultStatus: work.draft

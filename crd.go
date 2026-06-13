@@ -46,7 +46,6 @@ type ResourceSpec struct {
 	Family           string          `yaml:"family,omitempty"`
 
 	IsContainerKind  bool            `yaml:"isContainerKind,omitempty"`
-	Vacuumable       bool            `yaml:"vacuumable,omitempty"`
 	WhenToUse        string          `yaml:"whenToUse,omitempty"`
 	AgentNote        string          `yaml:"agentNote,omitempty"`
 	Implies          string          `yaml:"implies,omitempty"`
@@ -213,7 +212,6 @@ func applyLabelDefinition(ctx context.Context, s Store, r *Resource) error {
 		RequiredSections: r.Spec.RequiredSections,
 		Family:          r.Spec.Family,
 		IsContainerKind: r.Spec.IsContainerKind,
-		Vacuumable:       r.Spec.Vacuumable,
 	}
 	if r.Spec.Lifecycle != nil {
 		trait.DefaultStatus = r.Spec.Lifecycle.DefaultStatus

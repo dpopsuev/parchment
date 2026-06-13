@@ -109,15 +109,7 @@ func (p *Protocol) SkipEmptyCheck(kind string) bool {
 	return false
 }
 
-// Vacuumable reports whether archived artifacts of this kind may be hard-deleted.
-func (p *Protocol) Vacuumable(kind string) bool {
-	if lt, ok := p.labelTraits["kind:"+kind]; ok {
-		return lt.Vacuumable
-	}
-	return false
-}
-
-// IsProtected reports whether the kind is protected from vacuum deletion.
+// IsProtected reports whether the kind is protected from deletion.
 func (p *Protocol) IsProtected(kind string) bool {
 	if lt, ok := p.labelTraits["kind:"+kind]; ok {
 		return lt.Protected

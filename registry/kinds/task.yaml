@@ -6,7 +6,6 @@ spec:
   prefix: TASK
   code: TSK
   family: effort
-  vacuumable: true
   children: []
   lifecycle:
     defaultStatus: work.draft

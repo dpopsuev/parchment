@@ -15,7 +15,6 @@ func TestEvictionQuality_ViaProtocol(t *testing.T) {
 		min    float64
 	}{
 		"evergreen": {"note.evergreen", 0.9},
-		"retired":   {"retired", 0.7},
 		"active":    {"work.active", 0.4},
 		"fleeting":  {"note.fleeting", 0.1},
 	}

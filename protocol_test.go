@@ -6,7 +6,6 @@ import (
 	"errors"
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/dpopsuev/parchment"
 )
@@ -38,7 +37,7 @@ func createTask(t *testing.T, proto *parchment.Protocol, title string) *parchmen
 		Sections: []parchment.Section{
 			{Name: "context", Text: "context for " + title},
 		},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:task"}})
 }
 
 // createGoal is a shorthand for creating a goal artifact.
@@ -46,7 +45,7 @@ func createGoal(t *testing.T, proto *parchment.Protocol, title string) *parchmen
 	t.Helper()
 	return mustCreate(t, proto, parchment.CreateInput{Title: title,
 
-		Labels: []string{"kind:goal"},})
+		Labels: []string{"kind:goal"}})
 }
 
 // createCampaign is a shorthand for creating a campaign artifact.
@@ -57,7 +56,7 @@ func createCampaign(t *testing.T, proto *parchment.Protocol, title string) *parc
 		Sections: []parchment.Section{
 			{Name: "mission", Text: "mission for " + title},
 		},
-		Labels: []string{"kind:campaign"},})
+		Labels: []string{"kind:campaign"}})
 }
 
 // ============================================================
@@ -96,9 +95,9 @@ func TestListArtifacts_FilterByScope(t *testing.T) {
 	ctx := context.Background()
 
 	mustCreate(t, proto, parchment.CreateInput{Title: "alpha goal",
-		Labels: []string{"kind:goal", parchment.LabelPrefixScope + "alpha"},})
+		Labels: []string{"kind:goal", parchment.LabelPrefixScope + "alpha"}})
 	mustCreate(t, proto, parchment.CreateInput{Title: "beta goal",
-		Labels: []string{"kind:goal", parchment.LabelPrefixScope + "beta"},})
+		Labels: []string{"kind:goal", parchment.LabelPrefixScope + "beta"}})
 
 	arts, err := proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{parchment.LabelPrefixScope + "alpha"}})
 	if err != nil {
@@ -525,8 +524,8 @@ func TestDetachSection_TemplateRequiredBlocked(t *testing.T) {
 			{Name: "context", Text: "ctx"},
 			{Name: "design", Text: "my design"},
 		},
-		Links: map[string][]string{"satisfies": {"tpl-task-1"}},
-		Labels: []string{"kind:task"},})
+		Links:  map[string][]string{"satisfies": {"tpl-task-1"}},
+		Labels: []string{"kind:task"}})
 
 	// Trying to detach a template-required section should fail
 	_, err := proto.DetachSection(ctx, task.ID, "design")
@@ -563,7 +562,7 @@ func TestCompletionScore_Checklist(t *testing.T) {
 			{Name: "context", Text: "ctx"},
 			{Name: "checklist", Text: "- [x] done item\n- [x] also done\n- [ ] not done\n- [ ] also not done"},
 		},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:task"}})
 
 	score := proto.CompletionScore(ctx, task)
 	// 2 checked out of 4 = 0.5 for the checklist component
@@ -597,10 +596,10 @@ func TestCompletionScore_ChildCompletion(t *testing.T) {
 	parent := createGoal(t, proto, "parent for completion")
 	child1 := mustCreate(t, proto, parchment.CreateInput{Title: "child1", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{"kind:task"},})
+		Labels:   []string{"kind:task"}})
 	mustCreate(t, proto, parchment.CreateInput{Title: "child2", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{"kind:task"},})
+		Labels:   []string{"kind:task"}})
 
 	// Complete one child
 	c1, _ := store.Get(ctx, child1.ID)
@@ -638,7 +637,7 @@ func TestCreateArtifact_EmptyTitle(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:task"}})
 	if err == nil {
 		t.Error("expected error for empty title")
 	}
@@ -651,7 +650,7 @@ func TestCreateArtifact_InvalidKind(t *testing.T) {
 
 	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "invalid kind",
 
-		Labels: []string{"kind:unicorn"},})
+		Labels: []string{"kind:unicorn"}})
 	if err == nil {
 		t.Error("expected error for unknown kind")
 	}
@@ -662,10 +661,10 @@ func TestCreateArtifact_InvalidPriority(t *testing.T) {
 	proto, _ := newProto(t)
 	ctx := context.Background()
 
-	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title:    "bad priority",
+	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "bad priority",
 
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{"kind:task", "priority:super-urgent"},})
+		Labels:   []string{"kind:task", "priority:super-urgent"}})
 	if err == nil {
 		t.Error("expected error for invalid priority")
 	}
@@ -682,7 +681,7 @@ func TestCreateArtifact_WithSections(t *testing.T) {
 			{Name: "context", Text: "background info"},
 			{Name: "design", Text: "design doc"},
 		},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:task"}})
 	if err != nil {
 		t.Fatalf("CreateArtifact: %v", err)
 	}
@@ -705,7 +704,7 @@ func TestCreateArtifact_WithPatch(t *testing.T) {
 			"context": "patched context",
 			"notes":   "new section from patch",
 		},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:task"}})
 	if err != nil {
 		t.Fatalf("CreateArtifact: %v", err)
 	}
@@ -737,7 +736,7 @@ func TestCreateArtifact_ScopeInference(t *testing.T) {
 
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "auto-scoped goal",
 		// No explicit scope,
-		Labels: []string{"kind:goal"},})
+		Labels: []string{"kind:goal"}})
 	if err != nil {
 		t.Fatalf("CreateArtifact: %v", err)
 	}
@@ -752,9 +751,9 @@ func TestCreateArtifact_ScopeRequiredWhenMultiple(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"proj-a", "proj-b"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 
-	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title:    "missing scope",
+	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "missing scope",
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{"kind:task"},})
+		Labels:   []string{"kind:task"}})
 	if err == nil {
 		t.Error("expected error when scope is ambiguous (multiple scopes)")
 	}
@@ -777,7 +776,7 @@ func TestLinkArtifacts_BasicLink(t *testing.T) {
 		Sections: []parchment.Section{
 			{Name: "problem", Text: "the problem"},
 		},
-		Labels: []string{"kind:spec"},})
+		Labels: []string{"kind:spec"}})
 
 	results, err := proto.LinkArtifacts(ctx, task.ID, "implements", []string{spec.ID}, 0)
 	if err != nil {
@@ -983,17 +982,17 @@ func TestArtifactTree_CampaignGoalTask(t *testing.T) {
 	ctx := context.Background()
 
 	campaign := createCampaign(t, proto, "Q1 Campaign")
-	goal := mustCreate(t, proto, parchment.CreateInput{Title:  "Goal Alpha",
+	goal := mustCreate(t, proto, parchment.CreateInput{Title: "Goal Alpha",
 
 		Parent: campaign.ID,
-		Labels: []string{"kind:goal"},})
-	mustCreate(t, proto, parchment.CreateInput{Title:  "Task 1",
+		Labels: []string{"kind:goal"}})
+	mustCreate(t, proto, parchment.CreateInput{Title: "Task 1",
 
 		Parent: goal.ID,
 		Sections: []parchment.Section{
 			{Name: "context", Text: "ctx"},
 		},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:task"}})
 
 	tree, err := proto.ArtifactTree(ctx, parchment.TreeInput{ID: campaign.ID})
 	if err != nil {
@@ -1054,10 +1053,10 @@ func TestArtifactTree_DependsOnRelation(t *testing.T) {
 	parent := createGoal(t, proto, "parent goal")
 	a := mustCreate(t, proto, parchment.CreateInput{Title: "task A", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{"kind:task"},})
+		Labels:   []string{"kind:task"}})
 	b := mustCreate(t, proto, parchment.CreateInput{Title: "task B", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{"kind:task"},})
+		Labels:   []string{"kind:task"}})
 
 	// A depends on B
 	proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID}, 0)
@@ -1090,15 +1089,15 @@ func TestTopoSort_DependencyChain(t *testing.T) {
 	parent := createGoal(t, proto, "parent for topo")
 	a := mustCreate(t, proto, parchment.CreateInput{Title: "step 1", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{"kind:task"},})
+		Labels:   []string{"kind:task"}})
 	b := mustCreate(t, proto, parchment.CreateInput{Title: "step 2", Parent: parent.ID,
 		Sections:  []parchment.Section{{Name: "context", Text: "ctx"}},
 		DependsOn: []string{a.ID},
-		Labels: []string{"kind:task"},})
+		Labels:    []string{"kind:task"}})
 	c := mustCreate(t, proto, parchment.CreateInput{Title: "step 3", Parent: parent.ID,
 		Sections:  []parchment.Section{{Name: "context", Text: "ctx"}},
 		DependsOn: []string{b.ID},
-		Labels: []string{"kind:task"},})
+		Labels:    []string{"kind:task"}})
 
 	entries, err := proto.TopoSort(ctx, parent.ID)
 	if err != nil {
@@ -1136,10 +1135,10 @@ func TestTopoSort_NoDependencies(t *testing.T) {
 	parent := createGoal(t, proto, "parent")
 	mustCreate(t, proto, parchment.CreateInput{Title: "task 1", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{"kind:task"},})
+		Labels:   []string{"kind:task"}})
 	mustCreate(t, proto, parchment.CreateInput{Title: "task 2", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{"kind:task"},})
+		Labels:   []string{"kind:task"}})
 
 	entries, err := proto.TopoSort(ctx, parent.ID)
 	if err != nil {
@@ -1221,7 +1220,7 @@ func TestGetArtifactEdges_BothDirections(t *testing.T) {
 	parent := createGoal(t, proto, "parent")
 	child := mustCreate(t, proto, parchment.CreateInput{Title: "child", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{"kind:task"},})
+		Labels:   []string{"kind:task"}})
 
 	edges, err := proto.GetArtifactEdges(ctx, parent.ID)
 	if err != nil {
@@ -1241,11 +1240,6 @@ func TestGetArtifactEdges_BothDirections(t *testing.T) {
 // ============================================================
 // Priority 3 — Admin (protocol_admin.go)
 // ============================================================
-
-
-
-
-
 
 // --- Check ---
 
@@ -1398,9 +1392,9 @@ func TestCheck_ScopedCheck(t *testing.T) {
 	ctx := context.Background()
 
 	mustCreate(t, proto, parchment.CreateInput{Title: "alpha goal",
-		Labels: []string{"kind:goal", parchment.LabelPrefixScope + "alpha"},})
+		Labels: []string{"kind:goal", parchment.LabelPrefixScope + "alpha"}})
 	mustCreate(t, proto, parchment.CreateInput{Title: "beta goal",
-		Labels: []string{"kind:goal", parchment.LabelPrefixScope + "beta"},})
+		Labels: []string{"kind:goal", parchment.LabelPrefixScope + "beta"}})
 
 	report, err := proto.Check(ctx, "alpha")
 	if err != nil {
@@ -1413,129 +1407,6 @@ func TestCheck_ScopedCheck(t *testing.T) {
 }
 
 // --- Vacuum ---
-
-func TestVacuum_RemovesOldArchived(t *testing.T) {
-	t.Parallel()
-	proto, store := newProto(t)
-	ctx := context.Background()
-
-	// Create and archive a task, then backdate UpdatedAt
-	task := createTask(t, proto, "old archived task")
-	art, _ := store.Get(ctx, task.ID)
-	art.Labels = parchment.MirrorLabel(art.Labels, parchment.LabelPrefixStatus, "archived")
-	art.UpdatedAt = time.Now().Add(-180 * 24 * time.Hour) // 180 days ago
-	store.Put(ctx, art)
-
-	result, err := proto.Vacuum(ctx, 90, "", false)
-	if err != nil {
-		t.Fatalf("Vacuum: %v", err)
-	}
-	if len(result.Deleted) != 1 {
-		t.Errorf("expected 1 deleted, got %d", len(result.Deleted))
-	}
-
-	// Verify actually gone
-	_, err = store.Get(ctx, task.ID)
-	if !errors.Is(err, parchment.ErrArtifactNotFound) {
-		t.Error("expected artifact to be deleted after vacuum")
-	}
-}
-
-func TestVacuum_SkipsProtectedKinds(t *testing.T) {
-	t.Parallel()
-	proto, store := newProto(t)
-	ctx := context.Background()
-
-	// Goals are protected in default schema
-	goal := createGoal(t, proto, "protected goal")
-	art, _ := store.Get(ctx, goal.ID)
-	art.Labels = parchment.MirrorLabel(art.Labels, parchment.LabelPrefixStatus, "archived")
-	art.UpdatedAt = time.Now().Add(-180 * 24 * time.Hour)
-	store.Put(ctx, art)
-
-	result, err := proto.Vacuum(ctx, 90, "", false)
-	if err != nil {
-		t.Fatalf("Vacuum: %v", err)
-	}
-	if len(result.Deleted) != 0 {
-		t.Errorf("expected 0 deleted (protected kind), got %d", len(result.Deleted))
-	}
-}
-
-func TestVacuum_ForceDeletesProtected(t *testing.T) {
-	t.Parallel()
-	proto, store := newProto(t)
-	ctx := context.Background()
-
-	goal := createGoal(t, proto, "force delete goal")
-	art, _ := store.Get(ctx, goal.ID)
-	art.Labels = parchment.MirrorLabel(art.Labels, parchment.LabelPrefixStatus, "archived")
-	art.UpdatedAt = time.Now().Add(-180 * 24 * time.Hour)
-	store.Put(ctx, art)
-
-	result, err := proto.Vacuum(ctx, 90, "", true)
-	if err != nil {
-		t.Fatalf("Vacuum: %v", err)
-	}
-	if len(result.Deleted) != 1 {
-		t.Errorf("expected 1 deleted with force=true, got %d", len(result.Deleted))
-	}
-}
-
-func TestVacuum_SkipsRecentArchived(t *testing.T) {
-	t.Parallel()
-	proto, store := newProto(t)
-	ctx := context.Background()
-
-	task := createTask(t, proto, "recently archived")
-	art, _ := store.Get(ctx, task.ID)
-	art.Labels = parchment.MirrorLabel(art.Labels, parchment.LabelPrefixStatus, "archived")
-	art.UpdatedAt = time.Now().Add(-10 * 24 * time.Hour) // 10 days ago
-	store.Put(ctx, art)
-
-	result, err := proto.Vacuum(ctx, 90, "", false)
-	if err != nil {
-		t.Fatalf("Vacuum: %v", err)
-	}
-	if len(result.Deleted) != 0 {
-		t.Errorf("expected 0 deleted (too recent), got %d", len(result.Deleted))
-	}
-}
-
-func TestVacuum_ScopeFilter(t *testing.T) {
-	t.Parallel()
-	store := parchment.NewMemoryStore()
-	proto := parchment.New(store, nil, []string{"alpha", "beta"}, nil, parchment.ProtocolConfig{})
-	ctx := context.Background()
-
-	// Create old archived in alpha
-	artAlpha, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "alpha old",
-		Labels: []string{"kind:goal", parchment.LabelPrefixScope + "alpha"},})
-	a1, _ := store.Get(ctx, artAlpha.ID)
-	a1.Labels = parchment.MirrorLabel(a1.Labels, parchment.LabelPrefixStatus, "archived")
-	a1.UpdatedAt = time.Now().Add(-180 * 24 * time.Hour)
-	store.Put(ctx, a1)
-
-	// Create old archived in beta
-	artBeta, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "beta old",
-		Labels: []string{"kind:goal", parchment.LabelPrefixScope + "beta"},})
-	b1, _ := store.Get(ctx, artBeta.ID)
-	b1.Labels = parchment.MirrorLabel(b1.Labels, parchment.LabelPrefixStatus, "archived")
-	b1.UpdatedAt = time.Now().Add(-180 * 24 * time.Hour)
-	store.Put(ctx, b1)
-
-	result, err := proto.Vacuum(ctx, 90, "alpha", true)
-	if err != nil {
-		t.Fatalf("Vacuum: %v", err)
-	}
-	if len(result.Deleted) != 1 {
-		t.Errorf("expected 1 deleted (alpha only), got %d", len(result.Deleted))
-	}
-}
-
-
-
-// --- CheckFix ---
 
 func TestCheckFix_FixesInvalidParent(t *testing.T) {
 	t.Parallel()
@@ -1699,8 +1570,6 @@ func TestLint_DefaultSchemaIsClean(t *testing.T) {
 
 // --- Scope management ---
 
-
-
 func TestScopeLabels_SetAndGet(t *testing.T) {
 	t.Parallel()
 	proto, _ := newProto(t)
@@ -1735,7 +1604,6 @@ func TestListScopeInfo(t *testing.T) {
 		t.Fatal("expected at least one scope info")
 	}
 }
-
 
 // --- GetConfig ---
 
@@ -1779,10 +1647,10 @@ func TestCreateArtifact_MirrorSkipsGuards(t *testing.T) {
 	ctx := context.Background()
 
 	// Mirror kind has SkipGuards=true, so no template conformance, edge enforcement etc.
-	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title:      "external ticket JIRA-123",
+	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "external ticket JIRA-123",
 
 		ExplicitID: "MIR-JIRA-123",
-		Labels: []string{"kind:mirror"},})
+		Labels:     []string{"kind:mirror"}})
 	if err != nil {
 		t.Fatalf("CreateArtifact mirror: %v", err)
 	}
@@ -1803,7 +1671,7 @@ func TestCreateArtifact_TemplateIsScopeless(t *testing.T) {
 		Sections: []parchment.Section{
 			{Name: "content", Text: "template content"},
 		},
-		Labels: []string{"kind:template"},})
+		Labels: []string{"kind:template"}})
 	if err != nil {
 		t.Fatalf("CreateArtifact template: %v", err)
 	}
@@ -1815,8 +1683,6 @@ func TestCreateArtifact_TemplateIsScopeless(t *testing.T) {
 // --- DetectOverlaps ---
 
 // --- DetectOrphans ---
-
-
 
 // ============================================================
 // Helpers

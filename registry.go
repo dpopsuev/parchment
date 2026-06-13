@@ -31,7 +31,6 @@ func crdResourceToKindYAML(r *Resource) kindYAML {
 		Code:                      r.Spec.Code,
 		Family:                    r.Spec.Family,
 		Protected:                 r.Spec.Protected,
-		Vacuumable:                r.Spec.Vacuumable,
 		SkipGuards:                r.Spec.SkipGuards,
 		IsGoalKind:                r.Spec.IsGoalKind,
 		TrackInBrief:              r.Spec.TrackInBrief,
@@ -85,7 +84,6 @@ type kindYAML struct {
 	DefaultStatus             string
 	ActiveStatus              string
 	Protected                 bool
-	Vacuumable                bool
 	SkipGuards                bool
 	IsGoalKind                bool
 	TrackInBrief              bool
@@ -118,7 +116,6 @@ func (k *kindYAML) toLabelTrait() LabelTrait {
 		DefaultStatus:             k.DefaultStatus,
 		ActiveStatus:              k.ActiveStatus,
 		Protected:                 k.Protected,
-		Vacuumable:                k.Vacuumable,
 		SkipGuards:                k.SkipGuards,
 		IsGoalKind:                k.IsGoalKind,
 		TrackInBrief:              k.TrackInBrief,

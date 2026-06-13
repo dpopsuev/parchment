@@ -768,14 +768,7 @@ func mergeStringSlice(a, b []string) []string {
 // post-mortems) and are never deleted by Vacuum. Use for completed or
 // canceled work you want to preserve as memory. Use ArchiveArtifact for
 // work you want to freeze and eventually discard.
-func (p *Protocol) RetireArtifact(ctx context.Context, ids []string, cascade bool) ([]Result, error) {
-	slog.InfoContext(ctx, "retire",
-		slog.Int(LogKeyCount, len(ids)),
-		slog.Bool(LogKeyCascade, cascade))
-	return p.applyToEach(ctx, ids, "retire", func(id string) error {
-		return p.retireSingle(ctx, id, cascade)
-	})
-}
+
 
 // applyToEach applies fn to each id and accumulates Results, logging failures.
 func (p *Protocol) applyToEach(ctx context.Context, ids []string, op string, fn func(string) error) ([]Result, error) {
@@ -797,36 +790,7 @@ func (p *Protocol) applyToEach(ctx context.Context, ids []string, op string, fn 
 	return results, nil
 }
 
-func (p *Protocol) retireSingle(ctx context.Context, id string, cascade bool) error {
-	art, err := p.store.Get(ctx, id)
-	if err != nil {
-		return err
-	}
-	if p.IsTerminal(statusFromLabels(art.Labels)) {
-		return nil // idempotent — already in a terminal state
-	}
-	if p.IsReadonly(statusFromLabels(art.Labels)) {
-		return fmt.Errorf("%s is %s (readonly) — de-archive before retiring", id, statusFromLabels(art.Labels)) //nolint:err113 // domain error
-	}
-	children, err := p.store.Children(ctx, id)
-	if err != nil {
-		return err
-	}
-	for _, ch := range children {
-		if cascade {
-			if err := p.retireSingle(ctx, ch.ID, true); err != nil {
-				return fmt.Errorf("cascade retire %s: %w", ch.ID, err)
-			}
-		} else if !p.IsTerminal(statusFromLabels(ch.Labels)) {
-			return fmt.Errorf("cannot retire %s: child %s is %s (use cascade to retire the whole tree)", id, ch.ID, statusFromLabels(ch.Labels)) //nolint:err113 // domain error
-		}
-	}
-	art.Labels = setStatusLabel(art.Labels, "retired")
-	slog.InfoContext(ctx, "retired",
-		slog.String(LogKeyID, id),
-		slog.String(LogKeyKind, labelValue(art.Labels, LabelPrefixKind)))
-	return p.store.Put(ctx, art)
-}
+
 
 // --- helpers ---
 

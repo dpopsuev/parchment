@@ -134,9 +134,6 @@ func buildWhereClause(f Filter) ([]string, []any) { //nolint:cyclop,gocyclo,gocr
 		case strings.HasPrefix(label, LabelPrefixKind):
 			clauses = append(clauses, "kind = ?")
 			args = append(args, strings.TrimPrefix(label, LabelPrefixKind))
-		case label == LabelPrefixStatus+"retired":
-			clauses = append(clauses, "status = ?")
-			args = append(args, "retired")
 		case strings.HasPrefix(label, LabelPrefixScope):
 			scopeVal := strings.TrimPrefix(label, LabelPrefixScope)
 			if f.ScopePrefix {

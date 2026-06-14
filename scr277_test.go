@@ -13,7 +13,7 @@ func setupTemplateProtoForConformance(t *testing.T) *parchment.Protocol {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 	ctx := context.Background()
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
-		ID: "TPL-BUG-1", Labels: []string{"kind:template", "work.active", "scope:test"}, Title: "Bug Template",
+		ID: "TPL-BUG-1", Labels: []string{"kind:support.template", "work.active", "scope:test"}, Title: "Bug Template",
 		Sections: []parchment.Section{
 			{Name: "content", Text: "raw markdown"},
 			{Name: "observed", Text: "Observed vs expected behavior"},
@@ -34,7 +34,7 @@ func TestCreateDraft_SkipsTemplateConformance(t *testing.T) {
 	// Bug requires "observed" section (MustSection). Creating as work.draft
 	// should produce no warning and no conformance noise.
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "draft bug — sections to come",
-		Labels: []string{"kind:bug", "work.draft"},})
+		Labels: []string{"kind:intent.bug", "work.draft"},})
 	if err != nil {
 		t.Fatalf("CreateArtifact draft: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestCreateActive_StillChecksConformance(t *testing.T) {
 	proto := setupTemplateProtoForConformance(t)
 
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "active bug without sections",
-		Labels: []string{"kind:bug", "work.active"},})
+		Labels: []string{"kind:intent.bug", "work.active"},})
 	if err != nil {
 		t.Fatalf("CreateArtifact active: %v", err)
 	}

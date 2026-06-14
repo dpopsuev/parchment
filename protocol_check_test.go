@@ -49,7 +49,7 @@ func TestCheck_DetectsInvalidParent(t *testing.T) {
 	parentTask := createTask(t, proto, "parent task")
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "CHILD-001",
-		Labels: []string{"kind:task", "status:draft", "scope:test"},
+		Labels: []string{"kind:effort.task", "status:draft", "scope:test"},
 		Title:  "child task",
 	})
 	store.AddEdge(ctx, parchment.Edge{From: parentTask.ID, To: "CHILD-001", Relation: parchment.RelParentOf}) //nolint:errcheck // test seeding
@@ -77,7 +77,7 @@ func TestCheck_DetectsEmptyArtifact(t *testing.T) {
 	// Insert a draft task with no goal, no sections, no parent, no edges
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "EMPTY-001",
-		Labels: []string{"kind:task", "work.draft", "scope:test"},
+		Labels: []string{"kind:effort.task", "work.draft", "scope:test"},
 		Title:  "empty task",
 	})
 
@@ -158,9 +158,9 @@ func TestCheck_ScopedCheck(t *testing.T) {
 	ctx := context.Background()
 
 	mustCreate(t, proto, parchment.CreateInput{Title: "alpha goal",
-		Labels: []string{"kind:goal", parchment.LabelPrefixScope + "alpha"}})
+		Labels: []string{"kind:effort.goal", parchment.LabelPrefixScope + "alpha"}})
 	mustCreate(t, proto, parchment.CreateInput{Title: "beta goal",
-		Labels: []string{"kind:goal", parchment.LabelPrefixScope + "beta"}})
+		Labels: []string{"kind:effort.goal", parchment.LabelPrefixScope + "beta"}})
 
 	report, err := proto.Check(ctx, "alpha")
 	if err != nil {

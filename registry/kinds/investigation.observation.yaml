@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.observation
+  name: kind.investigation.observation
 spec:
   prefix: OBS
   code: obs
-  family: investigation
   children: []
   lifecycle:
     defaultStatus: obs.open
@@ -23,7 +22,7 @@ spec:
     incoming: [parent_of, explains]
     outgoing: [evidenced_by]
     targets:
-      evidenced_by: [ref]
+      evidenced_by: [support.ref]
   whenToCreate: |
     Create an observation to record a symptom or signal seen during an
     investigation. One observation per distinct symptom. Link it to the parent

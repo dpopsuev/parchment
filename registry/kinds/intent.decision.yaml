@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.decision
+  name: kind.intent.decision
 spec:
   prefix: ADR
   code: ADR
-  family: intent
   protected: true
   children: []
   lifecycle:
@@ -26,7 +25,7 @@ spec:
   relations:
     outgoing: [satisfies]
     targets:
-      satisfies: [template]
+      satisfies: [support.template]
   whenToCreate: |
     Create a decision (ADR) when you evaluate multiple options and choose one —
     a technology choice, an architectural pattern, a policy. The decision records

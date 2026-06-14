@@ -19,7 +19,7 @@ func TestCheckFix_FixesInvalidParent(t *testing.T) {
 	// Manually insert child of task (invalid: task has empty Children = leaf)
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "BAD-CHILD-1",
-		Labels: []string{"kind:task", "status:draft", "scope:test"},
+		Labels: []string{"kind:effort.task", "status:draft", "scope:test"},
 		Title:  "bad child",
 	})
 	store.AddEdge(ctx, parchment.Edge{From: parentTask.ID, To: "BAD-CHILD-1", Relation: parchment.RelParentOf}) //nolint:errcheck // test seeding
@@ -53,7 +53,7 @@ func TestVocabList(t *testing.T) {
 	// Should contain core kinds
 	found := false
 	for _, k := range vocab {
-		if k == "task" {
+		if k == "effort.task" {
 			found = true
 		}
 	}
@@ -86,7 +86,7 @@ func TestVocabAdd_Duplicate(t *testing.T) {
 	t.Parallel()
 	proto, _ := newProto(t)
 
-	err := proto.VocabAdd("task")
+	err := proto.VocabAdd("effort.task")
 	if err == nil {
 		t.Error("expected error for duplicate kind")
 	}
@@ -112,7 +112,7 @@ func TestVocabRemove_InUse(t *testing.T) {
 
 	createTask(t, proto, "using task kind")
 
-	err := proto.VocabRemove(ctx, "task")
+	err := proto.VocabRemove(ctx, "effort.task")
 	if err == nil {
 		t.Error("expected error: kind in use")
 	}
@@ -228,7 +228,7 @@ func TestGetConfig_WithScopedConfig(t *testing.T) {
 	// Create a config artifact with a section acting as key=value
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "cfg-1",
-		Labels: []string{"kind:config", "work.active", "scope:test"},
+		Labels: []string{"kind:support.config", "work.active", "scope:test"},
 		Title:  "test config",
 		Sections: []parchment.Section{
 			{Name: "default_scope", Text: "test"},
@@ -252,7 +252,7 @@ func TestCreateArtifact_MirrorSkipsGuards(t *testing.T) {
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "external ticket JIRA-123",
 
 		ExplicitID: "MIR-JIRA-123",
-		Labels:     []string{"kind:mirror"}})
+		Labels:     []string{"kind:support.mirror"}})
 	if err != nil {
 		t.Fatalf("CreateArtifact mirror: %v", err)
 	}
@@ -273,7 +273,7 @@ func TestCreateArtifact_TemplateIsScopeless(t *testing.T) {
 		Sections: []parchment.Section{
 			{Name: "content", Text: "template content"},
 		},
-		Labels: []string{"kind:template"}})
+		Labels: []string{"kind:support.template"}})
 	if err != nil {
 		t.Fatalf("CreateArtifact template: %v", err)
 	}

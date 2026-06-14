@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.config
+  name: kind.support.config
 spec:
   prefix: CFG
   code: CFG
-  family: support
   isConfig: true
   protected: true
   skipEmptyCheck: true

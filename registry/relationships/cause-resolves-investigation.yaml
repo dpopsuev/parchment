@@ -3,7 +3,7 @@ kind: Relationship
 metadata:
   name: cause-resolves-investigation
 spec:
-  from: kind:cause
+  from: kind:investigation.cause
   relation: resolves
-  to: kind:investigation
+  to: kind:investigation.investigation
   maxIncoming: 1

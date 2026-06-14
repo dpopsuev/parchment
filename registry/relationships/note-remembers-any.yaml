@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: note-remembers-any
 spec:
-  from: kind:note
+  from: kind:knowledge.note
   relation: remembers
   to: "*"

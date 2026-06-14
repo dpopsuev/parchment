@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: campaign-related-any
 spec:
-  from: kind:campaign
+  from: kind:effort.campaign
   relation: related
   to: "*"

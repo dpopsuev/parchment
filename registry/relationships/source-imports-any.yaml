@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: source-imports-any
 spec:
-  from: kind:source
+  from: kind:knowledge.source
   relation: imports
   to: "*"

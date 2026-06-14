@@ -76,7 +76,7 @@ func (p *Protocol) Seed(ctx context.Context, dir string) (*SeedResult, error) {
 }
 
 // ParseMDFile reads a markdown file with YAML frontmatter and ## H2 sections
-// into an Artifact. Kind defaults to "note" when not specified in frontmatter.
+// into an Artifact. Kind is taken from frontmatter; none is set if absent.
 // H2 headings become named sections; the full body before the first heading
 // is dropped (frontmatter carries the structured data).
 func ParseMDFile(path string) (*Artifact, error) { //nolint:gosec,gocyclo,cyclop // one case per frontmatter field; complexity is linear not nested
@@ -163,7 +163,7 @@ func parseTemplateFile(path string) (*Artifact, error) {
 	if err != nil {
 		return nil, err
 	}
-	art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, "template")
+	art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, "support.template")
 	art.Labels = setStatusLabel(art.Labels, "work.active")
 	if art.ID == "" {
 		base := strings.TrimSuffix(filepath.Base(path), ".md")
@@ -190,7 +190,7 @@ func parseConfigFile(path string) (*Artifact, error) {
 		scope = ""
 	}
 
-	labels := []string{LabelPrefixKind + "config", statusWorkActive}
+	labels := []string{LabelPrefixKind + "support.config", statusWorkActive}
 	if scope != "" {
 		labels = append(labels, LabelPrefixScope+scope)
 	}

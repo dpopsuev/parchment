@@ -18,7 +18,7 @@ func TestArtifact_Annotations_RoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	art := &Artifact{
-		ID: "ANN-1", Labels: []string{"kind:task", "status:draft"}, Title: "with annotations",
+		ID: "ANN-1", Labels: []string{"kind:effort.task", "status:draft"}, Title: "with annotations",
 		Annotations: []Annotation{
 			{Kind: "+", Comment: "good approach"},
 			{Kind: "-", Comment: "missing error handling"},
@@ -67,7 +67,7 @@ func TestQualityGate_BlockingPreventsCompletion(t *testing.T) {
 
 	// Create and activate an artifact
 	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Sections: []Section{{Name: "context", Text: "a"}},
-		Labels: []string{"kind:task", "priority:medium"},})
+		Labels: []string{"kind:effort.task", "priority:medium"},})
 	// Walk through lifecycle to work.active so work.complete is a valid transition.
 	p.SetField(ctx, []string{a.ID}, "status", "work.active", SetFieldOptions{Force: true}) //nolint:errcheck // test seeding
 
@@ -118,7 +118,7 @@ func TestQualityGate_WarningAllowsCompletion(t *testing.T) {
 	p.RegisterGate(gate)
 
 	a, _ := p.CreateArtifact(ctx, CreateInput{Title: "A", Sections: []Section{{Name: "context", Text: "a"}},
-		Labels: []string{"kind:task", "priority:medium"},})
+		Labels: []string{"kind:effort.task", "priority:medium"},})
 	// Walk to work.active so work.complete is a valid transition.
 	p.SetField(ctx, []string{a.ID}, "status", "work.active", SetFieldOptions{Force: true}) //nolint:errcheck // test seeding
 

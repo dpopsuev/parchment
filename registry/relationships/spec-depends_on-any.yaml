@@ -3,7 +3,7 @@ kind: Relationship
 metadata:
   name: spec-depends_on-any
 spec:
-  from: kind:spec
+  from: kind:intent.spec
   relation: depends_on
   to: "*"
   cycleGuard: true

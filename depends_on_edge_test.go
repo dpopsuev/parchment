@@ -16,12 +16,12 @@ func TestGuardDependsOnComplete_ReadsEdge(t *testing.T) {
 
 	// Create a dependency task and leave it draft (non-terminal).
 	dep, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "dep",
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 
 	// Create a task that depends on dep.
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "work", DependsOn: []string{dep.ID},
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-		Labels: []string{"kind:task", "priority:medium"},})
+		Labels: []string{"kind:effort.task", "priority:medium"},})
 
 	// Advance to in_review (prerequisite for complete).
 	for _, s := range []string{"active", "mature", "allocated", "in_progress", "in_review"} {
@@ -43,9 +43,9 @@ func TestGetArtifact_DependsOnFromEdge(t *testing.T) {
 	ctx := t.Context()
 
 	dep, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "dep",
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "work", DependsOn: []string{dep.ID},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 
 	edges, err := store.Neighbors(ctx, art.ID, parchment.RelDependsOn, parchment.Outgoing)
 	if err != nil {

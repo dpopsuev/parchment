@@ -30,7 +30,7 @@ func seedArtifacts(b *testing.B, p *Protocol, n int) []string {
 		art, err := p.CreateArtifact(ctx, CreateInput{Title:    fmt.Sprintf("bench-task-%d", i),
 
 			Sections: []Section{{Name: "context", Text: fmt.Sprintf("benchmark task %d context", i)}},
-		Labels: []string{"kind:task", "priority:medium"},})
+		Labels: []string{"kind:effort.task", "priority:medium"},})
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -52,7 +52,7 @@ func BenchmarkCreateArtifact(b *testing.B) {
 		_, err := p.CreateArtifact(ctx, CreateInput{Title:    fmt.Sprintf("bench-%d", i),
 
 			Sections: []Section{{Name: "context", Text: "benchmark"}},
-		Labels: []string{"kind:task", "priority:medium"},})
+		Labels: []string{"kind:effort.task", "priority:medium"},})
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -89,7 +89,7 @@ func BenchmarkTopoSort(b *testing.B) {
 
 	// Create a parent goal.
 	goal, err := p.CreateArtifact(ctx, CreateInput{Title: "bench-goal",
-		Labels: []string{"kind:goal"},})
+		Labels: []string{"kind:effort.goal"},})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func BenchmarkTopoSort(b *testing.B) {
 		in := CreateInput{Title: fmt.Sprintf("task-%d", i),
 Parent: goal.ID,
 			Sections: []Section{{Name: "context", Text: "bench"}},
-		Labels: []string{"kind:task", "priority:medium"},}
+		Labels: []string{"kind:effort.task", "priority:medium"},}
 		if prevID != "" && i%5 == 0 { // every 5th task depends on the previous
 			in.DependsOn = []string{prevID}
 		}

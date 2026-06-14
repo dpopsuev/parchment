@@ -24,7 +24,7 @@ func TestCheck_UUIDIDsNoViolation(t *testing.T) {
 	_, err = proto.CreateArtifact(ctx, parchment.CreateInput{
 		Title:  "uuid task",
 
-		Labels: []string{"kind:task"},
+		Labels: []string{"kind:effort.task"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestCheck_HumanIDsNoViolation(t *testing.T) {
 
 	_ = s.Put(ctx, &parchment.Artifact{
 		ID:    "SCR-TSK-001",
-		Labels: []string{"kind:task", "status:active", "scope:scribe"},
+		Labels: []string{"kind:effort.task", "status:active", "scope:scribe"},
 		Title: "human id task",
 	})
 

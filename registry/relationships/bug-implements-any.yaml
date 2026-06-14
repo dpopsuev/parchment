@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: bug-implements-any
 spec:
-  from: kind:bug
+  from: kind:intent.bug
   relation: implements
   to: "*"

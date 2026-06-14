@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: spec-satisfies-template
 spec:
-  from: kind:spec
+  from: kind:intent.spec
   relation: satisfies
-  to: kind:template
+  to: kind:support.template

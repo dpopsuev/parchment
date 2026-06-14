@@ -1,15 +1,14 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.campaign
+  name: kind.effort.campaign
 spec:
   prefix: CMP
   code: CMP
-  family: effort
   protected: true
   isContainerKind: true
   skipEmptyCheck: true
-  children: [goal]
+  children: [effort.goal]
   lifecycle:
     defaultStatus: work.draft
   activeStatus: work.active
@@ -20,7 +19,7 @@ spec:
   relations:
     outgoing: [parent_of, satisfies]
     targets:
-      satisfies: [template]
+      satisfies: [support.template]
   whenToCreate: |
     Create a campaign when you are coordinating a multi-week effort with multiple
     goals toward a named outcome — a release, a refactor initiative, a feature

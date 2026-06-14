@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: doc-documents-any
 spec:
-  from: kind:doc
+  from: kind:support.doc
   relation: documents
   to: "*"

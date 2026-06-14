@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.code-interface
+  name: kind.code.interface
 spec:
   prefix: IFC
   code: ifc
-  family: code
   children: []
   lifecycle:
     defaultStatus: code.indexed

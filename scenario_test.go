@@ -89,15 +89,15 @@ func TestScenario_A_Hierarchy(t *testing.T) {
 
 	campaign := mustCreate(t, proto, parchment.CreateInput{Title: "Q3 campaign",
 		Sections: []parchment.Section{{Name: "mission", Text: "ship it"}},
-		Labels:   []string{"kind:campaign"},})
+		Labels:   []string{"kind:effort.campaign"},})
 	goal := mustCreate(t, proto, parchment.CreateInput{Title: "core goal",
-		Labels: []string{"kind:goal"},})
+		Labels: []string{"kind:effort.goal"},})
 	task1 := mustCreate(t, proto, parchment.CreateInput{Title: "task one",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-		Labels:   []string{"kind:task"},})
+		Labels:   []string{"kind:effort.task"},})
 	task2 := mustCreate(t, proto, parchment.CreateInput{Title: "task two",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-		Labels:   []string{"kind:task"},})
+		Labels:   []string{"kind:effort.task"},})
 
 	slink(t, proto, campaign.ID, parchment.RelParentOf, goal.ID)
 	slink(t, proto, goal.ID, parchment.RelParentOf, task1.ID)
@@ -155,13 +155,13 @@ func TestScenario_B_CodeGraph(t *testing.T) {
 
 	// Source artifacts have no AllowedOutbound restriction — open world.
 	comp := mustCreate(t, proto, parchment.CreateInput{Title: "code:component:graphEngine",
-		Labels: []string{"kind:source", parchment.LabelPrefixScope + "test"},
+		Labels: []string{"kind:knowledge.source", parchment.LabelPrefixScope + "test"},
 	})
 	sym1 := mustCreate(t, proto, parchment.CreateInput{Title: "code:symbol:initGraph",
-		Labels: []string{"kind:source", parchment.LabelPrefixScope + "test"},
+		Labels: []string{"kind:knowledge.source", parchment.LabelPrefixScope + "test"},
 	})
 	sym2 := mustCreate(t, proto, parchment.CreateInput{Title: "code:symbol:applyData",
-		Labels: []string{"kind:source", parchment.LabelPrefixScope + "test"},
+		Labels: []string{"kind:knowledge.source", parchment.LabelPrefixScope + "test"},
 	})
 
 	// Open world: custom relations are accepted for source artifacts.
@@ -171,11 +171,11 @@ func TestScenario_B_CodeGraph(t *testing.T) {
 
 	// task.depends_on has cycle detection via CycleGuardedRelations.
 	t1 := mustCreate(t, proto, parchment.CreateInput{Title: "task-t1",
-		Labels:   []string{"kind:task", parchment.LabelPrefixScope + "test"},
+		Labels:   []string{"kind:effort.task", parchment.LabelPrefixScope + "test"},
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
 	})
 	t2 := mustCreate(t, proto, parchment.CreateInput{Title: "task-t2",
-		Labels:   []string{"kind:task", parchment.LabelPrefixScope + "test"},
+		Labels:   []string{"kind:effort.task", parchment.LabelPrefixScope + "test"},
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
 	})
 	slink(t, proto, t1.ID, parchment.RelDependsOn, t2.ID)
@@ -205,13 +205,13 @@ func TestScenario_C_AgentContext(t *testing.T) {
 
 	sessionID := "abc123"
 	ctxArt := mustCreate(t, proto, parchment.CreateInput{Title: "agent session context",
-		Labels: []string{"kind:context", "session:" + sessionID, "source:agent", parchment.LabelPrefixScope + "test"},
+		Labels: []string{"kind:knowledge.context", "session:" + sessionID, "source:agent", parchment.LabelPrefixScope + "test"},
 	})
 	note1 := mustCreate(t, proto, parchment.CreateInput{Title: "physics note",
-		Labels: []string{"kind:note", "session:" + sessionID, "source:agent", parchment.LabelPrefixScope + "test"},
+		Labels: []string{"kind:knowledge.note", "session:" + sessionID, "source:agent", parchment.LabelPrefixScope + "test"},
 	})
 	concept := mustCreate(t, proto, parchment.CreateInput{Title: "force graph concept",
-		Labels: []string{"kind:concept", "source:agent", parchment.LabelPrefixScope + "test"},
+		Labels: []string{"kind:knowledge.concept", "source:agent", parchment.LabelPrefixScope + "test"},
 	})
 
 	slink(t, proto, ctxArt.ID, parchment.RelRemembers, note1.ID)
@@ -260,11 +260,11 @@ func TestScenario_D_Wiki(t *testing.T) {
 	ctx := context.Background()
 
 	concept := mustCreate(t, proto, parchment.CreateInput{Title: "N-body gravity simulation",
-		Labels: []string{"kind:concept", parchment.LabelPrefixScope + "test"},})
+		Labels: []string{"kind:knowledge.concept", parchment.LabelPrefixScope + "test"},})
 	src := mustCreate(t, proto, parchment.CreateInput{Title: "Barnes-Hut paper",
-		Labels: []string{"kind:source", parchment.LabelPrefixScope + "test"},})
+		Labels: []string{"kind:knowledge.source", parchment.LabelPrefixScope + "test"},})
 	note := mustCreate(t, proto, parchment.CreateInput{Title: "notes on N-body",
-		Labels: []string{"kind:note", parchment.LabelPrefixScope + "test"},})
+		Labels: []string{"kind:knowledge.note", parchment.LabelPrefixScope + "test"},})
 
 	// note→source is valid per kind:note.AllowedOutbound.cites.
 	slink(t, proto, note.ID, "cites", src.ID)
@@ -302,13 +302,13 @@ func TestScenario_E_CrossSource(t *testing.T) {
 	ctx := context.Background()
 
 	spec := mustCreate(t, proto, parchment.CreateInput{Title: "ingest protocol spec",
-		Labels: []string{"kind:spec", "source:human", parchment.LabelPrefixScope + "test"},
+		Labels: []string{"kind:intent.spec", "source:human", parchment.LabelPrefixScope + "test"},
 	})
 	component := mustCreate(t, proto, parchment.CreateInput{Title: "code:component:ingest",
-		Labels: []string{"kind:note", "source:locus", parchment.LabelPrefixScope + "test"},
+		Labels: []string{"kind:knowledge.note", "source:locus", parchment.LabelPrefixScope + "test"},
 	})
 	issue := mustCreate(t, proto, parchment.CreateInput{Title: "JIRA-101: ingest timeout",
-		Labels:   []string{"kind:bug", "source:jira", parchment.LabelPrefixScope + "test"},
+		Labels:   []string{"kind:intent.bug", "source:jira", parchment.LabelPrefixScope + "test"},
 		Sections: []parchment.Section{{Name: "context", Text: "timeout"}},
 	})
 
@@ -361,48 +361,48 @@ func TestScenario_F_UnifiedGraph(t *testing.T) { //nolint:gocyclo // inherent co
 	// Task tracker (Scenario A nodes).
 	campaign := mustCreate(t, proto, parchment.CreateInput{Title: "unified campaign",
 		Sections: []parchment.Section{{Name: "mission", Text: "unified"}},
-		Labels:   []string{"kind:campaign", scopeTest},})
+		Labels:   []string{"kind:effort.campaign", scopeTest},})
 	goal := mustCreate(t, proto, parchment.CreateInput{Title: "unified goal",
-		Labels: []string{"kind:goal", scopeTest},})
+		Labels: []string{"kind:effort.goal", scopeTest},})
 	task := mustCreate(t, proto, parchment.CreateInput{Title: "unified task",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-		Labels:   []string{"kind:task", scopeTest},})
+		Labels:   []string{"kind:effort.task", scopeTest},})
 	slink(t, proto, campaign.ID, parchment.RelParentOf, goal.ID)
 	slink(t, proto, goal.ID, parchment.RelParentOf, task.ID)
 
 	// Docs (Scenario E).
 	spec := mustCreate(t, proto, parchment.CreateInput{Title: "unified spec",
-		Labels: []string{"kind:spec", "source:human", scopeTest},
+		Labels: []string{"kind:intent.spec", "source:human", scopeTest},
 	})
 	slink(t, proto, task.ID, parchment.RelImplements, spec.ID)
 
 	// Code (Scenario B — using source artifacts for open-world custom relations).
 	component := mustCreate(t, proto, parchment.CreateInput{Title: "code:component:unified",
-		Labels: []string{"kind:source", "source:locus", scopeTest},
+		Labels: []string{"kind:knowledge.source", "source:locus", scopeTest},
 	})
 	symbol := mustCreate(t, proto, parchment.CreateInput{Title: "code:symbol:unified",
-		Labels: []string{"kind:source", "source:locus", scopeTest},
+		Labels: []string{"kind:knowledge.source", "source:locus", scopeTest},
 	})
 	slink(t, proto, spec.ID, parchment.RelDocuments, component.ID)
 	slink(t, proto, symbol.ID, "belongs_to", component.ID)
 
 	// Jira issue.
 	issue := mustCreate(t, proto, parchment.CreateInput{Title: "JIRA-999: unified bug",
-		Labels:   []string{"kind:bug", "source:jira", scopeTest},
+		Labels:   []string{"kind:intent.bug", "source:jira", scopeTest},
 		Sections: []parchment.Section{{Name: "context", Text: "bug"}},
 	})
 	slink(t, proto, issue.ID, parchment.RelImplements, symbol.ID)
 
 	// Agent context (Scenario C).
 	ctxArt := mustCreate(t, proto, parchment.CreateInput{Title: "agent ctx",
-		Labels: []string{"kind:context", "session:sess1", "source:agent", scopeTest},
+		Labels: []string{"kind:knowledge.context", "session:sess1", "source:agent", scopeTest},
 	})
 	slink(t, proto, ctxArt.ID, parchment.RelRemembers, task.ID)
 	slink(t, proto, ctxArt.ID, parchment.RelRemembers, symbol.ID)
 
 	// Wiki concept (Scenario D).
 	concept := mustCreate(t, proto, parchment.CreateInput{Title: "unified concept",
-		Labels: []string{"kind:concept", scopeTest},})
+		Labels: []string{"kind:knowledge.concept", scopeTest},})
 	slink(t, proto, concept.ID, parchment.RelElaborates, spec.ID)
 	slink(t, proto, ctxArt.ID, parchment.RelElaborates, concept.ID)
 

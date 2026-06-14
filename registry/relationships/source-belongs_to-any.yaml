@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: source-belongs_to-any
 spec:
-  from: kind:source
+  from: kind:knowledge.source
   relation: belongs_to
   to: "*"

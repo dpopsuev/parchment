@@ -21,7 +21,7 @@ func TestFTS5_InsertIsSearchable(t *testing.T) {
 	defer s.Close() //nolint:errcheck // deferred close in test
 
 	err = s.Put(ctx, &Artifact{
-		ID: "TST-1", Labels: []string{"kind:task", "status:draft"},
+		ID: "TST-1", Labels: []string{"kind:effort.task", "status:draft"},
 		Title: "uniquefts5token",
 	})
 	if err != nil {
@@ -51,7 +51,7 @@ func TestFTS5_UpdateKeepsInSync(t *testing.T) {
 	defer s.Close() //nolint:errcheck // deferred close in test
 
 	_ = s.Put(ctx, &Artifact{
-		ID: "TST-1", Labels: []string{"kind:task", "status:draft"},
+		ID: "TST-1", Labels: []string{"kind:effort.task", "status:draft"},
 		Title: "xbefore uniqueoldword",
 	})
 
@@ -85,7 +85,7 @@ func TestFTS5_DeleteRemovesFromIndex(t *testing.T) {
 	defer s.Close() //nolint:errcheck // deferred close in test
 
 	_ = s.Put(ctx, &Artifact{
-		ID: "TST-1", Labels: []string{"kind:task", "status:draft"},
+		ID: "TST-1", Labels: []string{"kind:effort.task", "status:draft"},
 		Title: "delete-fts-token",
 	})
 

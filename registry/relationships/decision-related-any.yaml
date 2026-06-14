@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: decision-related-any
 spec:
-  from: kind:decision
+  from: kind:intent.decision
   relation: related
   to: "*"

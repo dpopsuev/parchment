@@ -16,10 +16,10 @@ func TestListByLabel_MemStore(t *testing.T) {
 	s := parchment.NewMemoryStore()
 	ctx := context.Background()
 
-	_ = s.Put(ctx, &parchment.Artifact{ID: "A1", Labels: []string{"kind:task", "status:active"}, Title: "t1"})
-	_ = s.Put(ctx, &parchment.Artifact{ID: "A2", Labels: []string{"kind:spec", "status:active"}, Title: "t2"})
+	_ = s.Put(ctx, &parchment.Artifact{ID: "A1", Labels: []string{"kind:effort.task", "status:active"}, Title: "t1"})
+	_ = s.Put(ctx, &parchment.Artifact{ID: "A2", Labels: []string{"kind:intent.spec", "status:active"}, Title: "t2"})
 
-	got, err := s.ListByLabel(ctx, "kind:task")
+	got, err := s.ListByLabel(ctx, "kind:effort.task")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,10 +37,10 @@ func TestListByLabel_SQLite(t *testing.T) {
 	defer s.Close() //nolint:errcheck // test teardown
 
 	ctx := context.Background()
-	_ = s.Put(ctx, &parchment.Artifact{ID: "B1", Labels: []string{"kind:task"}, Title: "b1"})
-	_ = s.Put(ctx, &parchment.Artifact{ID: "B2", Labels: []string{"kind:note"}, Title: "b2"})
+	_ = s.Put(ctx, &parchment.Artifact{ID: "B1", Labels: []string{"kind:effort.task"}, Title: "b1"})
+	_ = s.Put(ctx, &parchment.Artifact{ID: "B2", Labels: []string{"kind:knowledge.note"}, Title: "b2"})
 
-	got, err := s.ListByLabel(ctx, "kind:task")
+	got, err := s.ListByLabel(ctx, "kind:effort.task")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,8 +57,8 @@ func TestNeighborArtifacts_MemStore(t *testing.T) {
 	s := parchment.NewMemoryStore()
 	ctx := context.Background()
 
-	_ = s.Put(ctx, &parchment.Artifact{ID: "A1", Labels: []string{"kind:task"}, Title: "task"})
-	_ = s.Put(ctx, &parchment.Artifact{ID: "A2", Labels: []string{"kind:spec"}, Title: "spec"})
+	_ = s.Put(ctx, &parchment.Artifact{ID: "A1", Labels: []string{"kind:effort.task"}, Title: "task"})
+	_ = s.Put(ctx, &parchment.Artifact{ID: "A2", Labels: []string{"kind:intent.spec"}, Title: "spec"})
 	_ = s.AddEdge(ctx, parchment.Edge{From: "A1", To: "A2", Relation: parchment.RelImplements})
 
 	got, err := s.NeighborArtifacts(ctx, "A1", parchment.RelImplements, parchment.Outgoing)

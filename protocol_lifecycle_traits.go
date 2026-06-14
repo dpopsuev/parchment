@@ -72,11 +72,13 @@ func (p *Protocol) MustSections(kind string) []string {
 	return nil
 }
 
-// KindsForFamily returns all kind names with the given family, sorted.
-func (p *Protocol) KindsForFamily(family string) []string {
+// KindsWithPrefix returns all kind names whose name starts with prefix+".",
+// e.g. "effort" returns ["effort.campaign", "effort.goal", "effort.task"].
+func (p *Protocol) KindsWithPrefix(prefix string) []string {
 	var out []string
+	match := "kind:" + prefix + "."
 	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
-		if len(key) > 5 && key[:5] == "kind:" && p.labelTraits[key].Family == family {
+		if strings.HasPrefix(key, match) {
 			out = append(out, key[5:])
 		}
 	}

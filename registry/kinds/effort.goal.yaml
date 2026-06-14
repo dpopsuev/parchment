@@ -1,15 +1,14 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.goal
+  name: kind.effort.goal
 spec:
   prefix: GOAL
   code: GOL
-  family: effort
   protected: true
   isContainerKind: true
   skipEmptyCheck: true
-  children: [task, spec, bug, need, ref, doc, decision]
+  children: [effort.task, intent.spec, intent.bug, intent.need, support.ref, support.doc, intent.decision]
   lifecycle:
     defaultStatus: work.draft
   isGoalKind: true
@@ -19,7 +18,7 @@ spec:
     incoming: [parent_of]
     outgoing: [satisfies]
     targets:
-      satisfies: [template]
+      satisfies: [support.template]
   whenToCreate: |
     Create a goal when you have a measurable outcome that multiple tasks serve —
     a shipped feature, a passing test suite, a published release. Goals are the

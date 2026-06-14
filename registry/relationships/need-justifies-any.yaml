@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: need-justifies-any
 spec:
-  from: kind:need
+  from: kind:intent.need
   relation: justifies
   to: "*"

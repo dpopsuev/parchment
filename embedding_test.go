@@ -172,7 +172,7 @@ func TestEmbeddingStore_PutGet(t *testing.T) {
 	s := parchment.NewMemoryStore()
 	ctx := context.Background()
 
-	art := &parchment.Artifact{ID: "TST-1", Labels: []string{"kind:note", "status:active"}, Title: "test"}
+	art := &parchment.Artifact{ID: "TST-1", Labels: []string{"kind:knowledge.note", "status:active"}, Title: "test"}
 	if err := s.Put(ctx, art); err != nil {
 		t.Fatal(err)
 	}
@@ -203,8 +203,8 @@ func TestEmbeddingStore_SearchSemantic_RanksCloserFirst(t *testing.T) {
 
 	// Two artifacts: one about template conformance, one about PTP clocks.
 	for _, art := range []*parchment.Artifact{
-		{ID: "TST-CONF", Labels: []string{"kind:note", "status:active"}, Title: "template conformance"},
-		{ID: "TST-PTP", Labels: []string{"kind:note", "status:active"}, Title: "ptp clock"},
+		{ID: "TST-CONF", Labels: []string{"kind:knowledge.note", "status:active"}, Title: "template conformance"},
+		{ID: "TST-PTP", Labels: []string{"kind:knowledge.note", "status:active"}, Title: "ptp clock"},
 	} {
 		if err := s.Put(ctx, art); err != nil {
 			t.Fatal(err)
@@ -235,8 +235,8 @@ func TestEmbeddingStore_SearchSemantic_SkipsUnindexed(t *testing.T) {
 
 	// Two artifacts, only one has an embedding.
 	for _, art := range []*parchment.Artifact{
-		{ID: "TST-INDEXED", Labels: []string{"kind:note", "status:active"}, Title: "indexed"},
-		{ID: "TST-NONE", Labels: []string{"kind:note", "status:active"}, Title: "not indexed"},
+		{ID: "TST-INDEXED", Labels: []string{"kind:knowledge.note", "status:active"}, Title: "indexed"},
+		{ID: "TST-NONE", Labels: []string{"kind:knowledge.note", "status:active"}, Title: "not indexed"},
 	} {
 		_ = s.Put(ctx, art)
 	}
@@ -269,7 +269,7 @@ func TestProtocol_NeverAutoIndexesEmbedding(t *testing.T) {
 		Sections: []parchment.Section{
 			{Name: "body", Text: "template conformance check deferred from create to promote"},
 		},
-		Labels: []string{parchment.LabelPrefixKind + "note"},})
+		Labels: []string{parchment.LabelPrefixKind + "knowledge.note"},})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,10 +297,10 @@ func TestProtocol_SemanticRecall_BeatsFTSOnSemantic(t *testing.T) {
 
 	conf, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "template draft on missing sections",
 		Sections: []parchment.Section{{Name: "body", Text: "template conformance deferred, artifact created in draft"}},
-		Labels: []string{parchment.LabelPrefixKind + "note"},})
+		Labels: []string{parchment.LabelPrefixKind + "knowledge.note"},})
 	ptp, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "ptp clock holdover",
 		Sections: []parchment.Section{{Name: "body", Text: "ptp clock synchronization holdover test"}},
-		Labels: []string{parchment.LabelPrefixKind + "note"},})
+		Labels: []string{parchment.LabelPrefixKind + "knowledge.note"},})
 
 	// Librarian sidecar supplies embeddings externally.
 	confVec, _ := embedFn(ctx, "template conformance deferred, artifact created in draft")

@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: source-calls-any
 spec:
-  from: kind:source
+  from: kind:knowledge.source
   relation: calls
   to: "*"

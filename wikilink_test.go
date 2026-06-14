@@ -80,7 +80,7 @@ func TestBacklinks(t *testing.T) {
 	// Use decision kind — no required edges or fields.
 	mkArt := func(title string) *Artifact {
 		art, err := p.CreateArtifact(ctx, CreateInput{Title: title,
-		Labels: []string{"kind:decision"},})
+		Labels: []string{"kind:intent.decision"},})
 		if err != nil {
 			t.Fatalf("create %q: %v", title, err)
 		}
@@ -114,7 +114,7 @@ func TestSyncWikilinks(t *testing.T) {
 	p := New(store, nil, []string{"test"}, nil, ProtocolConfig{})
 
 	stoicism, err := p.CreateArtifact(ctx, CreateInput{Title: "Stoicism",
-		Labels: []string{"kind:decision"},})
+		Labels: []string{"kind:intent.decision"},})
 	if err != nil {
 		t.Fatalf("create stoicism: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestSyncWikilinks(t *testing.T) {
 		Sections: []Section{
 			{Name: "body", Text: "This note references [[Stoicism]] as a key philosophy."},
 		},
-		Labels: []string{"kind:decision"},})
+		Labels: []string{"kind:intent.decision"},})
 
 	if err != nil {
 		t.Fatalf("create note: %v", err)

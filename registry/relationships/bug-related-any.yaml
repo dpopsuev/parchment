@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: bug-related-any
 spec:
-  from: kind:bug
+  from: kind:intent.bug
   relation: related
   to: "*"

@@ -17,7 +17,7 @@ func TestSetFieldOptions_BypassGuards_ArchivesWithoutGuards(t *testing.T) {
 	proto, _ := newProto(t)
 
 	task := mustCreate(t, proto, parchment.CreateInput{Title: "T",
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 
 	results, err := proto.SetField(ctx, []string{task.ID}, "status", "archived",
 		parchment.SetFieldOptions{BypassGuards: true})
@@ -41,11 +41,11 @@ func TestSetFieldOptions_Cascade_TransitionsChildren(t *testing.T) {
 	proto, _ := newProto(t)
 
 	goal := mustCreate(t, proto, parchment.CreateInput{Title: "G",
-		Labels: []string{"kind:goal"},})
+		Labels: []string{"kind:effort.goal"},})
 	a := mustCreate(t, proto, parchment.CreateInput{Title: "A", Parent: goal.ID,
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 	b := mustCreate(t, proto, parchment.CreateInput{Title: "B", Parent: goal.ID,
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 
 	results, err := proto.SetField(ctx, []string{goal.ID}, "status", "archived",
 		parchment.SetFieldOptions{BypassGuards: true, Cascade: true})
@@ -72,7 +72,7 @@ func TestSetFieldOptions_DryRun_NoMutation(t *testing.T) {
 	proto, _ := newProto(t)
 
 	task := mustCreate(t, proto, parchment.CreateInput{Title: "T",
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 	original := task.Label(parchment.LabelPrefixStatus)
 
 	results, err := proto.SetField(ctx, []string{task.ID}, "status", "archived",
@@ -106,7 +106,7 @@ func TestSetField_Labels_ReplacesEntireSet(t *testing.T) {
 	proto, _ := newProto(t)
 
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Labels: []string{"kind:note", "scope:test", "priority:high"},
+		Labels: []string{"kind:knowledge.note", "scope:test", "priority:high"},
 		Title:  "test artifact",
 	})
 
@@ -122,7 +122,7 @@ func TestSetField_Labels_ReplacesEntireSet(t *testing.T) {
 	if len(after.Labels) > 3 { // compliance:ok may be added by StampCompliance
 		t.Logf("labels after SetField: %v", after.Labels)
 	}
-	for _, destroyed := range []string{"kind:note", "scope:test", "priority:high"} {
+	for _, destroyed := range []string{"kind:knowledge.note", "scope:test", "priority:high"} {
 		found := false
 		for _, l := range after.Labels {
 			if l == destroyed {

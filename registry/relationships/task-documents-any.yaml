@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: task-documents-any
 spec:
-  from: kind:task
+  from: kind:effort.task
   relation: documents
   to: "*"

@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.rule
+  name: kind.support.rule
 spec:
   prefix: RULE
   code: RUL
-  family: support
   isRule: true
   protected: true
   skipGuards: true

@@ -5,4 +5,4 @@ metadata:
 spec:
   from: "*"
   relation: produced_by
-  to: kind:ctx-tool-call
+  to: kind:ctx.tool-call

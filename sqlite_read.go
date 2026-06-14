@@ -85,12 +85,9 @@ func buildWhereClause(f Filter) ([]string, []any) { //nolint:cyclop,gocyclo,gocr
 		clauses = append(clauses, "id LIKE ?")
 		args = append(args, f.IDPrefix+"%")
 	}
-	if len(f.FamilyKinds) > 0 {
-		ph := strings.Repeat("?,", len(f.FamilyKinds))
-		clauses = append(clauses, "kind IN ("+ph[:len(ph)-1]+")")
-		for k := range f.FamilyKinds {
-			args = append(args, k)
-		}
+	if f.KindPrefix != "" {
+		clauses = append(clauses, "kind LIKE ?")
+		args = append(args, f.KindPrefix+".%")
 	}
 	if len(f.ScopesOr) > 0 {
 		ph := make([]string, len(f.ScopesOr))

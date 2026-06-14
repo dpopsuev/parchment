@@ -19,7 +19,7 @@ func TestPutIfVersion_SucceedsOnMatchingVersion(t *testing.T) {
 	ctx := context.Background()
 
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "original",
-		Labels: []string{parchment.LabelPrefixKind + "task"},})
+		Labels: []string{parchment.LabelPrefixKind + "effort.task"},})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestPutIfVersion_FailsOnStaleVersion(t *testing.T) {
 	ctx := context.Background()
 
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "original",
-		Labels: []string{parchment.LabelPrefixKind + "task"},})
+		Labels: []string{parchment.LabelPrefixKind + "effort.task"},})
 	staleVersion := art.UpdatedAt
 
 	// Simulate another agent updating the artifact: bump UpdatedAt in the store directly
@@ -77,7 +77,7 @@ func TestPutIfVersion_SQLite_SucceedsOnMatch(t *testing.T) {
 	ctx := context.Background()
 
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "original",
-		Labels: []string{parchment.LabelPrefixKind + "task"},})
+		Labels: []string{parchment.LabelPrefixKind + "effort.task"},})
 
 	art.Title = "updated"
 	if err := proto.UpdateArtifact(ctx, art, art.UpdatedAt); err != nil {
@@ -105,7 +105,7 @@ func TestPutIfVersion_SQLite_FailsOnStale(t *testing.T) {
 	ctx := context.Background()
 
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "original",
-		Labels: []string{parchment.LabelPrefixKind + "task"},})
+		Labels: []string{parchment.LabelPrefixKind + "effort.task"},})
 	staleVersion := art.UpdatedAt
 	time.Sleep(time.Millisecond) // ensure T2 > T1 on fast hardware
 

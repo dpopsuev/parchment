@@ -24,7 +24,7 @@ func TestAlias_CustomAliasOnCreate(t *testing.T) {
 
 		Alias:    "login-bug",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task"},})
+		Labels:   []string{"kind:effort.task"},})
 	if err != nil {
 		t.Fatalf("CreateArtifact: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestAlias_GetByAlias(t *testing.T) {
 	art, err := proto.CreateArtifact(ctx, CreateInput{Title: "Findable",
 		Alias:    "find-me",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task"},})
+		Labels:   []string{"kind:effort.task"},})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestAlias_Rename(t *testing.T) {
 	art, err := proto.CreateArtifact(ctx, CreateInput{Title: "Rename me",
 		Alias:    "old-name",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task"},})
+		Labels:   []string{"kind:effort.task"},})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestAlias_RenameByAlias(t *testing.T) {
 	art, err := proto.CreateArtifact(ctx, CreateInput{Title: "Rename by alias",
 		Alias:    "step-one",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task"},})
+		Labels:   []string{"kind:effort.task"},})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +166,7 @@ func TestAlias_SQLite_RoundTrip(t *testing.T) {
 	art, err := proto.CreateArtifact(ctx, CreateInput{Title: "Persistent alias",
 		Alias:    "persistent-one",
 		Sections: []Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task"},})
+		Labels:   []string{"kind:effort.task"},})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,7 +3,7 @@ kind: Relationship
 metadata:
   name: goal-parent_of-bug
 spec:
-  from: kind:goal
+  from: kind:effort.goal
   relation: parent_of
-  to: kind:bug
+  to: kind:intent.bug
   maxIncoming: 1

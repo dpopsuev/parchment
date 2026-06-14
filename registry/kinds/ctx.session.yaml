@@ -1,12 +1,11 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.ctx-session
+  name: kind.ctx.session
 spec:
   prefix: SES
   code: ses
-  family: ctx
-  children: [ctx-turn]
+  children: [ctx.turn]
   lifecycle:
     defaultStatus: ctx.active
     transitions:

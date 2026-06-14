@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: ctx-session-parent_of-ctx-turn
 spec:
-  from: kind:ctx-session
+  from: kind:ctx.session
   relation: parent_of
-  to: kind:ctx-turn
+  to: kind:ctx.turn

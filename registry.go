@@ -29,7 +29,6 @@ func crdResourceToKindYAML(r *Resource) kindYAML {
 		Name:                      name,
 		Prefix:                    r.Spec.Prefix,
 		Code:                      r.Spec.Code,
-		Family:                    r.Spec.Family,
 		Protected:                 r.Spec.Protected,
 		SkipGuards:                r.Spec.SkipGuards,
 		IsGoalKind:                r.Spec.IsGoalKind,
@@ -80,7 +79,6 @@ type kindYAML struct {
 	Name                      string
 	Prefix                    string
 	Code                      string
-	Family                    string
 	DefaultStatus             string
 	ActiveStatus              string
 	Protected                 bool
@@ -112,7 +110,6 @@ func (k *kindYAML) toLabelTrait() LabelTrait {
 	return LabelTrait{
 		Prefix:                    k.Prefix,
 		Code:                      k.Code,
-		Family:                    k.Family,
 		DefaultStatus:             k.DefaultStatus,
 		ActiveStatus:              k.ActiveStatus,
 		Protected:                 k.Protected,

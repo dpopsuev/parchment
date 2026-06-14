@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.concept
+  name: kind.knowledge.concept
 spec:
   prefix: CON
   code: "c"
-  family: knowledge
   children: []
   lifecycle:
     defaultStatus: work.active

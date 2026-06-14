@@ -3,7 +3,7 @@ kind: Relationship
 metadata:
   name: campaign-depends_on-any
 spec:
-  from: kind:campaign
+  from: kind:effort.campaign
   relation: depends_on
   to: "*"
   cycleGuard: true

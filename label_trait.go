@@ -47,7 +47,6 @@ type LabelTrait struct {
 	DefaultStatus             string   `json:"default_status,omitempty"`
 	ActiveStatus              string   `json:"active_status,omitempty"`
 	Transitions               []string `json:"trait_transitions,omitempty"`
-	Family                    string   `json:"family,omitempty"`
 	MustSections              []string `json:"must_sections,omitempty"`
 	ShouldSections            []string `json:"should_sections,omitempty"`
 	Properties                []string `json:"properties,omitempty"`
@@ -166,9 +165,6 @@ func LoadLabelTraitsWithComposition(ctx context.Context, s Store) map[string]Lab
 			if own.ActiveStatus == "" && p.ActiveStatus != "" {
 				own.ActiveStatus = p.ActiveStatus
 			}
-			if own.Family == "" && p.Family != "" {
-				own.Family = p.Family
-			}
 		own.Transitions = unionStrings(own.Transitions, p.Transitions)
 		own.MustSections = unionStrings(own.MustSections, p.MustSections)
 		own.Properties = unionStrings(own.Properties, p.Properties)
@@ -226,9 +222,6 @@ func ResolveTrait(traits map[string]LabelTrait, labels []string) LabelTrait {
 		}
 		if trait.ActiveStatus != "" && merged.ActiveStatus == "" {
 			merged.ActiveStatus = trait.ActiveStatus
-		}
-		if trait.Family != "" && merged.Family == "" {
-			merged.Family = trait.Family
 		}
 		merged.Transitions = unionStrings(merged.Transitions, trait.Transitions)
 		merged.MustSections = unionStrings(merged.MustSections, trait.MustSections)

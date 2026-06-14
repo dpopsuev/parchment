@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: context-remembers-any
 spec:
-  from: kind:context
+  from: kind:knowledge.context
   relation: remembers
   to: "*"

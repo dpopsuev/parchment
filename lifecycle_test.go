@@ -20,7 +20,7 @@ func TestTransition_DraftToActive(t *testing.T) {
 		Sections: []parchment.Section{
 			{Name: "context", Text: "context here"},
 		},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestTransition_ActiveToComplete(t *testing.T) {
 		Sections: []parchment.Section{
 			{Name: "context", Text: "context here"},
 		},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestTransition_FullLifecycle(t *testing.T) {
 		Sections: []parchment.Section{
 			{Name: "context", Text: "context"},
 		},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestTransition_InvalidTransitionBlocked(t *testing.T) {
 
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "blocked",
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
-		Labels: []string{"kind:task", "priority:medium"},})
+		Labels: []string{"kind:effort.task", "priority:medium"},})
 
 	// work.draft → work.complete should be blocked (must go through work.active).
 	results, err := proto.SetField(ctx, []string{art.ID}, "status", "work.complete", parchment.SetFieldOptions{})
@@ -132,7 +132,7 @@ func TestTransition_WorkerIDRequiredForAllocation(t *testing.T) {
 
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "simple task",
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
-		Labels: []string{"kind:task", "priority:medium"},})
+		Labels: []string{"kind:effort.task", "priority:medium"},})
 
 	results, err := proto.SetField(ctx, []string{art.ID}, "status", "work.active", parchment.SetFieldOptions{Force: true})
 	if err != nil || !results[0].OK {
@@ -155,7 +155,7 @@ func TestTransition_StampsRequiredForReview(t *testing.T) {
 
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "review task",
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
-		Labels: []string{"kind:task", "priority:medium"},})
+		Labels: []string{"kind:effort.task", "priority:medium"},})
 
 	proto.SetField(ctx, []string{art.ID}, "status", "work.active", parchment.SetFieldOptions{Force: true})
 

@@ -3,7 +3,7 @@ kind: Relationship
 metadata:
   name: cause-causes-cause
 spec:
-  from: kind:cause
+  from: kind:investigation.cause
   relation: causes
-  to: kind:cause
+  to: kind:investigation.cause
   cycleGuard: true

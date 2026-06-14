@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: note-contradicts-note
 spec:
-  from: kind:note
+  from: kind:knowledge.note
   relation: contradicts
-  to: kind:note
+  to: kind:knowledge.note

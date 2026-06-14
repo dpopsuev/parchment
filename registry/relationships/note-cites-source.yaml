@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: note-cites-source
 spec:
-  from: kind:note
+  from: kind:knowledge.note
   relation: cites
-  to: kind:source
+  to: kind:knowledge.source

@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.code-test
+  name: kind.code.test
 spec:
   prefix: TST
   code: tst
-  family: code
   children: []
   lifecycle:
     defaultStatus: code.indexed

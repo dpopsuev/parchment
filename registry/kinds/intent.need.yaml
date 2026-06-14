@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.need
+  name: kind.intent.need
 spec:
   prefix: NEED
   code: NED
-  family: intent
   protected: true
   children: []
   lifecycle:
@@ -29,8 +28,8 @@ spec:
   relations:
     outgoing: [justifies, satisfies]
     targets:
-      justifies: [spec]
-      satisfies: [template]
+      justifies: [intent.spec]
+      satisfies: [support.template]
   whenToCreate: |
     Create a need when you have identified a capability gap or a problem statement
     before any solution exists. A need captures the "why" — the pressure that

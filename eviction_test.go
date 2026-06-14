@@ -123,7 +123,7 @@ func TestMetricsStore_RecordAccess_Increments(t *testing.T) {
 	ctx := context.Background()
 	store := parchment.NewMemoryStore()
 
-	_ = store.Put(ctx, &parchment.Artifact{ID: "X-1", Labels: []string{"kind:task", "status:active"}, Title: "t"})
+	_ = store.Put(ctx, &parchment.Artifact{ID: "X-1", Labels: []string{"kind:effort.task", "status:active"}, Title: "t"})
 
 	if err := store.RecordAccess(ctx, "X-1"); err != nil {
 		t.Fatalf("RecordAccess: %v", err)
@@ -166,7 +166,7 @@ func TestGetArtifact_RecordsAccess(t *testing.T) {
 
 	art := mustCreate(t, proto, parchment.CreateInput{Title: "access test",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 
 	_, _ = proto.GetArtifact(ctx, art.ID)
 	_, _ = proto.GetArtifact(ctx, art.ID)
@@ -190,7 +190,7 @@ func TestDetectEvictionCandidates_FleetingOrphan_IsCandidate(t *testing.T) {
 	old := time.Now().Add(-60 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
 		ID:    "NOT-OLD-1",
-		Labels: []string{"kind:note", "note.fleeting", "scope:test"},
+		Labels: []string{"kind:knowledge.note", "note.fleeting", "scope:test"},
 		Title: "old fleeting orphan",
 		CreatedAt: old, UpdatedAt: old,
 	})
@@ -224,7 +224,7 @@ func TestDetectEvictionCandidates_Evergreen_NotCandidate(t *testing.T) {
 	old := time.Now().Add(-60 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
 		ID:    "NOT-EVER-1",
-		Labels: []string{"kind:note", "note.evergreen", "scope:test"},
+		Labels: []string{"kind:knowledge.note", "note.evergreen", "scope:test"},
 		Title: "old evergreen",
 		CreatedAt: old, UpdatedAt: old,
 	})
@@ -255,7 +255,7 @@ func TestDetectEvictionCandidates_PinnedAnnotation_Excluded(t *testing.T) {
 	old := time.Now().Add(-90 * 24 * time.Hour)
 	_ = store.Put(ctx, &parchment.Artifact{
 		ID:    "NOT-PIN-1",
-		Labels: []string{"kind:note", "note.fleeting", "scope:test"},
+		Labels: []string{"kind:knowledge.note", "note.fleeting", "scope:test"},
 		Title: "pinned note",
 		CreatedAt: old, UpdatedAt: old,
 		Annotations: []parchment.Annotation{{Kind: parchment.AnnotationPin, Comment: "keep forever"}},

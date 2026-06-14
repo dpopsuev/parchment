@@ -48,7 +48,7 @@ func TestSetField_StatusWritesLabel(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{})
 	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{Title: "status test",
-		Labels: []string{"kind:note"},})
+		Labels: []string{"kind:knowledge.note"},})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}

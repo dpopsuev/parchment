@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: task-implements-bug
 spec:
-  from: kind:task
+  from: kind:effort.task
   relation: implements
-  to: kind:bug
+  to: kind:intent.bug

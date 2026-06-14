@@ -9,7 +9,7 @@ import (
 )
 
 func TestRuleEvaluator_Blocks_WhenPredicateMatches(t *testing.T) {
-	// Given: a rule that blocks when to=active AND kind=task AND priority==""
+	// Given: a rule that blocks when to=active AND kind=effort.task AND priority==""
 	// When: evaluated against a task transitioning to active with no priority
 	// Then: returns a block result with the rule's message
 	t.Parallel()
@@ -17,12 +17,12 @@ func TestRuleEvaluator_Blocks_WhenPredicateMatches(t *testing.T) {
 		ID:      "RULE-test",
 		Title:   "priority_required",
 		Trigger: "status_changed",
-		When:    `to=active AND kind=task AND priority==""`,
+		When:    `to=active AND kind=effort.task AND priority==""`,
 		Action:  "block",
 		Message: "priority required",
 	}
 	art := &parchment.Artifact{
-		Labels: []string{"kind:task", "status:draft"},
+		Labels: []string{"kind:effort.task", "status:draft"},
 	}
 	result := parchment.EvaluateRule(rule, art, "active")
 	if result == nil {
@@ -43,12 +43,12 @@ func TestRuleEvaluator_Allows_WhenPredicateDoesNotMatch(t *testing.T) {
 	t.Parallel()
 	rule := &parchment.RuleDef{
 		Trigger: "status_changed",
-		When:    `to=active AND kind=task AND priority==""`,
+		When:    `to=active AND kind=effort.task AND priority==""`,
 		Action:  "block",
 		Message: "priority required",
 	}
 	art := &parchment.Artifact{
-		Labels: []string{"kind:task", "priority:high"},
+		Labels: []string{"kind:effort.task", "priority:high"},
 	}
 	if result := parchment.EvaluateRule(rule, art, "active"); result != nil {
 		t.Errorf("expected nil (allowed), got %+v", result)
@@ -61,11 +61,11 @@ func TestRuleEvaluator_DoesNotFire_OnWrongTrigger(t *testing.T) {
 	t.Parallel()
 	rule := &parchment.RuleDef{
 		Trigger: "status_changed",
-		When:    `to=complete AND kind=task`,
+		When:    `to=complete AND kind=effort.task`,
 		Action:  "block",
 		Message: "blocked",
 	}
-	art := &parchment.Artifact{Labels: []string{"kind:task"}}
+	art := &parchment.Artifact{Labels: []string{"kind:effort.task"}}
 	// Transitioning to 'active', not 'complete' — rule should not fire
 	if result := parchment.EvaluateRule(rule, art, "active"); result != nil {
 		t.Errorf("rule fired on wrong toStatus, got %+v", result)
@@ -76,12 +76,12 @@ func TestRuleEvaluator_KindCondition_DoesNotFire_ForWrongKind(t *testing.T) {
 	t.Parallel()
 	rule := &parchment.RuleDef{
 		Trigger: "status_changed",
-		When:    `to=active AND kind=task AND priority==""`,
+		When:    `to=active AND kind=effort.task AND priority==""`,
 		Action:  "block",
 		Message: "blocked",
 	}
-	// kind=spec, not task — rule should not fire
-	art := &parchment.Artifact{Labels: []string{"kind:spec"}}
+	// kind=intent.spec, not task — rule should not fire
+	art := &parchment.Artifact{Labels: []string{"kind:intent.spec"}}
 	if result := parchment.EvaluateRule(rule, art, "active"); result != nil {
 		t.Errorf("rule fired for wrong kind, got %+v", result)
 	}
@@ -109,7 +109,7 @@ func TestProtocol_RuleArtifact_BlocksTransition(t *testing.T) {
 	// No Go guard covers this — only the RuleEvaluator can fire it.
 	_ = s.Put(ctx, &parchment.Artifact{
 		ID:     "RULE-scope-block",
-		Labels: []string{parchment.LabelPrefixKind + "rule", parchment.LabelPrefixStatus + "work.active", parchment.LabelPrefixScope + parchment.SchemaScope},
+		Labels: []string{parchment.LabelPrefixKind + "support.rule", parchment.LabelPrefixStatus + "work.active", parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  "scope_block",
 		Sections: []parchment.Section{
 			{Name: "trigger", Text: "status_changed"},
@@ -122,7 +122,7 @@ func TestProtocol_RuleArtifact_BlocksTransition(t *testing.T) {
 
 	proto := parchment.New(s, parchment.KnowledgeSchema(), []string{"forbidden-scope"}, nil, parchment.ProtocolConfig{})
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Labels: []string{"kind:note"}, Title: "test",
+		Labels: []string{"kind:knowledge.note"}, Title: "test",
 	})
 
 	// BypassGuards so only rule artifacts can block
@@ -155,7 +155,7 @@ func TestProtocol_RuleArtifact_AllowsWhenNotMatching(t *testing.T) {
 	now := time.Now().UTC()
 	_ = s.Put(ctx, &parchment.Artifact{
 		ID:     "RULE-scope-block2",
-		Labels: []string{parchment.LabelPrefixKind + "rule", parchment.LabelPrefixStatus + "work.active", parchment.LabelPrefixScope + parchment.SchemaScope},
+		Labels: []string{parchment.LabelPrefixKind + "support.rule", parchment.LabelPrefixStatus + "work.active", parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  "scope_block2",
 		Sections: []parchment.Section{
 			{Name: "trigger", Text: "status_changed"},
@@ -169,7 +169,7 @@ func TestProtocol_RuleArtifact_AllowsWhenNotMatching(t *testing.T) {
 	// Use scope=allowed-scope — rule should NOT fire
 	proto := parchment.New(s, parchment.KnowledgeSchema(), []string{"allowed-scope"}, nil, parchment.ProtocolConfig{})
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Labels: []string{"kind:note"}, Title: "test",
+		Labels: []string{"kind:knowledge.note"}, Title: "test",
 	})
 
 	results, err := proto.SetField(ctx, []string{art.ID}, "status", "active",

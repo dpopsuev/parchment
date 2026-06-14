@@ -123,9 +123,8 @@ type ScopePolicy struct {
 
 // Filter constrains artifact list/query operations.
 type Filter struct {
-	Family      string          // restrict to a kind family (intent, effort, knowledge, support)
-	FamilyKinds map[string]bool // populated at query time: kind → true for the requested family
-	IDPrefix    string          // match artifacts whose ID starts with this prefix
+	KindPrefix  string // match artifacts whose kind starts with this prefix (e.g. "effort" matches "effort.task")
+	IDPrefix    string // match artifacts whose ID starts with this prefix
 	// ScopePrefix enables hierarchical scope matching when a scope: label is in Labels:
 	// scope:org/project matches 'org/project' and any 'org/project/*' sub-scope.
 	ScopePrefix bool
@@ -281,8 +280,9 @@ func hasAnyStatusLabel(labels []string) bool {
 }
 
 func (f Filter) Matches(art *Artifact) bool { //nolint:gocritic // hugeParam: Filter is read-only in all callers; pointer would complicate call sites
-	if f.Family != "" && len(f.FamilyKinds) > 0 {
-		if !f.FamilyKinds[labelValue(art.Labels, LabelPrefixKind)] {
+	if f.KindPrefix != "" {
+		kind := labelValue(art.Labels, LabelPrefixKind)
+		if !strings.HasPrefix(kind, f.KindPrefix+".") {
 			return false
 		}
 	}

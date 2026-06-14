@@ -21,7 +21,7 @@ func TestLinkArtifacts_BasicLink(t *testing.T) {
 		Sections: []parchment.Section{
 			{Name: "problem", Text: "the problem"},
 		},
-		Labels: []string{"kind:spec"}})
+		Labels: []string{"kind:intent.spec"}})
 
 	results, err := proto.LinkArtifacts(ctx, task.ID, "implements", []string{spec.ID}, 0)
 	if err != nil {
@@ -230,14 +230,14 @@ func TestArtifactTree_CampaignGoalTask(t *testing.T) {
 	goal := mustCreate(t, proto, parchment.CreateInput{Title: "Goal Alpha",
 
 		Parent: campaign.ID,
-		Labels: []string{"kind:goal"}})
+		Labels: []string{"kind:effort.goal"}})
 	mustCreate(t, proto, parchment.CreateInput{Title: "Task 1",
 
 		Parent: goal.ID,
 		Sections: []parchment.Section{
 			{Name: "context", Text: "ctx"},
 		},
-		Labels: []string{"kind:task"}})
+		Labels: []string{"kind:effort.task"}})
 
 	tree, err := proto.ArtifactTree(ctx, parchment.TreeInput{ID: campaign.ID})
 	if err != nil {
@@ -250,13 +250,13 @@ func TestArtifactTree_CampaignGoalTask(t *testing.T) {
 		t.Fatalf("expected 1 child (goal), got %d", len(tree.Children))
 	}
 	goalNode := tree.Children[0]
-	if !slices.Contains(goalNode.Labels, "kind:goal") {
+	if !slices.Contains(goalNode.Labels, "kind:effort.goal") {
 		t.Errorf("expected goal child, got labels=%v", goalNode.Labels)
 	}
 	if len(goalNode.Children) != 1 {
 		t.Fatalf("expected 1 grandchild (task), got %d", len(goalNode.Children))
 	}
-	if !slices.Contains(goalNode.Children[0].Labels, "kind:task") {
+	if !slices.Contains(goalNode.Children[0].Labels, "kind:effort.task") {
 		t.Errorf("expected task grandchild, got labels=%v", goalNode.Children[0].Labels)
 	}
 }
@@ -298,10 +298,10 @@ func TestArtifactTree_DependsOnRelation(t *testing.T) {
 	parent := createGoal(t, proto, "parent goal")
 	a := mustCreate(t, proto, parchment.CreateInput{Title: "task A", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task"}})
+		Labels:   []string{"kind:effort.task"}})
 	b := mustCreate(t, proto, parchment.CreateInput{Title: "task B", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task"}})
+		Labels:   []string{"kind:effort.task"}})
 
 	// A depends on B
 	proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID}, 0)
@@ -334,15 +334,15 @@ func TestTopoSort_DependencyChain(t *testing.T) {
 	parent := createGoal(t, proto, "parent for topo")
 	a := mustCreate(t, proto, parchment.CreateInput{Title: "step 1", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task"}})
+		Labels:   []string{"kind:effort.task"}})
 	b := mustCreate(t, proto, parchment.CreateInput{Title: "step 2", Parent: parent.ID,
 		Sections:  []parchment.Section{{Name: "context", Text: "ctx"}},
 		DependsOn: []string{a.ID},
-		Labels:    []string{"kind:task"}})
+		Labels:    []string{"kind:effort.task"}})
 	c := mustCreate(t, proto, parchment.CreateInput{Title: "step 3", Parent: parent.ID,
 		Sections:  []parchment.Section{{Name: "context", Text: "ctx"}},
 		DependsOn: []string{b.ID},
-		Labels:    []string{"kind:task"}})
+		Labels:    []string{"kind:effort.task"}})
 
 	entries, err := proto.TopoSort(ctx, parent.ID)
 	if err != nil {
@@ -380,10 +380,10 @@ func TestTopoSort_NoDependencies(t *testing.T) {
 	parent := createGoal(t, proto, "parent")
 	mustCreate(t, proto, parchment.CreateInput{Title: "task 1", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task"}})
+		Labels:   []string{"kind:effort.task"}})
 	mustCreate(t, proto, parchment.CreateInput{Title: "task 2", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task"}})
+		Labels:   []string{"kind:effort.task"}})
 
 	entries, err := proto.TopoSort(ctx, parent.ID)
 	if err != nil {
@@ -446,7 +446,7 @@ func TestGetArtifactEdges_BothDirections(t *testing.T) {
 	parent := createGoal(t, proto, "parent")
 	child := mustCreate(t, proto, parchment.CreateInput{Title: "child", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task"}})
+		Labels:   []string{"kind:effort.task"}})
 
 	edges, err := proto.GetArtifactEdges(ctx, parent.ID)
 	if err != nil {

@@ -3,7 +3,7 @@ kind: Relationship
 metadata:
   name: goal-parent_of-ref
 spec:
-  from: kind:goal
+  from: kind:effort.goal
   relation: parent_of
-  to: kind:ref
+  to: kind:support.ref
   maxIncoming: 1

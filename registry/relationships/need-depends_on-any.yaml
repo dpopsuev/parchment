@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: need-depends_on-any
 spec:
-  from: kind:need
+  from: kind:intent.need
   relation: depends_on
   to: "*"

@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.cause
+  name: kind.investigation.cause
 spec:
   prefix: CSE
   code: cse
-  family: investigation
   children: []
   lifecycle:
     defaultStatus: cause.proposed
@@ -23,9 +22,9 @@ spec:
     incoming: [parent_of, causes]
     outgoing: [explains, causes, resolves]
     targets:
-      explains: [observation]
-      causes: [cause, observation]
-      resolves: [investigation]
+      explains: [investigation.observation]
+      causes: [investigation.cause, investigation.observation]
+      resolves: [investigation.investigation]
   whenToCreate: |
     Create a cause to record a causal hypothesis during an investigation. One
     cause per distinct contributing factor. Confirmed causes link via explains

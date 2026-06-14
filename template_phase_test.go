@@ -20,7 +20,7 @@ func TestCreateBug_ShouldSucceedWithOnlyFilingTimeSections(t *testing.T) {
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
-		ID: "TPL-BUG-1", Labels: []string{"kind:template", "work.active", "scope:test"}, Title: "Bug Template",
+		ID: "TPL-BUG-1", Labels: []string{"kind:support.template", "work.active", "scope:test"}, Title: "Bug Template",
 		Sections: []parchment.Section{
 			{Name: "content", Text: "raw markdown"},
 			{Name: "observed", Text: "Observed vs Expected behavior"},
@@ -38,7 +38,7 @@ func TestCreateBug_ShouldSucceedWithOnlyFilingTimeSections(t *testing.T) {
 			{Name: "observed", Text: "Template conformance rejects creation when investigation-time sections are missing"},
 			{Name: "reproduction", Text: "1. Create a bug template with fix/root_cause/security_assessment sections\n2. Try to create a bug with only observed/reproduction\n3. Creation fails"},
 		},
-		Labels: []string{"kind:bug"},})
+		Labels: []string{"kind:intent.bug"},})
 	if err != nil {
 		t.Fatalf("creating a bug with only filing-time sections should succeed, but got: %v", err)
 	}

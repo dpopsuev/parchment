@@ -1,12 +1,11 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.ctx-turn
+  name: kind.ctx.turn
 spec:
   prefix: TRN
   code: trn
-  family: ctx
-  children: [ctx-tool-call]
+  children: [ctx.tool-call]
   lifecycle:
     defaultStatus: ctx.active
     transitions:

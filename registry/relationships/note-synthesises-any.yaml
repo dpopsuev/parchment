@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: note-synthesises-any
 spec:
-  from: kind:note
+  from: kind:knowledge.note
   relation: synthesises
   to: "*"

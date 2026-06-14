@@ -18,9 +18,9 @@ func TestCapsuleExport_Import_RoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "task one",
-		Labels: []string{parchment.LabelPrefixKind + "task"},})
+		Labels: []string{parchment.LabelPrefixKind + "effort.task"},})
 	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "task two",
-		Labels: []string{parchment.LabelPrefixKind + "task"},})
+		Labels: []string{parchment.LabelPrefixKind + "effort.task"},})
 	_, _ = proto.LinkArtifacts(ctx, a.ID, "depends_on", []string{b.ID}, 0)
 
 	// Export
@@ -63,7 +63,7 @@ func TestCapsuleInspect_ReadsManifestOnly(t *testing.T) {
 
 	for range 3 {
 		proto.CreateArtifact(ctx, parchment.CreateInput{ //nolint:errcheck // test setupTitle: "note",
-		Labels: []string{parchment.LabelPrefixKind + "note"},})
+		Labels: []string{parchment.LabelPrefixKind + "knowledge.note"},})
 	}
 
 	var buf bytes.Buffer

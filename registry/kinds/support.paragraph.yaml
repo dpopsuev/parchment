@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.paragraph
+  name: kind.support.paragraph
 spec:
   prefix: PAR
   code: PAR
-  family: support
   children: []
   lifecycle:
     defaultStatus: work.active

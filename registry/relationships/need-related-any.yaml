@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: need-related-any
 spec:
-  from: kind:need
+  from: kind:intent.need
   relation: related
   to: "*"

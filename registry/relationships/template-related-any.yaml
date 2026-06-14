@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: template-related-any
 spec:
-  from: kind:template
+  from: kind:support.template
   relation: related
   to: "*"

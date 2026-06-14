@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: section-parent_of-any
 spec:
-  from: kind:section
+  from: kind:support.section
   relation: parent_of
   to: "*"

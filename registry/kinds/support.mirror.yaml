@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.mirror
+  name: kind.support.mirror
 spec:
   prefix: MIR
   code: MIR
-  family: support
   protected: true
   skipGuards: true
   children: []

@@ -17,7 +17,7 @@ func TestFilter_MatchLabels_ExcludeLabels_UsesLabelCheck(t *testing.T) {
 	t.Parallel()
 	art := &parchment.Artifact{
 		ID:     "TSK-1",
-		Labels: []string{"kind:task", "status:active", "security", "go", "scope:test"},
+		Labels: []string{"kind:effort.task", "status:active", "security", "go", "scope:test"},
 	}
 	f := parchment.Filter{ExcludeLabels: []string{"security"}}
 	if f.Matches(art) {
@@ -33,7 +33,7 @@ func TestFilter_MatchLabels_ScopeLabel_DirectMatch(t *testing.T) {
 	t.Parallel()
 	art := &parchment.Artifact{
 		ID:     "TSK-2",
-		Labels: []string{"kind:task", "status:active", "scope:infra"},
+		Labels: []string{"kind:effort.task", "status:active", "scope:infra"},
 	}
 	f := parchment.Filter{
 		Labels: []string{"scope:infra"},
@@ -65,12 +65,12 @@ func TestBulkSetField_UpdatesAllMatching(t *testing.T) {
 	ctx := context.Background()
 
 	a, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "a",
-		Labels: []string{parchment.LabelPrefixKind + "task"},})
+		Labels: []string{parchment.LabelPrefixKind + "effort.task"},})
 	b, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "b",
-		Labels: []string{parchment.LabelPrefixKind + "task"},})
+		Labels: []string{parchment.LabelPrefixKind + "effort.task"},})
 
 	result, err := proto.BulkSetField(ctx, parchment.BulkMutationInput{
-		Labels: []string{parchment.LabelPrefixKind + "task"},}, "priority", "high")
+		Labels: []string{parchment.LabelPrefixKind + "effort.task"},}, "priority", "high")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,10 +95,10 @@ func TestBulkSetField_DryRun_NoMutation(t *testing.T) {
 	ctx := context.Background()
 
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "c",
-		Labels: []string{parchment.LabelPrefixKind + "task"},})
+		Labels: []string{parchment.LabelPrefixKind + "effort.task"},})
 
 	result, err := proto.BulkSetField(ctx, parchment.BulkMutationInput{DryRun: true,
-		Labels: []string{parchment.LabelPrefixKind + "task"},}, "priority", "critical")
+		Labels: []string{parchment.LabelPrefixKind + "effort.task"},}, "priority", "critical")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,13 +126,13 @@ func TestVocab_ContainsKindNames(t *testing.T) {
 	}
 	found := false
 	for _, k := range vocab {
-		if k == "task" {
+		if k == "effort.task" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("Vocab() does not contain %q: %v", "task", vocab)
+		t.Errorf("Vocab() does not contain %q: %v", "effort.task", vocab)
 	}
 }
 
@@ -147,30 +147,29 @@ func TestFilter_LabelsOr(t *testing.T) {
 	p := parchment.New(s, parchment.DefaultSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
 
 	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "task", Sections: []parchment.Section{{Name: "context", Text: "x"}},
-		Labels: []string{parchment.LabelPrefixKind + "task", parchment.LabelPrefixPriority + "none"},}); err != nil {
+		Labels: []string{parchment.LabelPrefixKind + "effort.task", parchment.LabelPrefixPriority + "none"},}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "bug", Sections: []parchment.Section{{Name: "context", Text: "x"}},
-		Labels: []string{parchment.LabelPrefixKind + "bug"},}); err != nil {
+		Labels: []string{parchment.LabelPrefixKind + "intent.bug"},}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := p.CreateArtifact(ctx, parchment.CreateInput{Title: "spec",
-		Labels: []string{parchment.LabelPrefixKind + "spec"},}); err != nil {
+		Labels: []string{parchment.LabelPrefixKind + "intent.spec"},}); err != nil {
 		t.Fatal(err)
 	}
 
 	arts, err := p.ListArtifacts(ctx, parchment.ListInput{
-		LabelsOr: []string{"kind:" + "task", "kind:" + "bug"},
-
+		LabelsOr: []string{"kind:effort.task", "kind:intent.bug"},
 	})
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
 	if len(arts) != 2 {
-		t.Errorf("got %d artifacts, want 2 (task+bug)", len(arts))
+		t.Errorf("got %d artifacts, want 2 (effort.task+intent.bug)", len(arts))
 	}
 	for _, a := range arts {
-		if parchment.LabelValue(a.Labels, parchment.LabelPrefixKind) != "task" && parchment.LabelValue(a.Labels, parchment.LabelPrefixKind) != "bug" {
+		if parchment.LabelValue(a.Labels, parchment.LabelPrefixKind) != "effort.task" && parchment.LabelValue(a.Labels, parchment.LabelPrefixKind) != "intent.bug" {
 			t.Errorf("unexpected kind %q in result", parchment.LabelValue(a.Labels, parchment.LabelPrefixKind))
 		}
 	}

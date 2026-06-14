@@ -35,7 +35,7 @@ func createTask(t *testing.T, proto *parchment.Protocol, title string) *parchmen
 		Sections: []parchment.Section{
 			{Name: "context", Text: "context for " + title},
 		},
-		Labels: []string{"kind:task"}})
+		Labels: []string{"kind:effort.task"}})
 }
 
 // createGoal is a shorthand for creating a goal artifact.
@@ -43,7 +43,7 @@ func createGoal(t *testing.T, proto *parchment.Protocol, title string) *parchmen
 	t.Helper()
 	return mustCreate(t, proto, parchment.CreateInput{Title: title,
 
-		Labels: []string{"kind:goal"}})
+		Labels: []string{"kind:effort.goal"}})
 }
 
 // createCampaign is a shorthand for creating a campaign artifact.
@@ -54,7 +54,7 @@ func createCampaign(t *testing.T, proto *parchment.Protocol, title string) *parc
 		Sections: []parchment.Section{
 			{Name: "mission", Text: "mission for " + title},
 		},
-		Labels: []string{"kind:campaign"}})
+		Labels: []string{"kind:effort.campaign"}})
 }
 
 // ============================================================
@@ -72,7 +72,7 @@ func TestListArtifacts_FilterByKind(t *testing.T) {
 	createTask(t, proto, "task 2")
 	createGoal(t, proto, "goal 1")
 
-	arts, err := proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{"kind:task"}})
+	arts, err := proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{"kind:effort.task"}})
 	if err != nil {
 		t.Fatalf("ListArtifacts: %v", err)
 	}
@@ -80,8 +80,8 @@ func TestListArtifacts_FilterByKind(t *testing.T) {
 		t.Errorf("expected 2 tasks, got %d", len(arts))
 	}
 	for _, a := range arts {
-		if parchment.LabelValue(a.Labels, parchment.LabelPrefixKind) != "task" {
-			t.Errorf("expected kind=task, got %s", parchment.LabelValue(a.Labels, parchment.LabelPrefixKind))
+		if parchment.LabelValue(a.Labels, parchment.LabelPrefixKind) != "effort.task" {
+			t.Errorf("expected kind=effort.task, got %s", parchment.LabelValue(a.Labels, parchment.LabelPrefixKind))
 		}
 	}
 }
@@ -93,9 +93,9 @@ func TestListArtifacts_FilterByScope(t *testing.T) {
 	ctx := context.Background()
 
 	mustCreate(t, proto, parchment.CreateInput{Title: "alpha goal",
-		Labels: []string{"kind:goal", parchment.LabelPrefixScope + "alpha"}})
+		Labels: []string{"kind:effort.goal", parchment.LabelPrefixScope + "alpha"}})
 	mustCreate(t, proto, parchment.CreateInput{Title: "beta goal",
-		Labels: []string{"kind:goal", parchment.LabelPrefixScope + "beta"}})
+		Labels: []string{"kind:effort.goal", parchment.LabelPrefixScope + "beta"}})
 
 	arts, err := proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{parchment.LabelPrefixScope + "alpha"}})
 	if err != nil {
@@ -170,7 +170,7 @@ func TestListArtifacts_MultipleFilters(t *testing.T) {
 	createGoal(t, proto, "goal A")
 
 	// Filter by kind=task and status=work.draft
-	arts, err := proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{"kind:task", "work.draft"}})
+	arts, err := proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{"kind:effort.task", "work.draft"}})
 	if err != nil {
 		t.Fatalf("ListArtifacts: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestListArtifacts_MultipleFilters(t *testing.T) {
 	}
 
 	// Filter by kind=goal — goal default status is work.draft
-	arts, err = proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{"kind:goal", "work.draft"}})
+	arts, err = proto.ListArtifacts(ctx, parchment.ListInput{Labels: []string{"kind:effort.goal", "work.draft"}})
 	if err != nil {
 		t.Fatalf("ListArtifacts: %v", err)
 	}
@@ -246,15 +246,15 @@ func TestSearchArtifacts_WithKindFilter(t *testing.T) {
 	createTask(t, proto, "widget feature")
 	createGoal(t, proto, "widget goal")
 
-	arts, err := proto.SearchArtifacts(ctx, "widget", parchment.ListInput{Labels: []string{"kind:task"}})
+	arts, err := proto.SearchArtifacts(ctx, "widget", parchment.ListInput{Labels: []string{"kind:effort.task"}})
 	if err != nil {
 		t.Fatalf("SearchArtifacts: %v", err)
 	}
 	if len(arts) != 1 {
 		t.Errorf("expected 1 result (task only), got %d", len(arts))
 	}
-	if len(arts) > 0 && arts[0].Label(parchment.LabelPrefixKind) != "task" {
-		t.Errorf("expected kind=task, got %s", arts[0].Label(parchment.LabelPrefixKind))
+	if len(arts) > 0 && arts[0].Label(parchment.LabelPrefixKind) != "effort.task" {
+		t.Errorf("expected kind=effort.task, got %s", arts[0].Label(parchment.LabelPrefixKind))
 	}
 }
 
@@ -290,8 +290,8 @@ func TestGetArtifact_Success(t *testing.T) {
 	if got.Title != "get me" {
 		t.Errorf("expected title 'get me', got %q", got.Title)
 	}
-	if got.Label(parchment.LabelPrefixKind) != "task" {
-		t.Errorf("expected kind=task, got %s", got.Label(parchment.LabelPrefixKind))
+	if got.Label(parchment.LabelPrefixKind) != "effort.task" {
+		t.Errorf("expected kind=effort.task, got %s", got.Label(parchment.LabelPrefixKind))
 	}
 }
 
@@ -506,7 +506,7 @@ func TestDetachSection_TemplateRequiredBlocked(t *testing.T) {
 	// Create a template with a required section
 	tpl := &parchment.Artifact{
 		ID:     "tpl-task-1",
-		Labels: []string{"kind:template", "work.active"},
+		Labels: []string{"kind:support.template", "work.active"},
 		Title:  "Task Template",
 		Sections: []parchment.Section{
 			{Name: "content", Text: "template content"},
@@ -523,7 +523,7 @@ func TestDetachSection_TemplateRequiredBlocked(t *testing.T) {
 			{Name: "design", Text: "my design"},
 		},
 		Links:  map[string][]string{"satisfies": {"tpl-task-1"}},
-		Labels: []string{"kind:task"}})
+		Labels: []string{"kind:effort.task"}})
 
 	// Trying to detach a template-required section should fail
 	_, err := proto.DetachSection(ctx, task.ID, "design")
@@ -555,7 +555,7 @@ func TestCreateArtifact_EmptyTitle(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Labels: []string{"kind:task"}})
+		Labels: []string{"kind:effort.task"}})
 	if err == nil {
 		t.Error("expected error for empty title")
 	}
@@ -582,7 +582,7 @@ func TestCreateArtifact_InvalidPriority(t *testing.T) {
 	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "bad priority",
 
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task", "priority:super-urgent"}})
+		Labels:   []string{"kind:effort.task", "priority:super-urgent"}})
 	if err == nil {
 		t.Error("expected error for invalid priority")
 	}
@@ -599,7 +599,7 @@ func TestCreateArtifact_WithSections(t *testing.T) {
 			{Name: "context", Text: "background info"},
 			{Name: "design", Text: "design doc"},
 		},
-		Labels: []string{"kind:task"}})
+		Labels: []string{"kind:effort.task"}})
 	if err != nil {
 		t.Fatalf("CreateArtifact: %v", err)
 	}
@@ -622,7 +622,7 @@ func TestCreateArtifact_WithPatch(t *testing.T) {
 			"context": "patched context",
 			"notes":   "new section from patch",
 		},
-		Labels: []string{"kind:task"}})
+		Labels: []string{"kind:effort.task"}})
 	if err != nil {
 		t.Fatalf("CreateArtifact: %v", err)
 	}
@@ -654,7 +654,7 @@ func TestCreateArtifact_ScopeInference(t *testing.T) {
 
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "auto-scoped goal",
 		// No explicit scope,
-		Labels: []string{"kind:goal"}})
+		Labels: []string{"kind:effort.goal"}})
 	if err != nil {
 		t.Fatalf("CreateArtifact: %v", err)
 	}
@@ -671,7 +671,7 @@ func TestCreateArtifact_ScopeRequiredWhenMultiple(t *testing.T) {
 
 	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "missing scope",
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task"}})
+		Labels:   []string{"kind:effort.task"}})
 	if err == nil {
 		t.Error("expected error when scope is ambiguous (multiple scopes)")
 	}

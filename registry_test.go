@@ -19,20 +19,20 @@ func TestRegistry_KindTraits_LoadedFromYAML(t *testing.T) {
 	ctx := context.Background()
 	parchment.SeedLabelTraits(ctx, s)
 
-	// LDEF-kind:task must exist and carry guidance sections from YAML.
-	art, err := s.Get(ctx, "LDEF-kind:task")
+	// LDEF-kind:effort.task must exist and carry guidance sections from YAML.
+	art, err := s.Get(ctx, "LDEF-kind:effort.task")
 	if err != nil {
-		t.Fatal("LDEF-kind:task not seeded")
+		t.Fatal("LDEF-kind:effort.task not seeded")
 	}
 	sections := make(map[string]string)
 	for _, sec := range art.Sections {
 		sections[sec.Name] = sec.Text
 	}
 	if sections["when_to_create"] == "" {
-		t.Error("LDEF-kind:task missing when_to_create section from registry YAML")
+		t.Error("LDEF-kind:effort.task missing when_to_create section from registry YAML")
 	}
 	if sections["agent_note"] == "" {
-		t.Error("LDEF-kind:task missing agent_note section from registry YAML")
+		t.Error("LDEF-kind:effort.task missing agent_note section from registry YAML")
 	}
 }
 
@@ -62,10 +62,10 @@ func TestRegistry_LabelYAML_LoadedBySeedLabelTraits(t *testing.T) {
 }
 
 func TestRegistry_Protocol_KindTaskKnown(t *testing.T) {
-	// Protocol must know about kind:task after seeding.
+	// Protocol must know about kind:effort.task after seeding.
 	t.Parallel()
 	p := parchment.New(parchment.NewMemoryStore(), nil, []string{"test"}, nil, parchment.ProtocolConfig{})
-	if !p.IsKnownKind("task") {
+	if !p.IsKnownKind("effort.task") {
 		t.Fatal("task kind not registered — registry YAML not loaded")
 	}
 }

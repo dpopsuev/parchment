@@ -1,12 +1,11 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.section
+  name: kind.support.section
 spec:
   prefix: SEC
   code: SEC
   skipEmptyCheck: true
-  family: support
   children: ["*"]
   lifecycle:
     defaultStatus: work.active

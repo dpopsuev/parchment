@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: goal-follows-any
 spec:
-  from: kind:goal
+  from: kind:effort.goal
   relation: follows
   to: "*"

@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.task
+  name: kind.effort.task
 spec:
   prefix: TASK
   code: TSK
-  family: effort
   children: []
   lifecycle:
     defaultStatus: work.draft
@@ -25,15 +24,15 @@ spec:
   activationRequiresSections: true
   triggerStatus: work.complete
   sections:
-    must: [context]
+    must: [knowledge.context]
     should: [checklist, acceptance]
     could: [current_architecture, desired_architecture]
   requiredFields: [priority]
   relations:
     outgoing: [implements, depends_on, satisfies]
     targets:
-      implements: [spec, bug]
-      satisfies: [template]
+      implements: [intent.spec, intent.bug]
+      satisfies: [support.template]
   whenToCreate: |
     Create a task when work is discrete, time-bounded, and assigned to a single
     effort. A task has clear done-criteria. If the work is too large to fit in

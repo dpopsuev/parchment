@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.bug
+  name: kind.intent.bug
 spec:
   prefix: BUG
   code: BUG
-  family: intent
   protected: true
   requiresImplementation: true
   children: []
@@ -33,7 +32,7 @@ spec:
     incoming: [implements]
     outgoing: [satisfies]
     targets:
-      satisfies: [template]
+      satisfies: [support.template]
   whenToCreate: |
     Create a bug when observed behavior deviates from desired state — a crash,
     wrong output, missing guard, or broken contract. Bugs are intent artifacts:

@@ -20,7 +20,7 @@ func TestCompletionScore_Checklist(t *testing.T) {
 			{Name: "context", Text: "ctx"},
 			{Name: "checklist", Text: "- [x] done item\n- [x] also done\n- [ ] not done\n- [ ] also not done"},
 		},
-		Labels: []string{"kind:task"}})
+		Labels: []string{"kind:effort.task"}})
 
 	score := proto.CompletionScore(ctx, task)
 	// 2 checked out of 4 = 0.5 for the checklist component
@@ -54,10 +54,10 @@ func TestCompletionScore_ChildCompletion(t *testing.T) {
 	parent := createGoal(t, proto, "parent for completion")
 	child1 := mustCreate(t, proto, parchment.CreateInput{Title: "child1", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task"}})
+		Labels:   []string{"kind:effort.task"}})
 	mustCreate(t, proto, parchment.CreateInput{Title: "child2", Parent: parent.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task"}})
+		Labels:   []string{"kind:effort.task"}})
 
 	// Complete one child
 	c1, _ := store.Get(ctx, child1.ID)

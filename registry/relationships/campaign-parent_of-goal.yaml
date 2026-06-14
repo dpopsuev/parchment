@@ -3,7 +3,7 @@ kind: Relationship
 metadata:
   name: campaign-parent_of-goal
 spec:
-  from: kind:campaign
+  from: kind:effort.campaign
   relation: parent_of
-  to: kind:goal
+  to: kind:effort.goal
   maxIncoming: 1

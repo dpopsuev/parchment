@@ -1,21 +1,20 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.ref
+  name: kind.support.ref
 spec:
   prefix: REF
   code: REF
-  family: support
   protected: true
   skipEmptyCheck: true
   children: []
   sections:
-    should: [summary, source]
+    should: [summary, knowledge.source]
   relations:
     outgoing: [documents, satisfies]
     expectedOutgoing: [documents]
     targets:
-      satisfies: [template]
+      satisfies: [support.template]
   whenToCreate: |
     Create a ref to link an external source (paper, blog post, RFC, documentation)
     into the artifact graph. Refs provide citeable provenance for notes and specs.

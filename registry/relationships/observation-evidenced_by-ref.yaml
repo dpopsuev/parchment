@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: observation-evidenced_by-ref
 spec:
-  from: kind:observation
+  from: kind:investigation.observation
   relation: evidenced_by
-  to: kind:ref
+  to: kind:support.ref

@@ -28,13 +28,13 @@ func TestTopoSort_ShouldRespectParentGoalDependencies(t *testing.T) {
 	goal1 := mustCreate(t, proto, parchment.CreateInput{Title:  "goal 1 — prerequisite",
 
 		Parent: campaign.ID,
-		Labels: []string{"kind:goal"},})
+		Labels: []string{"kind:effort.goal"},})
 
 	// 3. Create goal GOL-2 as child of CMP-1, with depends_on edge to GOL-1
 	goal2 := mustCreate(t, proto, parchment.CreateInput{Title:  "goal 2 — depends on goal 1",
 
 		Parent: campaign.ID,
-		Labels: []string{"kind:goal"},})
+		Labels: []string{"kind:effort.goal"},})
 	// Link GOL-2 depends_on GOL-1
 	_, err := proto.LinkArtifacts(ctx, goal2.ID, "depends_on", []string{goal1.ID}, 0)
 	if err != nil {
@@ -46,14 +46,14 @@ func TestTopoSort_ShouldRespectParentGoalDependencies(t *testing.T) {
 
 		Parent:   goal1.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 
 	// 5. Create task TSK-2 as child of GOL-2
 	task2 := mustCreate(t, proto, parchment.CreateInput{Title:    "task under goal 2",
 
 		Parent:   goal2.ID,
 		Sections: []parchment.Section{{Name: "context", Text: "ctx"}},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 
 	// 6. Run TopoSort on CMP-1 repeatedly. The underlying graph library uses
 	//    Kahn's algorithm which iterates over a Go map, producing
@@ -108,7 +108,7 @@ func TestDefaultSchema_BugKindIsRegistered_DefectIsNot(t *testing.T) {
 	t.Parallel()
 	p := parchment.New(parchment.NewMemoryStore(), nil, []string{"test"}, nil, parchment.ProtocolConfig{})
 
-	if !p.IsKnownKind("bug") {
+	if !p.IsKnownKind("intent.bug") {
 		t.Error("bug kind not registered")
 	}
 	if p.IsKnownKind("defect") {
@@ -126,13 +126,13 @@ func TestDefaultSchema_BugKindHasIntentSections(t *testing.T) {
 	p := parchment.New(parchment.NewMemoryStore(), parchment.DefaultSchema(), []string{"test"}, nil, parchment.ProtocolConfig{})
 
 	// MustSections should contain "observed" (filing-time requirement)
-	if !containsString(p.MustSections("bug"), "observed") {
-		t.Errorf("bug MustSections = %v; want it to contain \"observed\"", p.MustSections("bug"))
+	if !containsString(p.MustSections("intent.bug"), "observed") {
+		t.Errorf("bug MustSections = %v; want it to contain \"observed\"", p.MustSections("intent.bug"))
 	}
 
 	// ShouldSections should contain "reproduction" (investigation-time recommendation)
-	if !containsString(p.ShouldSections("bug"), "reproduction") {
-		t.Errorf("bug ShouldSections = %v; want it to contain \"reproduction\"", p.ShouldSections("bug"))
+	if !containsString(p.ShouldSections("intent.bug"), "reproduction") {
+		t.Errorf("bug ShouldSections = %v; want it to contain \"reproduction\"", p.ShouldSections("intent.bug"))
 	}
 }
 
@@ -162,7 +162,7 @@ func TestTopoSort_CollectsArbitraryDepth(t *testing.T) {
 	put := func(id, parent string) {
 		t.Helper()
 		if err := proto.Store().Put(ctx, &parchment.Artifact{
-			ID: id, Labels: []string{"kind:task", "status:draft", "scope:test"}, Title: id,
+			ID: id, Labels: []string{"kind:effort.task", "status:draft", "scope:test"}, Title: id,
 		}); err != nil {
 			t.Fatalf("put %s: %v", id, err)
 		}

@@ -22,7 +22,7 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 		s := newStore(t)
 		ctx := context.Background()
 
-		art := &Artifact{ID: "TST-TSK-1", Labels: []string{"kind:task", "status:draft"}, Title: "test"}
+		art := &Artifact{ID: "TST-TSK-1", Labels: []string{"kind:effort.task", "status:draft"}, Title: "test"}
 		if err := s.Put(ctx, art); err != nil {
 			t.Fatal(err)
 		}
@@ -52,11 +52,11 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 		s := newStore(t)
 		ctx := context.Background()
 
-		s.Put(ctx, &Artifact{ID: "T-1", Labels: []string{"kind:task", "status:draft", "scope:a"}, Title: "one"})    //nolint:errcheck // test seeding
-		s.Put(ctx, &Artifact{ID: "T-2", Labels: []string{"kind:spec", "status:draft", "scope:a"}, Title: "two"})    //nolint:errcheck // test seeding
-		s.Put(ctx, &Artifact{ID: "T-3", Labels: []string{"kind:task", "status:active", "scope:b"}, Title: "three"}) //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "T-1", Labels: []string{"kind:effort.task", "status:draft", "scope:a"}, Title: "one"})    //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "T-2", Labels: []string{"kind:intent.spec", "status:draft", "scope:a"}, Title: "two"})    //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "T-3", Labels: []string{"kind:effort.task", "status:active", "scope:b"}, Title: "three"}) //nolint:errcheck // test seeding
 
-		arts, err := s.List(ctx, Filter{Labels: []string{"kind:task"}})
+		arts, err := s.List(ctx, Filter{Labels: []string{"kind:effort.task"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -78,8 +78,8 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 		s := newStore(t)
 		ctx := context.Background()
 
-		s.Put(ctx, &Artifact{ID: "A", Labels: []string{"kind:goal", "status:draft"}, Title: "a"}) //nolint:errcheck // test seeding
-		s.Put(ctx, &Artifact{ID: "B", Labels: []string{"kind:task", "status:draft"}, Title: "b"}) //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "A", Labels: []string{"kind:effort.goal", "status:draft"}, Title: "a"}) //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "B", Labels: []string{"kind:effort.task", "status:draft"}, Title: "b"}) //nolint:errcheck // test seeding
 
 		if err := s.AddEdge(ctx, Edge{From: "A", To: "B", Relation: RelParentOf}); err != nil {
 			t.Fatal(err)
@@ -119,7 +119,7 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 		s := newStore(t)
 		ctx := context.Background()
 
-		s.Put(ctx, &Artifact{ID: "DEL-1", Labels: []string{"kind:task", "status:draft"}, Title: "delete me"}) //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "DEL-1", Labels: []string{"kind:effort.task", "status:draft"}, Title: "delete me"}) //nolint:errcheck // test seeding
 
 		if err := s.Delete(ctx, "DEL-1"); err != nil {
 			t.Fatal(err)
@@ -135,7 +135,7 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 		s := newStore(t)
 		ctx := context.Background()
 
-		s.Put(ctx, &Artifact{ID: "S-1", Labels: []string{"kind:task", "status:draft"}, Title: "uniquesearchterm"}) //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "S-1", Labels: []string{"kind:effort.task", "status:draft"}, Title: "uniquesearchterm"}) //nolint:errcheck // test seeding
 
 		ids, err := s.Search(ctx, "uniquesearchterm")
 		if err != nil {
@@ -256,7 +256,7 @@ func TestSQLiteStore_MigrationCompat(t *testing.T) {
 
 	// Write a new artifact with the new fields.
 	err = s.Put(ctx, &Artifact{
-		ID: "NEW-TSK-1", Labels: []string{"kind:task", "status:draft"},
+		ID: "NEW-TSK-1", Labels: []string{"kind:effort.task", "status:draft"},
 		Title:       "new artifact",
 		Annotations: []Annotation{{Kind: "+", Comment: "good"}},
 		CreatedAt:   art.CreatedAt, UpdatedAt: art.CreatedAt,
@@ -295,7 +295,7 @@ func TestSQLiteStore_ListDoesNotSilentlyDropRows(t *testing.T) {
 		err := s.Put(ctx, &Artifact{
 			// uid generated internally
 			ID:     fmt.Sprintf("ND-TSK-%d", i),
-			Labels: []string{"kind:task", "status:draft"},
+			Labels: []string{"kind:effort.task", "status:draft"},
 			Title:  fmt.Sprintf("task %d", i),
 		})
 		if err != nil {

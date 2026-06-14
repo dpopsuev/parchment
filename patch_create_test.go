@@ -14,7 +14,7 @@ func setupTemplateProto(t *testing.T) *parchment.Protocol {
 	ctx := context.Background()
 
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
-		ID: "TPL-1", Labels: []string{"kind:template", "work.active", "scope:test"}, Title: "Bug Template",
+		ID: "TPL-1", Labels: []string{"kind:support.template", "work.active", "scope:test"}, Title: "Bug Template",
 		Sections: []parchment.Section{
 			{Name: "content", Text: "raw markdown"},
 			{Name: "observed", Text: "Observed vs expected behavior"},
@@ -37,7 +37,7 @@ func TestCreateArtifact_PatchFillsSections(t *testing.T) {
 			"reproduction": "1. call Foo(nil)\n2. observe panic",
 			"root_cause":   "missing nil guard",
 		},
-		Labels: []string{"kind:bug"},})
+		Labels: []string{"kind:intent.bug"},})
 	if err != nil {
 		t.Fatalf("create with patch should succeed: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestCreateArtifact_PatchMergesWithExplicitSections(t *testing.T) {
 			"reproduction": "1. run with -race",
 			"root_cause":   "unsynchronized map access",
 		},
-		Labels: []string{"kind:bug"},})
+		Labels: []string{"kind:intent.bug"},})
 	if err != nil {
 		t.Fatalf("create with sections+patch should succeed: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestCreateArtifact_PatchOverridesExplicitSection(t *testing.T) {
 		Patch: map[string]string{
 			"observed": "new observed from patch",
 		},
-		Labels: []string{"kind:bug"},})
+		Labels: []string{"kind:intent.bug"},})
 	if err != nil {
 		t.Fatalf("create should succeed: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestAttachSection_EnablesStatusPromotion(t *testing.T) {
 
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "stash test bug",
 
-		Labels: []string{"kind:bug"},})
+		Labels: []string{"kind:intent.bug"},})
 	if err != nil {
 		t.Fatalf("create without sections should succeed as draft: %v", err)
 	}

@@ -3,7 +3,7 @@ kind: Relationship
 metadata:
   name: goal-depends_on-any
 spec:
-  from: kind:goal
+  from: kind:effort.goal
   relation: depends_on
   to: "*"
   cycleGuard: true

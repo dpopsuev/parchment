@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: task-implements-spec
 spec:
-  from: kind:task
+  from: kind:effort.task
   relation: implements
-  to: kind:spec
+  to: kind:intent.spec

@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.spec
+  name: kind.intent.spec
 spec:
   prefix: SPEC
   code: SPC
-  family: intent
   protected: true
   requiresImplementation: true
   children: []
@@ -27,13 +26,13 @@ spec:
   activationRequiresSections: true
   sections:
     must: [problem]
-    should: [decision, acceptance]
+    should: [intent.decision, acceptance]
     could: [architecture, current_architecture, desired_architecture]
   relations:
     incoming: [implements, justifies]
     outgoing: [satisfies]
     targets:
-      satisfies: [template]
+      satisfies: [support.template]
   whenToCreate: |
     Create a spec when you need to design something before building it —
     interface contracts, data models, architectural decisions, or any work where

@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.journal
+  name: kind.knowledge.journal
 spec:
   prefix: JRN
   code: "j"
-  family: knowledge
   children: []
   lifecycle:
     defaultStatus: work.active

@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: context-elaborates-any
 spec:
-  from: kind:context
+  from: kind:knowledge.context
   relation: elaborates
   to: "*"

@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: ref-related-any
 spec:
-  from: kind:ref
+  from: kind:support.ref
   relation: related
   to: "*"

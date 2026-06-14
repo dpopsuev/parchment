@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.ctx-tool-call
+  name: kind.ctx.tool-call
 spec:
   prefix: TCL
   code: tcl
-  family: ctx
   children: []
   lifecycle:
     defaultStatus: ctx.active

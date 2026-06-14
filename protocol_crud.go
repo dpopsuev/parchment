@@ -305,7 +305,7 @@ func (p *Protocol) DeleteArtifact(ctx context.Context, id string, force bool) er
 }
 
 type ListInput struct {
-	Family         string   `json:"family,omitempty"` // filter by kind family: intent, effort, knowledge, support
+	KindPrefix     string   `json:"kind_prefix,omitempty"` // match kinds with this prefix (e.g. "effort" matches "effort.task")
 	IDPrefix       string   `json:"id_prefix,omitempty"`
 	Labels         []string `json:"labels,omitempty"`
 	LabelsOr       []string `json:"labels_or,omitempty"`
@@ -345,7 +345,7 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 	}
 
 	f := Filter{
-		Family:         in.Family,
+		KindPrefix:     in.KindPrefix,
 		IDPrefix:       in.IDPrefix,
 		Labels:         in.Labels,
 		LabelsOr:       in.LabelsOr,
@@ -364,7 +364,6 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 		}
 		f.ScopesOr = rawScopes
 	}
-	p.populateFamilyKinds(&f)
 	arts, err := p.store.List(ctx, f)
 	if err != nil {
 		return arts, err
@@ -384,7 +383,7 @@ func (p *Protocol) ListPage(ctx context.Context, in ListInput) (Page, error) { /
 	}
 
 	f := Filter{
-		Family:         in.Family,
+		KindPrefix:     in.KindPrefix,
 		IDPrefix:       in.IDPrefix,
 		Labels:         in.Labels,
 		LabelsOr:       in.LabelsOr,
@@ -405,7 +404,6 @@ func (p *Protocol) ListPage(ctx context.Context, in ListInput) (Page, error) { /
 		}
 		f.ScopesOr = rawScopes
 	}
-	p.populateFamilyKinds(&f)
 	page, err := p.store.ListPage(ctx, f)
 	if err != nil {
 		return page, err
@@ -431,19 +429,6 @@ func filterByTitleContains(arts []*Artifact, q string) []*Artifact {
 		}
 	}
 	return out
-}
-
-// populateFamilyKinds resolves the Family filter field into a FamilyKinds
-// map so Filter.Matches can check it without a schema reference.
-func (p *Protocol) populateFamilyKinds(f *Filter) {
-	if f.Family == "" {
-		return
-	}
-	kinds := p.KindsForFamily(f.Family)
-	f.FamilyKinds = make(map[string]bool, len(kinds))
-	for _, k := range kinds {
-		f.FamilyKinds[k] = true
-	}
 }
 
 

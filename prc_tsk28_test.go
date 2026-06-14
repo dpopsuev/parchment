@@ -17,7 +17,7 @@ func TestCreateRefWithoutDocumentsEdge(t *testing.T) {
 
 	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "McIlroy 1964 — Unix Pipes Memo",
 		Goal:  "Primary source for the Unix composability lineage",
-		Labels: []string{"kind:ref"},})
+		Labels: []string{"kind:support.ref"},})
 	if err != nil {
 		t.Fatalf("CreateArtifact(ref) without documents edge: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestCreateDocWithoutDocumentsEdge(t *testing.T) {
 	proto, _ := newProto(t)
 
 	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "Architecture Decision Record — store selection",
-		Labels: []string{"kind:doc"},})
+		Labels: []string{"kind:support.doc"},})
 	if err != nil {
 		t.Fatalf("CreateArtifact(doc) without documents edge: %v", err)
 	}
@@ -45,11 +45,11 @@ func TestCreateRefWithDocumentsEdgeStillWorks(t *testing.T) {
 		Sections: []parchment.Section{
 			{Name: "context", Text: "add pipe operator"},
 		},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 
 	_, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "POSIX pipes specification",
 		Links: map[string][]string{parchment.RelDocuments: {target.ID}},
-		Labels: []string{"kind:ref"},})
+		Labels: []string{"kind:support.ref"},})
 	if err != nil {
 		t.Fatalf("CreateArtifact(ref) with documents edge: %v", err)
 	}

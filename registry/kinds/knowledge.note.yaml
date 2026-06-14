@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.note
+  name: kind.knowledge.note
 spec:
   prefix: NOT
   code: "n"
-  family: knowledge
   children: []
   lifecycle:
     defaultStatus: note.fleeting
@@ -21,7 +20,7 @@ spec:
   sections:
     should: [body]
   whenToCreate: |
-    Create a note to capture an idea, observation, or piece of knowledge during
+    Create a note to capture an idea, investigation.observation, or piece of knowledge during
     a session. Start as note.fleeting (draft in transit). Promote to note.evergreen when
     the insight has been validated across multiple contexts.
   agentNote: |

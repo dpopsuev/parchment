@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.doc
+  name: kind.support.doc
 spec:
   prefix: DOC
   code: DOC
-  family: support
   protected: true
   skipEmptyCheck: true
   children: []
@@ -16,7 +15,7 @@ spec:
     outgoing: [documents, satisfies]
     expectedOutgoing: [documents]
     targets:
-      satisfies: [template]
+      satisfies: [support.template]
   whenToCreate: |
     Create a doc when you need human-readable documentation for an artifact —
     a spec, a system, or a codebase component. Docs document; they do not decide.

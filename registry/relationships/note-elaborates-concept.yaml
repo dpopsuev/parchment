@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: note-elaborates-concept
 spec:
-  from: kind:note
+  from: kind:knowledge.note
   relation: elaborates
-  to: kind:concept
+  to: kind:knowledge.concept

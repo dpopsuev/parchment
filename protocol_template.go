@@ -92,10 +92,17 @@ func (p *Protocol) createHookArtifacts(ctx context.Context, parent *Artifact, ra
 // the artifact kind. Returns the template ID if exactly one match, empty string otherwise.
 func (p *Protocol) findTemplateForKind(ctx context.Context, kind, scope string) string {
 	kindLower := strings.ToLower(kind)
+	// For namespaced kinds like "intent.bug", also match the suffix "bug" so that
+	// templates titled "Bug Template" still work alongside "intent.bug Template".
+	kindSuffix := kindLower
+	if idx := strings.LastIndex(kindLower, "."); idx >= 0 {
+		kindSuffix = kindLower[idx+1:]
+	}
 	match := func(templates []*Artifact) string {
 		var matches []string
 		for _, tpl := range templates {
-			if strings.Contains(strings.ToLower(tpl.Title), kindLower) {
+			title := strings.ToLower(tpl.Title)
+			if strings.Contains(title, kindLower) || (kindSuffix != kindLower && strings.Contains(title, kindSuffix)) {
 				matches = append(matches, tpl.ID)
 			}
 		}

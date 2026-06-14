@@ -12,7 +12,7 @@ func TestRule_ArtifactKindExists(t *testing.T) {
 	// kind=rule is registered via label traits.
 	t.Parallel()
 	p := parchment.New(parchment.NewMemoryStore(), nil, []string{"test"}, nil, parchment.ProtocolConfig{})
-	if !p.IsKnownKind("rule") {
+	if !p.IsKnownKind("support.rule") {
 		t.Fatalf("kind=rule not registered — registry YAML not loaded")
 	}
 }
@@ -23,7 +23,7 @@ func TestRule_ParsedFromArtifact(t *testing.T) {
 	t.Parallel()
 	art := &parchment.Artifact{
 		ID:     "RULE-001",
-		Labels: []string{parchment.LabelPrefixKind + "rule", parchment.LabelPrefixScope + parchment.SchemaScope},
+		Labels: []string{parchment.LabelPrefixKind + "support.rule", parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  "priority_required",
 		Sections: []parchment.Section{
 			{Name: "trigger", Text: "status_changed"},
@@ -63,7 +63,7 @@ func TestRule_SeededInSchema(t *testing.T) {
 	parchment.SeedRules(ctx, s)
 
 	arts, err := s.List(ctx, parchment.Filter{
-		Labels: []string{parchment.LabelPrefixKind + "rule", parchment.LabelPrefixScope + parchment.SchemaScope},
+		Labels: []string{parchment.LabelPrefixKind + "support.rule", parchment.LabelPrefixScope + parchment.SchemaScope},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -89,7 +89,7 @@ func TestRule_LoadedByProtocol(t *testing.T) {
 	now := time.Now().UTC()
 	_ = s.Put(ctx, &parchment.Artifact{
 		ID:     "RULE-test",
-		Labels: []string{parchment.LabelPrefixKind + "rule", parchment.LabelPrefixStatus + "work.active", parchment.LabelPrefixScope + parchment.SchemaScope},
+		Labels: []string{parchment.LabelPrefixKind + "support.rule", parchment.LabelPrefixStatus + "work.active", parchment.LabelPrefixScope + parchment.SchemaScope},
 		Title:  "test_rule",
 		Sections: []parchment.Section{
 			{Name: "trigger", Text: "status_changed"},

@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: config-related-any
 spec:
-  from: kind:config
+  from: kind:support.config
   relation: related
   to: "*"

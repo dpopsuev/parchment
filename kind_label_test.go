@@ -8,9 +8,9 @@ import (
 )
 
 func TestResolvedKind_FromLabel(t *testing.T) {
-	art := &parchment.Artifact{Labels: []string{"kind:bug", "priority:high"}}
-	if got := parchment.LabelValue(art.Labels, parchment.LabelPrefixKind); got != "bug" {
-		t.Errorf("expected bug, got %q", got)
+	art := &parchment.Artifact{Labels: []string{"kind:intent.bug", "priority:high"}}
+	if got := parchment.LabelValue(art.Labels, parchment.LabelPrefixKind); got != "intent.bug" {
+		t.Errorf("expected intent.bug, got %q", got)
 	}
 }
 
@@ -25,16 +25,16 @@ func TestResolvedKind_EmptyWhenNoLabel(t *testing.T) {
 
 func TestFilter_LabelsKindMatchesLabelKind(t *testing.T) {
 	// Given an artifact with kind:bug label
-	art := &parchment.Artifact{ID: "X-1", Labels: []string{"kind:bug"}}
-	f := parchment.Filter{Labels: []string{"kind:bug"}}
+	art := &parchment.Artifact{ID: "X-1", Labels: []string{"kind:intent.bug"}}
+	f := parchment.Filter{Labels: []string{"kind:intent.bug"}}
 	if !f.Matches(art) {
 		t.Error("Filter.Labels=[kind:bug] should match artifact with labels[kind:bug]")
 	}
 }
 
 func TestFilter_ExcludeKindMatchesLabelKind(t *testing.T) {
-	art := &parchment.Artifact{ID: "X-1", Labels: []string{"kind:bug"}}
-	f := parchment.Filter{ExcludeLabels: []string{"kind:bug"}}
+	art := &parchment.Artifact{ID: "X-1", Labels: []string{"kind:intent.bug"}}
+	f := parchment.Filter{ExcludeLabels: []string{"kind:intent.bug"}}
 	if f.Matches(art) {
 		t.Error("Filter.ExcludeKind=bug should exclude artifact with labels[kind:bug]")
 	}
@@ -48,13 +48,13 @@ func TestCreateArtifact_KindFromLabel(t *testing.T) {
 	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{})
 	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{
 		Title:  "test bug",
-		Labels: []string{"kind:bug"},
+		Labels: []string{"kind:intent.bug"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if parchment.LabelValue(art.Labels, parchment.LabelPrefixKind) != "bug" {
-		t.Errorf("expected ResolvedKind()=bug, got %q", parchment.LabelValue(art.Labels, parchment.LabelPrefixKind))
+	if parchment.LabelValue(art.Labels, parchment.LabelPrefixKind) != "intent.bug" {
+		t.Errorf("expected ResolvedKind()=intent.bug, got %q", parchment.LabelValue(art.Labels, parchment.LabelPrefixKind))
 	}
 }
 
@@ -64,11 +64,11 @@ func TestSetField_KindWritesLabel(t *testing.T) {
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, nil, nil, parchment.ProtocolConfig{})
 	art, err := proto.CreateArtifact(t.Context(), parchment.CreateInput{Title: "original",
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	results, err := proto.SetField(t.Context(), []string{art.ID}, "kind", "bug")
+	results, err := proto.SetField(t.Context(), []string{art.ID}, "kind", "intent.bug")
 	if err != nil {
 		t.Fatalf("SetField: %v", err)
 	}
@@ -79,10 +79,10 @@ func TestSetField_KindWritesLabel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if updated.Label(parchment.LabelPrefixKind) != "bug" {
-		t.Errorf("ResolvedKind(): expected bug, got %q", updated.Label(parchment.LabelPrefixKind))
+	if updated.Label(parchment.LabelPrefixKind) != "intent.bug" {
+		t.Errorf("ResolvedKind(): expected intent.bug, got %q", updated.Label(parchment.LabelPrefixKind))
 	}
-	if !slices.Contains(updated.Labels, "kind:bug") {
-		t.Errorf("expected kind:bug in labels, got %v", updated.Labels)
+	if !slices.Contains(updated.Labels, "kind:intent.bug") {
+		t.Errorf("expected kind:intent.bug in labels, got %v", updated.Labels)
 	}
 }

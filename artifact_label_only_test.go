@@ -10,9 +10,9 @@ import (
 )
 
 func TestArtifact_ScanHydration_KindFromLabel(t *testing.T) {
-	// Given: an artifact stored in SQLite with labels kind:task and status:active.
+	// Given: an artifact stored in SQLite with labels kind:effort.task and status:active.
 	// When:  Get reads it back.
-	// Then:  ResolvedKind() == "task", ResolvedStatus() == "active".
+	// Then:  ResolvedKind() == "effort.task", ResolvedStatus() == "active".
 	t.Parallel()
 	s, err := parchment.OpenSQLite(filepath.Join(t.TempDir(), "hydrate.sqlite"))
 	if err != nil {
@@ -24,7 +24,7 @@ func TestArtifact_ScanHydration_KindFromLabel(t *testing.T) {
 	art := &parchment.Artifact{
 		ID:     "TEST-1",
 		Title:  "hydration test",
-		Labels: []string{"kind:task", "scope:test", "status:active"},
+		Labels: []string{"kind:effort.task", "scope:test", "status:active"},
 	}
 	if err := s.Put(ctx, art); err != nil {
 		t.Fatal(err)
@@ -35,8 +35,8 @@ func TestArtifact_ScanHydration_KindFromLabel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got.Label(parchment.LabelPrefixKind) != "task" {
-		t.Errorf("scan hydration failed: ResolvedKind()=%q, want 'task' from label", got.Label(parchment.LabelPrefixKind))
+	if got.Label(parchment.LabelPrefixKind) != "effort.task" {
+		t.Errorf("scan hydration failed: ResolvedKind()=%q, want 'effort.task' from label", got.Label(parchment.LabelPrefixKind))
 	}
 	if got.Label(parchment.LabelPrefixScope) != "test" {
 		t.Errorf("scan hydration failed: Scope()=%q, want 'test' from label", got.Label(parchment.LabelPrefixScope))
@@ -97,7 +97,7 @@ func TestArtifact_ScanHydration_ListAlsoHydrates(t *testing.T) {
 func TestCreateArtifact_KindFromLabelIsCanonical(t *testing.T) {
 	// Given: CreateArtifact called with Kind="task".
 	// When:  the returned artifact is inspected.
-	// Then:  Labels contains "kind:task" and ResolvedKind() == "task".
+	// Then:  Labels contains "kind:effort.task" and ResolvedKind() == "effort.task".
 	t.Parallel()
 	store := parchment.NewMemoryStore()
 	proto := parchment.New(store, nil, []string{"test"}, nil, parchment.ProtocolConfig{})
@@ -105,15 +105,15 @@ func TestCreateArtifact_KindFromLabelIsCanonical(t *testing.T) {
 
 	art, err := proto.CreateArtifact(ctx, parchment.CreateInput{Title: "label canonical test",
 		Sections: []parchment.Section{{Name: "context", Text: "x"}},
-		Labels: []string{"kind:task"},})
+		Labels: []string{"kind:effort.task"},})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !slices.Contains(art.Labels, "kind:task") {
+	if !slices.Contains(art.Labels, "kind:effort.task") {
 		t.Errorf("kind:task missing from labels: %v", art.Labels)
 	}
-	if parchment.LabelValue(art.Labels, parchment.LabelPrefixKind) != "task" {
-		t.Errorf("ResolvedKind() = %q, want 'task'", parchment.LabelValue(art.Labels, parchment.LabelPrefixKind))
+	if parchment.LabelValue(art.Labels, parchment.LabelPrefixKind) != "effort.task" {
+		t.Errorf("ResolvedKind() = %q, want 'effort.task'", parchment.LabelValue(art.Labels, parchment.LabelPrefixKind))
 	}
 }

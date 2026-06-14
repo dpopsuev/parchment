@@ -84,7 +84,7 @@ func TestIntentLifecycle_Protocol(t *testing.T) {
 		Sections: []Section{
 			{Name: "problem", Text: "FTS5 misses semantic matches."},
 		},
-		Labels: []string{"kind:need"},})
+		Labels: []string{"kind:intent.need"},})
 	if err != nil {
 		t.Fatalf("create need: %v", err)
 	}

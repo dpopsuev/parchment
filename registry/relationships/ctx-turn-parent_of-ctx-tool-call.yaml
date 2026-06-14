@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: ctx-turn-parent_of-ctx-tool-call
 spec:
-  from: kind:ctx-turn
+  from: kind:ctx.turn
   relation: parent_of
-  to: kind:ctx-tool-call
+  to: kind:ctx.tool-call

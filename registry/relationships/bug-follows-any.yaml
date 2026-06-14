@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: bug-follows-any
 spec:
-  from: kind:bug
+  from: kind:intent.bug
   relation: follows
   to: "*"

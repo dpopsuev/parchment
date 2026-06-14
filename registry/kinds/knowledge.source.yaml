@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.source
+  name: kind.knowledge.source
 spec:
   prefix: SRC
   code: "s"
-  family: knowledge
   children: []
   lifecycle:
     defaultStatus: work.active

@@ -1,11 +1,10 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.context
+  name: kind.knowledge.context
 spec:
   prefix: CTX
   code: "x"
-  family: knowledge
   protected: true
   children: []
   lifecycle:

@@ -28,8 +28,8 @@ type RuleDef struct {
 func ParseRule(art *Artifact) (*RuleDef, error) {
 	// ParseRule is a standalone function without Protocol access.
 	// Rules self-identify by having trigger/when/action/message sections.
-	// Kind check uses the literal "rule" — IsRuleKind() is available on Protocol.
-	if kind := labelValue(art.Labels, LabelPrefixKind); kind != "rule" {
+	// Kind check uses the literal "support.rule" — IsRuleKind() is available on Protocol.
+	if kind := labelValue(art.Labels, LabelPrefixKind); kind != "support.rule" {
 		return nil, fmt.Errorf("artifact %s is kind=%s, want a rule kind", art.ID, kind) //nolint:err113 // user-facing hint
 	}
 	sections := make(map[string]string, len(art.Sections))
@@ -113,7 +113,7 @@ func seedRulesFromRegistry(ctx context.Context, s Store) {
 		}
 		art := &Artifact{
 			ID:     id,
-			Labels: []string{LabelPrefixKind + "rule", statusWorkActive, LabelPrefixScope + SchemaScope},
+			Labels: []string{LabelPrefixKind + "support.rule", statusWorkActive, LabelPrefixScope + SchemaScope},
 			Title:  r.Name,
 			CreatedAt:  now,
 			UpdatedAt:  now,
@@ -169,7 +169,7 @@ type RuleResult struct {
 //
 // Predicate syntax (simple AND-chain, intentionally minimal):
 //   to=active                — matches toStatus == "active"
-//   kind=task                — matches labelValue(art.Labels, LabelPrefixKind) == "task"
+//   kind=effort.task         — matches labelValue(art.Labels, LabelPrefixKind) == "effort.task"
 //   priority==""             — matches art.Priority == ""
 //   status=draft             — matches art.Status == "draft"
 //   AND                      — conjunction (all must match)

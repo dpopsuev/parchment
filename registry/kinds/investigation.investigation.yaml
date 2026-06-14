@@ -1,12 +1,11 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.investigation
+  name: kind.investigation.investigation
 spec:
   prefix: INV
   code: inv
-  family: investigation
-  children: [observation, cause]
+  children: [investigation.observation, investigation.cause]
   lifecycle:
     defaultStatus: inv.open
     transitions:
@@ -24,7 +23,7 @@ spec:
   relations:
     outgoing: [parent_of]
     targets:
-      parent_of: [observation, cause]
+      parent_of: [investigation.observation, investigation.cause]
   whenToCreate: |
     Create an investigation when an unexpected system behavior needs structured
     RCA. An investigation groups observations (symptoms) and causes (hypotheses

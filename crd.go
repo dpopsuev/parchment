@@ -43,8 +43,6 @@ type ResourceSpec struct {
 	Lifecycle        *LifecycleSpec  `yaml:"lifecycle,omitempty"`
 	Sections         *SectionsSpec   `yaml:"sections,omitempty"`
 	Properties       *PropertiesSpec `yaml:"properties,omitempty"`
-	Family           string          `yaml:"family,omitempty"`
-
 	IsContainerKind  bool            `yaml:"isContainerKind,omitempty"`
 	WhenToUse        string          `yaml:"whenToUse,omitempty"`
 	AgentNote        string          `yaml:"agentNote,omitempty"`
@@ -210,7 +208,6 @@ func applyLabelDefinition(ctx context.Context, s Store, r *Resource) error {
 		HalfLifeDays:     int(r.Spec.HalfLifeDays),
 		AlwaysApply:      r.Spec.AlwaysApply,
 		RequiredSections: r.Spec.RequiredSections,
-		Family:          r.Spec.Family,
 		IsContainerKind: r.Spec.IsContainerKind,
 	}
 	if r.Spec.Lifecycle != nil {

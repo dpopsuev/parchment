@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: cause-causes-observation
 spec:
-  from: kind:cause
+  from: kind:investigation.cause
   relation: causes
-  to: kind:observation
+  to: kind:investigation.observation

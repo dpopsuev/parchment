@@ -23,26 +23,26 @@ func buildV042DB(t *testing.T, path string) {
 	}
 
 	artifacts := []*Artifact{
-		{ID: "SCR-GOL-1", Labels: []string{"kind:goal", "status:active", "scope:scribe"}, Title: "Ship v1"},
-		{ID: "SCR-CAM-1", Labels: []string{"kind:campaign", "status:active", "scope:scribe"},
+		{ID: "SCR-GOL-1", Labels: []string{"kind:effort.goal", "status:active", "scope:scribe"}, Title: "Ship v1"},
+		{ID: "SCR-CAM-1", Labels: []string{"kind:effort.campaign", "status:active", "scope:scribe"},
 			Title: "Q2 Campaign",
 			Sections: []Section{
 				{Name: "mission", Text: "ship the thing"},
 			},
 		},
-		{ID: "SCR-TSK-1", Labels: []string{"kind:task", "status:draft", "scope:scribe"},
+		{ID: "SCR-TSK-1", Labels: []string{"kind:effort.task", "status:draft", "scope:scribe"},
 			Title: "Implement feature A",
 			Sections: []Section{
 				{Name: "context", Text: "needs doing"},
 			},
 		},
-		{ID: "SCR-TSK-2", Labels: []string{"kind:task", "status:active", "scope:scribe"},
+		{ID: "SCR-TSK-2", Labels: []string{"kind:effort.task", "status:active", "scope:scribe"},
 			Title: "Implement feature B",
 			Sections: []Section{
 				{Name: "context", Text: "blocked on A"},
 			},
 		},
-		{ID: "SCR-BUG-1", Labels: []string{"kind:bug", "status:open", "scope:scribe"},
+		{ID: "SCR-BUG-1", Labels: []string{"kind:intent.bug", "status:open", "scope:scribe"},
 			Title: "Crash on startup",
 		},
 	}
@@ -185,7 +185,7 @@ func TestV043_NewArtifactsGetUUIDs(t *testing.T) {
 		Title:    "New task after migration",
 
 		Sections: []Section{{Name: "context", Text: "ctx"}},
-		Labels:   []string{"kind:task"},
+		Labels:   []string{"kind:effort.task"},
 	})
 	if err != nil {
 		t.Fatalf("CreateArtifact: %v", err)
@@ -223,7 +223,7 @@ func TestV043_ExplicitIDPreserved(t *testing.T) {
 		Title:      "Seeded with explicit ID",
 		ExplicitID: "SCR-TSK-999",
 
-		Labels:     []string{"kind:task"},
+		Labels:     []string{"kind:effort.task"},
 	})
 	if err != nil {
 		t.Fatalf("CreateArtifact with ExplicitID: %v", err)

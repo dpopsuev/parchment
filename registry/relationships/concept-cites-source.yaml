@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: concept-cites-source
 spec:
-  from: kind:concept
+  from: kind:knowledge.concept
   relation: cites
-  to: kind:source
+  to: kind:knowledge.source

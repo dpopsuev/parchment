@@ -3,7 +3,7 @@ kind: Relationship
 metadata:
   name: task-depends_on-any
 spec:
-  from: kind:task
+  from: kind:effort.task
   relation: depends_on
   to: "*"
   cycleGuard: true

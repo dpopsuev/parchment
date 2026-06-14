@@ -3,7 +3,7 @@ kind: Relationship
 metadata:
   name: bug-depends_on-any
 spec:
-  from: kind:bug
+  from: kind:intent.bug
   relation: depends_on
   to: "*"
   cycleGuard: true

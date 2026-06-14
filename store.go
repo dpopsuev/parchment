@@ -56,6 +56,9 @@ type ArtifactStore interface {
 	GetEmbeddingHash(ctx context.Context, artifactID, model string) string
 	SearchSemantic(ctx context.Context, model string, query []float32, n int) ([]SearchResult, error)
 
+	PutSectionEmbedding(ctx context.Context, artifactID, section, model, contentHash string, vec []float32) error
+	SearchSectionSemantic(ctx context.Context, model string, query []float32, n int) ([]SearchResult, error)
+
 	// ListByLabel returns all artifacts carrying the given label.
 	// Equivalent to List(ctx, Filter{Labels: []string{label}}) with a direct index path.
 	ListByLabel(ctx context.Context, label string) ([]*Artifact, error)

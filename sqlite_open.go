@@ -329,6 +329,16 @@ func runSchemaEvolutions(db *sql.DB) { //nolint:cyclop,gocyclo // linear DDL seq
 	// the edge only when the set becomes empty.
 	exec(`ALTER TABLE edges ADD COLUMN sources TEXT NOT NULL DEFAULT '["manual"]'`)
 
+	// v3.x: section-level embeddings for fine-grained retrieval.
+	exec(`CREATE TABLE IF NOT EXISTS section_embeddings (
+		artifact_id  TEXT NOT NULL,
+		section_name TEXT NOT NULL,
+		model        TEXT NOT NULL,
+		vector       BLOB NOT NULL,
+		content_hash TEXT NOT NULL DEFAULT '',
+		PRIMARY KEY (artifact_id, section_name, model)
+	)`)
+
 	// v3.x: binary attachments for vision-capable agents. Stored separately so
 	// bulk artifact queries remain unaffected. Data is raw bytes; base64
 	// encoding/decoding is the caller's responsibility at the transport layer.

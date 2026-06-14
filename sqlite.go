@@ -186,6 +186,61 @@ func (s *SQLiteStore) ensureVecTable(ctx context.Context, model string, dims int
 	return nil
 }
 
+// ─── Section embeddings ──────────────────────────────────────────────────────
+
+func (s *SQLiteStore) PutSectionEmbedding(ctx context.Context, artifactID, section, model, contentHash string, vec []float32) error {
+	_, err := s.writer.ExecContext(ctx,
+		`INSERT INTO section_embeddings (artifact_id, section_name, model, vector, content_hash) VALUES (?, ?, ?, ?, ?)
+		 ON CONFLICT(artifact_id, section_name, model) DO UPDATE SET vector=excluded.vector, content_hash=excluded.content_hash`,
+		artifactID, section, model, vecToBlob(vec), contentHash)
+	return err
+}
+
+func (s *SQLiteStore) SearchSectionSemantic(ctx context.Context, model string, query []float32, n int) ([]SearchResult, error) {
+	rows, err := s.reader.QueryContext(ctx,
+		`SELECT artifact_id, section_name, vector FROM section_embeddings WHERE model=?`, model)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck // best-effort close
+
+	type scored struct {
+		id      string
+		section string
+		score   float32
+	}
+	var all []scored
+	for rows.Next() {
+		var id, sec string
+		var blob []byte
+		if err := rows.Scan(&id, &sec, &blob); err != nil {
+			continue
+		}
+		sim := CosineSimilarity(query, blobToVec(blob))
+		all = append(all, scored{id: id, section: sec, score: sim})
+	}
+
+	for i := 1; i < len(all); i++ {
+		for j := i; j > 0 && all[j].score > all[j-1].score; j-- {
+			all[j], all[j-1] = all[j-1], all[j]
+		}
+	}
+
+	seen := make(map[string]bool)
+	var results []SearchResult
+	for _, s := range all {
+		if seen[s.id] {
+			continue
+		}
+		seen[s.id] = true
+		results = append(results, SearchResult{ID: s.id, Score: s.score})
+		if len(results) >= n {
+			break
+		}
+	}
+	return results, nil
+}
+
 // ─── MetricsStore ─────────────────────────────────────────────────────────────
 
 // RecordAccess increments the access counter and updates last_accessed.

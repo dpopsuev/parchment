@@ -99,6 +99,42 @@ func TestSQLiteVec_PutEmbedding_Upsert(t *testing.T) {
 	}
 }
 
+func TestSQLiteStore_SectionEmbeddings(t *testing.T) {
+	t.Parallel()
+	s, err := parchment.OpenSQLite(filepath.Join(t.TempDir(), "sec-embed.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+
+	art := &parchment.Artifact{ID: "SEC-1", Labels: []string{"kind:knowledge.note", "status:active"}, Title: "test"}
+	if err := s.Put(ctx, art); err != nil {
+		t.Fatal(err)
+	}
+
+	bodyVec := []float32{1.0, 0.0, 0.0}
+	notesVec := []float32{0.0, 1.0, 0.0}
+
+	if err := s.PutSectionEmbedding(ctx, "SEC-1", "body", "test", "h1", bodyVec); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PutSectionEmbedding(ctx, "SEC-1", "notes", "test", "h2", notesVec); err != nil {
+		t.Fatal(err)
+	}
+
+	results, err := s.SearchSectionSemantic(ctx, "test", []float32{0.9, 0.1, 0.0}, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result (deduped by artifact), got %d", len(results))
+	}
+	if results[0].ID != "SEC-1" {
+		t.Errorf("expected SEC-1, got %s", results[0].ID)
+	}
+}
+
 func TestSQLiteVec_SearchSemantic_RespectsK(t *testing.T) {
 	t.Parallel()
 	s, err := parchment.OpenSQLite(filepath.Join(t.TempDir(), "vec-k.sqlite"))

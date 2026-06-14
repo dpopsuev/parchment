@@ -600,6 +600,55 @@ func (m *MemoryStore) SearchSemantic(_ context.Context, model string, query []fl
 	return results[:n], nil
 }
 
+func (m *MemoryStore) PutSectionEmbedding(_ context.Context, artifactID, section, model, _ string, vec []float32) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := embeddingKey(artifactID+"/"+section, model)
+	cp := make([]float32, len(vec))
+	copy(cp, vec)
+	m.embeddings[key] = cp
+	return nil
+}
+
+func (m *MemoryStore) SearchSectionSemantic(_ context.Context, model string, query []float32, n int) ([]SearchResult, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	type scored struct {
+		id    string
+		score float32
+	}
+	var all []scored
+	suffix := ":" + model
+	for key, vec := range m.embeddings {
+		if !strings.HasSuffix(key, suffix) {
+			continue
+		}
+		slashIdx := strings.Index(key, "/")
+		if slashIdx < 0 {
+			continue
+		}
+		artID := key[:slashIdx]
+		all = append(all, scored{id: artID, score: CosineSimilarity(query, vec)})
+	}
+
+	sort.Slice(all, func(i, j int) bool { return all[i].score > all[j].score })
+
+	seen := make(map[string]bool)
+	var results []SearchResult
+	for _, s := range all {
+		if seen[s.id] {
+			continue
+		}
+		seen[s.id] = true
+		results = append(results, SearchResult{ID: s.id, Score: s.score})
+		if len(results) >= n {
+			break
+		}
+	}
+	return results, nil
+}
+
 // --- New store interface methods ---
 
 // BulkPut inserts or replaces multiple artifacts. Sequential Put calls under a single lock.

@@ -9,7 +9,7 @@ spec:
   skipEmptyCheck: true
   children: []
   sections:
-    should: [summary, knowledge.source]
+    should: [summary, source]
   relations:
     outgoing: [documents, satisfies]
     expectedOutgoing: [documents]

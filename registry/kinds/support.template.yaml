@@ -12,7 +12,7 @@ spec:
   lifecycle:
     defaultStatus: work.active
   sections:
-    could: [knowledge.context, guidance]
+    could: [context, guidance]
   whenToCreate: |
     Create a template to define required and recommended sections for a kind.
     Templates are enforced at the satisfies link — an artifact that satisfies a

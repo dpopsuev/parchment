@@ -24,7 +24,7 @@ spec:
   activationRequiresSections: true
   triggerStatus: work.complete
   sections:
-    must: [knowledge.context]
+    must: [context]
     should: [checklist, acceptance]
     could: [current_architecture, desired_architecture]
   requiredFields: [priority]

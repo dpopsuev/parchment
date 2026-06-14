@@ -26,7 +26,7 @@ spec:
   activationRequiresSections: true
   sections:
     must: [problem]
-    should: [intent.decision, acceptance]
+    should: [decision, acceptance]
     could: [architecture, current_architecture, desired_architecture]
   relations:
     incoming: [implements, justifies]

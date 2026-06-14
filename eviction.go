@@ -253,7 +253,7 @@ func (p *Protocol) DetectEvictionCandidates(ctx context.Context, policy Eviction
 
 		// Label trait check: protected artifacts are never surfaced.
 		trait := ResolveTrait(p.labelTraits, art.Labels)
-		if trait.EvictionPolicy == "protected" {
+		if trait.EvictionPolicy == EvictionPolicyProtected {
 			continue
 		}
 

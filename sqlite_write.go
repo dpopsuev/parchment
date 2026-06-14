@@ -475,7 +475,7 @@ func scanRow(s rowScanner) (*Artifact, error) {
 		dst  any
 		name string
 	}{
-		{labels, &art.Labels, "labels"},
+		{labels, &art.Labels, FieldLabels},
 		{sections, &art.Sections, "sections"},
 		{extra, &art.Extra, "extra"},
 		{annotations, &art.Annotations, "annotations"},

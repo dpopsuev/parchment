@@ -36,8 +36,8 @@ func (r *ComponentRegistry) Rules() []*RuleDef {
 func (r *ComponentRegistry) ReloadTraits(ctx context.Context) {
 	labelMap := LoadLabelTraitsWithComposition(ctx, r.store)
 	ts := NewTraitStore()
-	for k, v := range labelMap {
-		ts.PutLabel(k, v)
+	for k := range labelMap {
+		ts.PutLabel(k, labelMap[k])
 	}
 	r.mu.Lock()
 	r.ts = ts

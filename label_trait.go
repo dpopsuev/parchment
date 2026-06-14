@@ -67,7 +67,7 @@ type LabelTrait struct {
 
 // ConflictPolicy for LabelTrait is ConflictUnion — label traits accumulate
 // across labels; the merged result is the union of all contributing labels.
-func (l LabelTrait) ConflictPolicy() ConflictPolicy { return ConflictUnion }
+func (l LabelTrait) ConflictPolicy() ConflictPolicy { return ConflictUnion } //nolint:gocritic // hugeParam: value receiver required to satisfy Trait interface — pointer would break callers using LabelTrait as Trait
 
 // loadLabelTraits reads label_definition artifacts from SchemaScope and returns
 // a map keyed by label slug (artifact Title). Mirrors extraToKindDef pattern.
@@ -129,49 +129,54 @@ func LoadLabelTraitsWithComposition(ctx context.Context, s Store) map[string]Lab
 			if !ok {
 				continue
 			}
-			p := raw[parent.Title]
-			if own.EvictionPolicy == "" && p.EvictionPolicy != "" {
-				own.EvictionPolicy = p.EvictionPolicy
-			}
-			if own.World == "" && p.World != "" {
-				own.World = p.World
-			}
-			if own.HalfLifeDays == 0 && p.HalfLifeDays != 0 {
-				own.HalfLifeDays = p.HalfLifeDays
-			}
-			if !own.AlwaysApply && p.AlwaysApply {
-				own.AlwaysApply = p.AlwaysApply
-			}
-			own.RequiredSections = unionStrings(own.RequiredSections, p.RequiredSections)
-			if !own.Terminal && p.Terminal {
-				own.Terminal = p.Terminal
-			}
-			if !own.Readonly && p.Readonly {
-				own.Readonly = p.Readonly
-			}
-			if !own.IsContainerKind && p.IsContainerKind {
-				own.IsContainerKind = p.IsContainerKind
-			}
-			if !own.RequiresImplementation && p.RequiresImplementation {
-				own.RequiresImplementation = p.RequiresImplementation
-			}
-			if !own.SkipEmptyCheck && p.SkipEmptyCheck {
-				own.SkipEmptyCheck = p.SkipEmptyCheck
-			}
-
-			if own.DefaultStatus == "" && p.DefaultStatus != "" {
-				own.DefaultStatus = p.DefaultStatus
-			}
-			if own.ActiveStatus == "" && p.ActiveStatus != "" {
-				own.ActiveStatus = p.ActiveStatus
-			}
-		own.Transitions = unionStrings(own.Transitions, p.Transitions)
-		own.MustSections = unionStrings(own.MustSections, p.MustSections)
-		own.Properties = unionStrings(own.Properties, p.Properties)
-	}
-	raw[art.Title] = own
+			own = mergeComposedTrait(own, raw[parent.Title])
+		}
+		raw[art.Title] = own
 	}
 	return raw
+}
+
+// mergeComposedTrait merges parent trait fields into child where the child has zero values.
+// Child's own non-zero fields always win; slices are unioned.
+func mergeComposedTrait(own, p LabelTrait) LabelTrait { //nolint:gocyclo,cyclop,gocritic // complexity is a flat sequence of independent field merges; hugeParam: value semantics required — caller updates the map slot with the returned value
+	if own.EvictionPolicy == "" && p.EvictionPolicy != "" {
+		own.EvictionPolicy = p.EvictionPolicy
+	}
+	if own.World == "" && p.World != "" {
+		own.World = p.World
+	}
+	if own.HalfLifeDays == 0 && p.HalfLifeDays != 0 {
+		own.HalfLifeDays = p.HalfLifeDays
+	}
+	if !own.AlwaysApply && p.AlwaysApply {
+		own.AlwaysApply = p.AlwaysApply
+	}
+	if !own.Terminal && p.Terminal {
+		own.Terminal = p.Terminal
+	}
+	if !own.Readonly && p.Readonly {
+		own.Readonly = p.Readonly
+	}
+	if !own.IsContainerKind && p.IsContainerKind {
+		own.IsContainerKind = p.IsContainerKind
+	}
+	if !own.RequiresImplementation && p.RequiresImplementation {
+		own.RequiresImplementation = p.RequiresImplementation
+	}
+	if !own.SkipEmptyCheck && p.SkipEmptyCheck {
+		own.SkipEmptyCheck = p.SkipEmptyCheck
+	}
+	if own.DefaultStatus == "" && p.DefaultStatus != "" {
+		own.DefaultStatus = p.DefaultStatus
+	}
+	if own.ActiveStatus == "" && p.ActiveStatus != "" {
+		own.ActiveStatus = p.ActiveStatus
+	}
+	own.RequiredSections = unionStrings(own.RequiredSections, p.RequiredSections)
+	own.Transitions = unionStrings(own.Transitions, p.Transitions)
+	own.MustSections = unionStrings(own.MustSections, p.MustSections)
+	own.Properties = unionStrings(own.Properties, p.Properties)
+	return own
 }
 
 // ResolveTrait merges the traits of all expanded labels into one LabelTrait.
@@ -231,7 +236,7 @@ func ResolveTrait(traits map[string]LabelTrait, labels []string) LabelTrait {
 }
 
 func mergeEvictionPolicy(a, b string) string {
-	rank := map[string]int{"protected": 2, "normal": 1, "aggressive": 0, "": 1}
+	rank := map[string]int{EvictionPolicyProtected: 2, EvictionPolicyNormal: 1, EvictionPolicyAggressive: 0, "": 1}
 	if rank[b] > rank[a] {
 		return b
 	}
@@ -266,19 +271,19 @@ var defaultLabelTraits = []struct {
 	{"always", LabelTrait{AlwaysApply: true},
 		"Apply 'always' to rules or context notes that must be included in every agent context assembly, regardless of scope or query.",
 		"Bypasses eviction and recency filtering. The artifact is always present in context_read output."},
-	{"rule", LabelTrait{World: "behavioral", EvictionPolicy: "protected"},
+	{"rule", LabelTrait{World: "behavioral", EvictionPolicy: EvictionPolicyProtected},
 		"Apply 'rule' to notes that encode behavioral constraints — coding standards, commit policies, naming conventions, process gates. These are the agent's operating procedure.",
 		"Protected from eviction. Included in context_read as behavioral rules. Dot-namespaced: 'rule.security' inherits 'rule'."},
-	{"skill", LabelTrait{World: "behavioral", EvictionPolicy: "protected"},
+	{"skill", LabelTrait{World: "behavioral", EvictionPolicy: EvictionPolicyProtected},
 		"Apply 'skill' to notes that encode procedural knowledge — how to do X, step-by-step instructions, reusable procedures. Skills are the agent's procedural memory.",
 		"Protected from eviction. Included in context_read as procedural guidance. Searchable via recall(query=how to X)."},
-	{"knowledge", LabelTrait{EvictionPolicy: "protected", HalfLifeDays: 180},
+	{"knowledge", LabelTrait{EvictionPolicy: EvictionPolicyProtected, HalfLifeDays: 180},
 		"Apply 'knowledge' to notes that encode domain facts, concepts, or reference material that should survive beyond the session that created them.",
 		"Protected from eviction for 180 days. Included in evergreen knowledge queries. Not auto-evicted by the structural heat algorithm."},
 	{"lang", LabelTrait{World: "behavioral"},
 		"Apply 'lang.go', 'lang.ts', 'lang.python' etc. to scope rules and skills to a specific programming language. Use dot-namespacing: 'lang.go.test' inherits both 'lang.go' and 'lang'.",
 		"Dot-expanded: 'lang.go' also matches 'lang' queries. Behavioral world — affects context_read assembly for language-specific sessions."},
-	{"decision", LabelTrait{EvictionPolicy: "protected"},
+	{"decision", LabelTrait{EvictionPolicy: EvictionPolicyProtected},
 		"Apply 'decision' to notes created via admin(action=decision) — cached answers to recurring questions. Not the same as kind=decision (ADR); this is a lightweight key-value cache.",
 		"Protected from eviction. Queryable via admin(action=decision, snapshot_action=check, check=<key>)."},
 
@@ -361,7 +366,8 @@ func SeedLabelTraits(ctx context.Context, s Store) {
 	migrateLabelSections(ctx, s)
 
 	// Fallback: seed any labels in defaultLabelTraits not already seeded.
-	for _, entry := range defaultLabelTraits {
+	for i := range defaultLabelTraits {
+		entry := &defaultLabelTraits[i]
 		id := "LDEF-" + entry.label
 		if _, err := s.Get(ctx, id); err == nil {
 			continue

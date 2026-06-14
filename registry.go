@@ -233,10 +233,10 @@ func seedKindLabelTraitsFromRegistry(ctx context.Context, s Store) {
 			InsertedAt: now,
 		}
 		if k.WhenToCreate != "" {
-			art.Sections = append(art.Sections, Section{Name: "when_to_create", Text: strings.TrimSpace(k.WhenToCreate)})
+			art.Sections = append(art.Sections, Section{Name: SectionWhenToCreate, Text: strings.TrimSpace(k.WhenToCreate)})
 		}
 		if k.AgentNote != "" {
-			art.Sections = append(art.Sections, Section{Name: "agent_note", Text: strings.TrimSpace(k.AgentNote)})
+			art.Sections = append(art.Sections, Section{Name: SectionAgentNote, Text: strings.TrimSpace(k.AgentNote)})
 		}
 		if err := s.Put(ctx, art); err != nil {
 			slog.WarnContext(ctx, "registry: seed kind trait failed",
@@ -273,10 +273,10 @@ func seedLabelsFromRegistry(ctx context.Context, s Store) {
 			InsertedAt: now,
 		}
 		if l.WhenToApply != "" {
-			art.Sections = append(art.Sections, Section{Name: "when_to_apply", Text: strings.TrimSpace(l.WhenToApply)})
+			art.Sections = append(art.Sections, Section{Name: SectionWhenToApply, Text: strings.TrimSpace(l.WhenToApply)})
 		}
 		if l.Implies != "" {
-			art.Sections = append(art.Sections, Section{Name: "implies", Text: strings.TrimSpace(l.Implies)})
+			art.Sections = append(art.Sections, Section{Name: SectionImplies, Text: strings.TrimSpace(l.Implies)})
 		}
 		if err := s.Put(ctx, art); err != nil {
 			slog.WarnContext(ctx, "registry: seed label failed",
@@ -301,11 +301,11 @@ func migrateLabelSections(ctx context.Context, s Store) { //nolint:dupl // paral
 		}
 		var added bool
 		if l.WhenToApply != "" && !existing["when_to_apply"] {
-			art.Sections = append(art.Sections, Section{Name: "when_to_apply", Text: strings.TrimSpace(l.WhenToApply)})
+			art.Sections = append(art.Sections, Section{Name: SectionWhenToApply, Text: strings.TrimSpace(l.WhenToApply)})
 			added = true
 		}
 		if l.Implies != "" && !existing["implies"] {
-			art.Sections = append(art.Sections, Section{Name: "implies", Text: strings.TrimSpace(l.Implies)})
+			art.Sections = append(art.Sections, Section{Name: SectionImplies, Text: strings.TrimSpace(l.Implies)})
 			added = true
 		}
 		if added {

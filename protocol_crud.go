@@ -727,56 +727,6 @@ func (p *Protocol) UpsertArtifact(ctx context.Context, in CreateInput) (UpsertRe
 	return UpsertResult{Artifact: existing, Created: false}, nil
 }
 
-// mergeStringSlice returns the union of a and b preserving order without duplicates.
-func mergeStringSlice(a, b []string) []string {
-	seen := make(map[string]struct{}, len(a)+len(b))
-	out := make([]string, 0, len(a)+len(b))
-	for _, s := range a {
-		if _, ok := seen[s]; !ok {
-			seen[s] = struct{}{}
-			out = append(out, s)
-		}
-	}
-	for _, s := range b {
-		if _, ok := seen[s]; !ok {
-			seen[s] = struct{}{}
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-// --- Composite actions ---
-
-// RetireArtifact transitions artifacts to the retired status — terminal but
-// NOT readonly. Retired artifacts remain searchable and writable (for
-// post-mortems) and are never deleted by Vacuum. Use for completed or
-// canceled work you want to preserve as memory. Use ArchiveArtifact for
-// work you want to freeze and eventually discard.
-
-
-// applyToEach applies fn to each id and accumulates Results, logging failures.
-func (p *Protocol) applyToEach(ctx context.Context, ids []string, op string, fn func(string) error) ([]Result, error) {
-	if len(ids) == 0 {
-		return nil, fmt.Errorf("ids is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
-	}
-	results := make([]Result, 0, len(ids))
-	for _, id := range ids {
-		if err := fn(id); err != nil {
-			slog.WarnContext(ctx, "operation failed",
-				slog.String(LogKeyOp, op),
-				slog.String(LogKeyID, id),
-				slog.Any(LogKeyError, err))
-			results = append(results, Result{ID: id, Error: err.Error()})
-			continue
-		}
-		results = append(results, Result{ID: id, OK: true})
-	}
-	return results, nil
-}
-
-
-
 // --- helpers ---
 
 

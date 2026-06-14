@@ -3,20 +3,15 @@ package parchment
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
-var (
-	errNotCRD           = errors.New("not a CRD document: missing apiVersion and kind")
-	errUnsupportedKind  = errors.New("unsupported resource kind")
-)
+var errNotCRD = errors.New("not a CRD document: missing apiVersion and kind")
 
 // Resource is a Kubernetes-style resource definition.
 type Resource struct {
@@ -196,89 +191,4 @@ func ApplyArtifactResource(ctx context.Context, p *Protocol, r *Resource) (Upser
 	})
 }
 
-func resourceID(name string) string {
-	sanitized := strings.NewReplacer(".", "-", ":", "-").Replace(name)
-	return "RDEF-" + sanitized
-}
 
-func applyLabelDefinition(ctx context.Context, s Store, r *Resource) error {
-	trait := LabelTrait{
-		World:            r.Spec.World,
-		EvictionPolicy:   r.Spec.EvictionPolicy,
-		HalfLifeDays:     int(r.Spec.HalfLifeDays),
-		AlwaysApply:      r.Spec.AlwaysApply,
-		RequiredSections: r.Spec.RequiredSections,
-		IsContainerKind: r.Spec.IsContainerKind,
-	}
-	if r.Spec.Lifecycle != nil {
-		trait.DefaultStatus = r.Spec.Lifecycle.DefaultStatus
-		trait.Terminal = r.Spec.Lifecycle.Terminal
-		trait.Readonly = r.Spec.Lifecycle.Readonly
-	}
-	if r.Spec.Sections != nil {
-		trait.MustSections = r.Spec.Sections.Must
-	}
-
-	b, err := json.Marshal(trait)
-	if err != nil {
-		return err
-	}
-	var extra map[string]any
-	if err := json.Unmarshal(b, &extra); err != nil {
-		return err
-	}
-
-	now := time.Now().UTC()
-	id := resourceID(r.Metadata.Name)
-	art := &Artifact{
-		ID:         id,
-		Labels:     []string{LabelPrefixKind + kindLabelDefinition, statusWorkActive, LabelPrefixScope + SchemaScope},
-		Title:      r.Metadata.Name,
-		Extra:      extra,
-		CreatedAt:  now,
-		UpdatedAt:  now,
-		InsertedAt: now,
-	}
-	if r.Spec.WhenToUse != "" {
-		art.Sections = append(art.Sections, Section{Name: "when_to_use", Text: strings.TrimSpace(r.Spec.WhenToUse)})
-	}
-	if r.Spec.AgentNote != "" {
-		art.Sections = append(art.Sections, Section{Name: "agent_note", Text: strings.TrimSpace(r.Spec.AgentNote)})
-	}
-	if r.Spec.Implies != "" {
-		art.Sections = append(art.Sections, Section{Name: "implies", Text: strings.TrimSpace(r.Spec.Implies)})
-	}
-	return s.Put(ctx, art)
-}
-
-func applyRelationship(ctx context.Context, s Store, r *Resource) error {
-	rt := RelationshipTrait{
-		From:             r.Spec.From,
-		Relation:         r.Spec.Relation,
-		To:               r.Spec.To,
-		CycleGuard:       r.Spec.RelCycleGuard,
-		MaxIncoming:      r.Spec.RelMaxIncoming,
-		ConformanceCheck: r.Spec.RelConformanceCheck,
-	}
-	b, err := json.Marshal(rt)
-	if err != nil {
-		return err
-	}
-	var extra map[string]any
-	if err := json.Unmarshal(b, &extra); err != nil {
-		return err
-	}
-	now := time.Now().UTC()
-	sanitized := strings.NewReplacer(".", "-", ":", "-").Replace(r.Metadata.Name)
-	id := "REL-" + sanitized
-	art := &Artifact{
-		ID:         id,
-		Labels:     []string{LabelPrefixKind + kindRelationship, statusWorkActive, LabelPrefixScope + SchemaScope},
-		Title:      r.Metadata.Name,
-		Extra:      extra,
-		CreatedAt:  now,
-		UpdatedAt:  now,
-		InsertedAt: now,
-	}
-	return s.Put(ctx, art)
-}

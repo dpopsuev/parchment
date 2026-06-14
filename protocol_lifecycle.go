@@ -181,24 +181,7 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 	case FieldStatus:
 		return p.setStatusForce(ctx, art, value, opt.Force || opt.BypassGuards)
 	case FieldParent:
-		if value != "" {
-			if parent, err := p.store.Get(ctx, value); err == nil {
-				if reason, ok := p.ValidChild(labelValue(parent.Labels, LabelPrefixKind), labelValue(art.Labels, LabelPrefixKind)); !ok {
-					return Result{ID: id, Error: reason}
-				}
-			}
-			if cycle, path := p.wouldCycleParent(ctx, value, id); cycle {
-				return Result{ID: id, Error: fmt.Sprintf("parent_of cycle detected: %s", strings.Join(path, " → "))}
-			}
-		}
-		oldParentEdges, _ := p.store.Neighbors(ctx, id, RelParentOf, Incoming)
-		for _, e := range oldParentEdges {
-			_ = p.store.RemoveEdge(ctx, e)
-		}
-		if value != "" {
-			_ = p.store.AddEdge(ctx, Edge{From: value, To: id, Relation: RelParentOf})
-		}
-		return Result{ID: id, OK: true}
+		return p.setFieldParent(ctx, id, art, value)
 	case FieldPriority:
 		if value != "" && !p.schema.ValidPriority(value) {
 			return Result{ID: id, Error: fmt.Sprintf("invalid priority %q — valid: %s", value, strings.Join(p.schema.Priorities, ", "))}
@@ -212,25 +195,8 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		}
 		art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, value)
 	case FieldDependsOn:
-		if value == "" {
-			existing, _ := p.store.Neighbors(ctx, id, RelDependsOn, Outgoing)
-			for _, e := range existing {
-				_ = p.store.RemoveEdge(ctx, e)
-			}
-		} else {
-			newDeps := strings.Split(value, ",")
-			for i := range newDeps {
-				newDeps[i] = strings.TrimSpace(newDeps[i])
-			}
-			for _, dep := range newDeps {
-				if cycle, path := p.wouldCycle(ctx, RelDependsOn, id, dep); cycle {
-					return Result{ID: id, Error: fmt.Sprintf("depends_on cycle detected: %s", strings.Join(path, " → "))}
-				}
-				_ = p.store.AddEdge(ctx, Edge{From: id, To: dep, Relation: RelDependsOn})
-			}
-		}
-		return Result{ID: id, OK: true}
-	case "labels":
+		return p.setFieldDependsOn(ctx, id, value)
+	case FieldLabels:
 		if value == "" {
 			art.Labels = nil
 		} else {
@@ -263,6 +229,48 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 	return Result{ID: id, OK: true}
 }
 
+func (p *Protocol) setFieldParent(ctx context.Context, id string, art *Artifact, value string) Result {
+	if value != "" {
+		if parent, err := p.store.Get(ctx, value); err == nil {
+			if reason, ok := p.ValidChild(labelValue(parent.Labels, LabelPrefixKind), labelValue(art.Labels, LabelPrefixKind)); !ok {
+				return Result{ID: id, Error: reason}
+			}
+		}
+		if cycle, path := p.wouldCycleParent(ctx, value, id); cycle {
+			return Result{ID: id, Error: fmt.Sprintf("parent_of cycle detected: %s", strings.Join(path, " → "))}
+		}
+	}
+	oldParentEdges, _ := p.store.Neighbors(ctx, id, RelParentOf, Incoming)
+	for _, e := range oldParentEdges {
+		_ = p.store.RemoveEdge(ctx, e)
+	}
+	if value != "" {
+		_ = p.store.AddEdge(ctx, Edge{From: value, To: id, Relation: RelParentOf})
+	}
+	return Result{ID: id, OK: true}
+}
+
+func (p *Protocol) setFieldDependsOn(ctx context.Context, id, value string) Result {
+	if value == "" {
+		existing, _ := p.store.Neighbors(ctx, id, RelDependsOn, Outgoing)
+		for _, e := range existing {
+			_ = p.store.RemoveEdge(ctx, e)
+		}
+		return Result{ID: id, OK: true}
+	}
+	newDeps := strings.Split(value, ",")
+	for i := range newDeps {
+		newDeps[i] = strings.TrimSpace(newDeps[i])
+	}
+	for _, dep := range newDeps {
+		if cycle, path := p.wouldCycle(ctx, RelDependsOn, id, dep); cycle {
+			return Result{ID: id, Error: fmt.Sprintf("depends_on cycle detected: %s", strings.Join(path, " → "))}
+		}
+		_ = p.store.AddEdge(ctx, Edge{From: id, To: dep, Relation: RelDependsOn})
+	}
+	return Result{ID: id, OK: true}
+}
+
 func (p *Protocol) setStatus(ctx context.Context, art *Artifact, status string) Result {
 	return p.setStatusForce(ctx, art, status, false)
 }
@@ -270,7 +278,7 @@ func (p *Protocol) setStatus(ctx context.Context, art *Artifact, status string) 
 
 
 func (p *Protocol) isValidTransition(kind, from, to string) (valid bool, reason string) {
-	trait, ok := p.labelTraits["kind:"+kind]
+	trait, ok := p.labelTraits[LabelPrefixKind+kind]
 	if !ok || len(trait.Transitions) == 0 {
 		// Unknown kind or no transitions declared — open state machine.
 		return true, ""
@@ -285,7 +293,7 @@ func (p *Protocol) isValidTransition(kind, from, to string) (valid bool, reason 
 }
 
 func (p *Protocol) validNextStatuses(kind, from string) []string {
-	trait := p.labelTraits["kind:"+kind]
+	trait := p.labelTraits[LabelPrefixKind+kind]
 	var next []string
 	for _, t := range trait.Transitions {
 		parts := strings.SplitN(t, "→", 2)

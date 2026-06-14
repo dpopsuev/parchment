@@ -91,7 +91,7 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 		// Compute vocab from registered kind traits when not provided by caller.
 		if len(vocab) == 0 {
 			for key := range p.labelTraits {
-				if len(key) > 5 && key[:5] == "kind:" {
+				if len(key) > 5 && key[:len(LabelPrefixKind)] == LabelPrefixKind {
 					vocab = append(vocab, key[5:])
 				}
 			}
@@ -100,8 +100,8 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 		// Unified TraitStore — bridges from the existing map (Step 2 strangler seam).
 		p.vocab = vocab
 		p.traits = NewTraitStore()
-		for k, v := range p.labelTraits {
-			p.traits.PutLabel(k, v)
+		for k := range p.labelTraits {
+			p.traits.PutLabel(k, p.labelTraits[k])
 		}
 		rules, _ := p.LoadRules(context.Background())
 		p.rules = rules

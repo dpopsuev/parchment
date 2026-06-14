@@ -80,3 +80,18 @@ const (
 // It is the default active status for infrastructure artifacts (rules, configs, templates).
 // Application-defined statuses are data in registry/kinds/*.yaml, not compiled constants.
 const statusWorkActive = "work.active" //nolint:unused // used in rule.go, seed.go
+
+// Eviction policies for LabelTrait.EvictionPolicy.
+const (
+	EvictionPolicyProtected  = "protected"
+	EvictionPolicyNormal     = "normal"
+	EvictionPolicyAggressive = "aggressive"
+)
+
+// Section name constants for well-known section names used across the registry.
+const (
+	SectionWhenToApply  = "when_to_apply"
+	SectionWhenToCreate = "when_to_create"
+	SectionAgentNote    = "agent_note"
+	SectionImplies      = "implies"
+)

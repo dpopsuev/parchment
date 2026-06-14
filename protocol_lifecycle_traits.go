@@ -48,7 +48,7 @@ func (p *Protocol) IsReadonly(status string) bool {
 
 // DefaultStatus returns the default status for a kind.
 func (p *Protocol) DefaultStatus(kind string) string {
-	if trait, ok := p.labelTraits["kind:"+kind]; ok && trait.DefaultStatus != "" {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok && trait.DefaultStatus != "" {
 		return trait.DefaultStatus
 	}
 	return ""
@@ -66,7 +66,7 @@ func (p *Protocol) ValidChild(parentKind, childKind string) (string, bool) {
 
 // MustSections returns sections required at creation time for the kind.
 func (p *Protocol) MustSections(kind string) []string {
-	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
 		return trait.MustSections
 	}
 	return nil
@@ -76,7 +76,7 @@ func (p *Protocol) MustSections(kind string) []string {
 // e.g. "effort" returns ["effort.campaign", "effort.goal", "effort.task"].
 func (p *Protocol) KindsWithPrefix(prefix string) []string {
 	var out []string
-	match := "kind:" + prefix + "."
+		match := LabelPrefixKind + prefix + "."
 	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
 		if strings.HasPrefix(key, match) {
 			out = append(out, key[5:])
@@ -89,7 +89,7 @@ func (p *Protocol) KindsWithPrefix(prefix string) []string {
 // IsContainerKind reports whether kind is a container (goal, campaign).
 // Consults label traits only — no schema fallback (new flag).
 func (p *Protocol) IsContainerKind(kind string) bool {
-	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
 		return trait.IsContainerKind
 	}
 	return false
@@ -98,7 +98,7 @@ func (p *Protocol) IsContainerKind(kind string) bool {
 // RequiresImplementation reports whether kind needs an incoming implements link.
 // Consults label traits only — no schema fallback (new flag).
 func (p *Protocol) RequiresImplementation(kind string) bool {
-	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
 		return trait.RequiresImplementation
 	}
 	return false
@@ -107,7 +107,7 @@ func (p *Protocol) RequiresImplementation(kind string) bool {
 // SkipEmptyCheck reports whether kind is exempt from the empty-artifact check.
 // Consults label traits only — no schema fallback (new flag).
 func (p *Protocol) SkipEmptyCheck(kind string) bool {
-	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
 		return trait.SkipEmptyCheck
 	}
 	return false
@@ -115,7 +115,7 @@ func (p *Protocol) SkipEmptyCheck(kind string) bool {
 
 // IsProtected reports whether the kind is protected from deletion.
 func (p *Protocol) IsProtected(kind string) bool {
-	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
 		return trait.Protected
 	}
 	return false
@@ -124,7 +124,7 @@ func (p *Protocol) IsProtected(kind string) bool {
 // IsTemplatekind reports whether artifacts of this kind serve as templates
 // that are auto-linked to new artifacts of matching kinds via satisfies edges.
 func (p *Protocol) IsTemplateKind(kind string) bool {
-	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
 		return trait.IsTemplate
 	}
 	return false
@@ -133,7 +133,7 @@ func (p *Protocol) IsTemplateKind(kind string) bool {
 // IsRuleKind reports whether artifacts of this kind are evaluated by the
 // rules engine during status transitions.
 func (p *Protocol) IsRuleKind(kind string) bool {
-	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
 		return trait.IsRule
 	}
 	return false
@@ -142,7 +142,7 @@ func (p *Protocol) IsRuleKind(kind string) bool {
 // IsConfigKind reports whether artifacts of this kind serve as key-value
 // configuration stores queryable via GetConfig.
 func (p *Protocol) IsConfigKind(kind string) bool {
-	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
 		return trait.IsConfig
 	}
 	return false
@@ -150,7 +150,7 @@ func (p *Protocol) IsConfigKind(kind string) bool {
 
 // SkipGuards reports whether transition guards are bypassed for this kind.
 func (p *Protocol) SkipGuards(kind string) bool {
-	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
 		return trait.SkipGuards
 	}
 	return false
@@ -158,7 +158,7 @@ func (p *Protocol) SkipGuards(kind string) bool {
 
 // IsGoalKind reports whether the kind serves as the current-goal container.
 func (p *Protocol) IsGoalKind(kind string) bool {
-	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
 		return trait.IsGoalKind
 	}
 	return false
@@ -166,7 +166,7 @@ func (p *Protocol) IsGoalKind(kind string) bool {
 
 // TrackInBrief reports whether artifacts of this kind appear in brief summaries.
 func (p *Protocol) TrackInBrief(kind string) bool {
-	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
 		return trait.TrackInBrief
 	}
 	return false
@@ -174,7 +174,7 @@ func (p *Protocol) TrackInBrief(kind string) bool {
 
 // ActiveStatus returns the "in-flight" status label for a kind (e.g. "work.active").
 func (p *Protocol) ActiveStatus(kind string) string {
-	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
 		return trait.ActiveStatus
 	}
 	return ""
@@ -182,7 +182,7 @@ func (p *Protocol) ActiveStatus(kind string) string {
 
 // ActivationRequiresSections reports whether the kind requires sections before activating.
 func (p *Protocol) ActivationRequiresSections(kind string) bool {
-	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
 		return trait.ActivationRequiresSections
 	}
 	return false
@@ -190,7 +190,7 @@ func (p *Protocol) ActivationRequiresSections(kind string) bool {
 
 // ShouldSections returns sections recommended for the kind.
 func (p *Protocol) ShouldSections(kind string) []string {
-	if trait, ok := p.labelTraits["kind:"+kind]; ok {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
 		return trait.ShouldSections
 	}
 	return nil
@@ -224,7 +224,7 @@ func (p *Protocol) AllStatuses() []string {
 func (p *Protocol) AllKinds() []string {
 	var kinds []string
 	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
-		if len(key) > 5 && key[:5] == "kind:" {
+		if len(key) > 5 && key[:len(LabelPrefixKind)] == LabelPrefixKind {
 			kinds = append(kinds, key[5:])
 		}
 	}
@@ -234,7 +234,7 @@ func (p *Protocol) AllKinds() []string {
 
 // IsKnownKind reports whether kind has a registered label trait.
 func (p *Protocol) IsKnownKind(kind string) bool {
-	_, ok := p.labelTraits["kind:"+kind]
+	_, ok := p.labelTraits[LabelPrefixKind+kind]
 	return ok
 }
 
@@ -298,7 +298,7 @@ func (p *Protocol) templateKindLabels() []string {
 	var labels []string
 	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
 		trait := p.labelTraits[key]
-		if len(key) > 5 && key[:5] == "kind:" && trait.IsTemplate {
+		if len(key) > 5 && key[:len(LabelPrefixKind)] == LabelPrefixKind && trait.IsTemplate {
 			labels = append(labels, key)
 		}
 	}
@@ -310,7 +310,7 @@ func (p *Protocol) ruleKindLabels() []string {
 	var labels []string
 	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
 		trait := p.labelTraits[key]
-		if len(key) > 5 && key[:5] == "kind:" && trait.IsRule {
+		if len(key) > 5 && key[:len(LabelPrefixKind)] == LabelPrefixKind && trait.IsRule {
 			labels = append(labels, key)
 		}
 	}
@@ -322,7 +322,7 @@ func (p *Protocol) configKindLabels() []string {
 	var labels []string
 	for key := range p.labelTraits { //nolint:gocritic // rangeValCopy: indexing avoids copy
 		trait := p.labelTraits[key]
-		if len(key) > 5 && key[:5] == "kind:" && trait.IsConfig {
+		if len(key) > 5 && key[:len(LabelPrefixKind)] == LabelPrefixKind && trait.IsConfig {
 			labels = append(labels, key)
 		}
 	}

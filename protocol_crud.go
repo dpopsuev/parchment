@@ -252,6 +252,9 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	}
 
 	p.emitEvent(ctx, EventCreated, art.ID, labelValue(art.Labels, LabelPrefixScope), nil)
+	if len(art.Sections) > 0 {
+		_, _ = p.SyncWikilinks(ctx, art.ID)
+	}
 	return art, nil
 }
 
@@ -536,6 +539,7 @@ func (p *Protocol) AttachSection(ctx context.Context, id, name, text string) (bo
 	if err := p.store.Put(ctx, art); err != nil {
 		return false, err
 	}
+	_, _ = p.SyncWikilinks(ctx, id)
 	return replaced, nil
 }
 
@@ -723,6 +727,9 @@ func (p *Protocol) UpsertArtifact(ctx context.Context, in CreateInput) (UpsertRe
 		for _, tid := range targets {
 			_ = p.store.AddEdge(ctx, Edge{From: existing.ID, To: tid, Relation: rel})
 		}
+	}
+	if len(in.Sections) > 0 {
+		_, _ = p.SyncWikilinks(ctx, existing.ID)
 	}
 	return UpsertResult{Artifact: existing, Created: false}, nil
 }

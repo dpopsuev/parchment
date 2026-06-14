@@ -41,6 +41,11 @@ func TestExtractWikilinks(t *testing.T) {
 			text: "line one [[Alpha]]\nline two [[Beta]]",
 			want: []string{"Alpha", "Beta"},
 		},
+		{
+			name: "typed wikilink",
+			text: "see [[blocks::TaskA]] and [[implements::SpecB]]",
+			want: []string{"blocks::TaskA", "implements::SpecB"},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -54,6 +59,48 @@ func TestExtractWikilinks(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestParseWikilink(t *testing.T) {
+	tests := []struct {
+		inner    string
+		wantRel  string
+		wantTarg string
+	}{
+		{"Stoicism", "", "Stoicism"},
+		{"blocks::TaskA", "blocks", "TaskA"},
+		{" implements :: SpecB ", "implements", "SpecB"},
+		{"no-double-colon", "", "no-double-colon"},
+		{"cites::Source With Spaces", "cites", "Source With Spaces"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.inner, func(t *testing.T) {
+			ref := ParseWikilink(tc.inner)
+			if ref.Relation != tc.wantRel {
+				t.Errorf("relation: got %q, want %q", ref.Relation, tc.wantRel)
+			}
+			if ref.Target != tc.wantTarg {
+				t.Errorf("target: got %q, want %q", ref.Target, tc.wantTarg)
+			}
+		})
+	}
+}
+
+func TestExtractWikilinkRefs(t *testing.T) {
+	text := "see [[blocks::TaskA]] and [[Stoicism]] and [[cites::Source]]"
+	refs := ExtractWikilinkRefs(text)
+	if len(refs) != 3 {
+		t.Fatalf("got %d refs, want 3", len(refs))
+	}
+	if refs[0].Relation != "blocks" || refs[0].Target != "TaskA" {
+		t.Errorf("ref[0]: got %+v", refs[0])
+	}
+	if refs[1].Relation != "" || refs[1].Target != "Stoicism" {
+		t.Errorf("ref[1]: got %+v", refs[1])
+	}
+	if refs[2].Relation != "cites" || refs[2].Target != "Source" {
+		t.Errorf("ref[2]: got %+v", refs[2])
 	}
 }
 
@@ -114,32 +161,113 @@ func TestSyncWikilinks(t *testing.T) {
 	p := New(store, nil, []string{"test"}, nil, ProtocolConfig{})
 
 	stoicism, err := p.CreateArtifact(ctx, CreateInput{Title: "Stoicism",
-		Labels: []string{"kind:intent.decision"},})
+		Labels: []string{"kind:intent.decision"}})
 	if err != nil {
 		t.Fatalf("create stoicism: %v", err)
 	}
 	note, err := p.CreateArtifact(ctx, CreateInput{Title: "My Note",
-
 		Sections: []Section{
 			{Name: "body", Text: "This note references [[Stoicism]] as a key philosophy."},
 		},
-		Labels: []string{"kind:intent.decision"},})
-
+		Labels: []string{"kind:intent.decision"}})
 	if err != nil {
 		t.Fatalf("create note: %v", err)
 	}
 
-	created, err := p.SyncWikilinks(ctx, note.ID)
-	if err != nil {
-		t.Fatalf("SyncWikilinks: %v", err)
+	edges, _ := store.Neighbors(ctx, note.ID, RelMentions, Outgoing)
+	if len(edges) != 1 || edges[0].To != stoicism.ID {
+		t.Errorf("expected mentions edge auto-created on create, got %v", edges)
 	}
-	if len(created) != 1 || created[0] != stoicism.ID {
-		t.Errorf("expected link to %s, got %v", stoicism.ID, created)
+	if len(edges) > 0 && !edgeHasSource(edges[0], EdgeSourceWikilink) {
+		t.Error("edge should have wikilink source")
 	}
 
-	// Idempotent — second sync creates no new links.
-	created2, _ := p.SyncWikilinks(ctx, note.ID)
-	if len(created2) != 0 {
-		t.Errorf("second sync should be idempotent, got %v", created2)
+	created, _ := p.SyncWikilinks(ctx, note.ID)
+	if len(created) != 0 {
+		t.Errorf("re-sync should be idempotent, got %v", created)
+	}
+	_ = stoicism
+}
+
+func TestSyncWikilinks_TypedRelation(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	p := New(store, nil, []string{"test"}, nil, ProtocolConfig{})
+
+	spec, _ := p.CreateArtifact(ctx, CreateInput{Title: "Auth Spec",
+		Labels: []string{"kind:intent.decision"}})
+	task, _ := p.CreateArtifact(ctx, CreateInput{Title: "Implement Auth",
+		Sections: []Section{
+			{Name: "body", Text: "This task [[implements::Auth Spec]]."},
+		},
+		Labels: []string{"kind:intent.decision"}})
+
+	edges, _ := store.Neighbors(ctx, task.ID, RelImplements, Outgoing)
+	if len(edges) != 1 || edges[0].To != spec.ID {
+		t.Errorf("expected implements edge auto-created on create, got %v", edges)
+	}
+}
+
+func TestSyncWikilinks_RemovesStaleLinks(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	p := New(store, nil, []string{"test"}, nil, ProtocolConfig{})
+
+	alpha, _ := p.CreateArtifact(ctx, CreateInput{Title: "Alpha",
+		Labels: []string{"kind:intent.decision"}})
+	beta, _ := p.CreateArtifact(ctx, CreateInput{Title: "Beta",
+		Labels: []string{"kind:intent.decision"}})
+	note, _ := p.CreateArtifact(ctx, CreateInput{Title: "My Note",
+		Sections: []Section{
+			{Name: "body", Text: "References [[Alpha]] and [[Beta]]."},
+		},
+		Labels: []string{"kind:intent.decision"}})
+
+	p.SyncWikilinks(ctx, note.ID)
+	edges, _ := store.Neighbors(ctx, note.ID, RelMentions, Outgoing)
+	if len(edges) != 2 {
+		t.Fatalf("expected 2 edges, got %d", len(edges))
+	}
+
+	updated, _ := store.Get(ctx, note.ID)
+	updated.Sections = []Section{{Name: "body", Text: "Only [[Alpha]] now."}}
+	store.Put(ctx, updated)
+	p.SyncWikilinks(ctx, note.ID)
+
+	edges, _ = store.Neighbors(ctx, note.ID, RelMentions, Outgoing)
+	if len(edges) != 1 {
+		t.Fatalf("expected 1 edge after removal, got %d", len(edges))
+	}
+	if edges[0].To != alpha.ID {
+		t.Errorf("remaining edge should be to Alpha, got %s", edges[0].To)
+	}
+
+	edgesBeta, _ := store.Neighbors(ctx, note.ID, RelMentions, Outgoing)
+	for _, e := range edgesBeta {
+		if e.To == beta.ID {
+			t.Error("Beta edge should have been removed")
+		}
+	}
+	_ = beta
+}
+
+func TestSyncWikilinks_SkipsSelfReference(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	p := New(store, nil, []string{"test"}, nil, ProtocolConfig{})
+
+	note, _ := p.CreateArtifact(ctx, CreateInput{Title: "Self Note",
+		Sections: []Section{
+			{Name: "body", Text: "This references [[Self Note]] itself."},
+		},
+		Labels: []string{"kind:intent.decision"}})
+
+	created, _ := p.SyncWikilinks(ctx, note.ID)
+	if len(created) != 0 {
+		t.Errorf("self-references should be skipped, got %v", created)
+	}
+	edges, _ := store.Neighbors(ctx, note.ID, "", Outgoing)
+	if len(edges) != 0 {
+		t.Errorf("no edges should be created for self-references, got %d", len(edges))
 	}
 }

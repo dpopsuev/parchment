@@ -1,7 +1,7 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.investigation.investigation
+  name: kind.investigation.case
 spec:
   prefix: INV
   code: inv

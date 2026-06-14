@@ -3,6 +3,6 @@ kind: Relationship
 metadata:
   name: investigation-parent_of-cause
 spec:
-  from: kind:investigation.investigation
+  from: kind:investigation.case
   relation: parent_of
   to: kind:investigation.cause

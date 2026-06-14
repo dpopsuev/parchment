@@ -210,10 +210,38 @@ func loadRegistryLabels() []labelYAML { //nolint:dupl // parallel to loadRegistr
 
 // seedKindLabelTraitsFromRegistry writes kind:X label_definition artifacts from
 // the embedded kind CRD registry. Always PUT — kind traits are derived from YAML
-// and stay in sync with the registry on every startup.
+// and stay in sync with the registry on every startup. Stale LDEF-kind:X artifacts
+// for kinds no longer in the registry are deleted to keep the vocab clean.
 func seedKindLabelTraitsFromRegistry(ctx context.Context, s Store) {
 	now := time.Now().UTC()
-	for _, k := range loadRegistryKinds() { //nolint:gocritic // rangeValCopy: indexing avoids copy
+	kinds := loadRegistryKinds()
+
+	// Build the set of expected LDEF IDs from the current registry.
+	expectedIDs := make(map[string]bool, len(kinds))
+	for i := range kinds {
+		expectedIDs["LDEF-kind:"+kinds[i].Name] = true
+	}
+
+	// Delete any existing LDEF-kind:X artifacts whose ID is not in the expected set.
+	// This removes stale entries left over from kind renames (e.g. LDEF-kind:task
+	// after the kind was renamed to effort.task).
+	existing, err := s.List(ctx, Filter{Labels: []string{
+		LabelPrefixKind + kindLabelDefinition,
+		LabelPrefixScope + SchemaScope,
+	}})
+	if err == nil {
+		for _, art := range existing {
+			if !strings.HasPrefix(art.ID, "LDEF-kind:") {
+				continue
+			}
+			if !expectedIDs[art.ID] {
+				_ = s.Delete(ctx, art.ID) // best-effort; stale entry, ignore error
+			}
+		}
+	}
+
+	for i := range kinds { //nolint:gocritic // rangeValCopy: indexing avoids copy
+		k := kinds[i]
 		trait := k.toLabelTrait()
 		b, err := json.Marshal(trait)
 		if err != nil {

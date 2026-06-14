@@ -321,6 +321,11 @@ func runSchemaEvolutions(db *sql.DB) { //nolint:cyclop,gocyclo // linear DDL seq
 
 	// v3.x: embedding content hash for staleness detection.
 	exec("ALTER TABLE artifact_embeddings ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''")
+
+	// v3.x: multi-source edge provenance. Each edge carries a JSON set of source
+	// names (e.g. ["manual"], ["wikilink"], ["locus"]). RemoveEdgeSource deletes
+	// the edge only when the set becomes empty.
+	exec(`ALTER TABLE edges ADD COLUMN sources TEXT NOT NULL DEFAULT '["manual"]'`)
 }
 
 func generateUID() string {

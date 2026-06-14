@@ -219,6 +219,48 @@ func (m *MemoryStore) RemoveEdge(_ context.Context, e Edge) error {
 	return nil
 }
 
+func (m *MemoryStore) AddEdgeSource(_ context.Context, from, relation, to, source string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := edgeKey(from, relation, to)
+	e, ok := m.edges[key]
+	if !ok {
+		m.edges[key] = Edge{From: from, Relation: relation, To: to, Sources: []string{source}}
+		return nil
+	}
+	for _, s := range e.Sources {
+		if s == source {
+			return nil // already present
+		}
+	}
+	e.Sources = append(e.Sources, source)
+	m.edges[key] = e
+	return nil
+}
+
+func (m *MemoryStore) RemoveEdgeSource(_ context.Context, from, relation, to, source string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := edgeKey(from, relation, to)
+	e, ok := m.edges[key]
+	if !ok {
+		return nil
+	}
+	filtered := e.Sources[:0]
+	for _, s := range e.Sources {
+		if s != source {
+			filtered = append(filtered, s)
+		}
+	}
+	if len(filtered) == 0 {
+		delete(m.edges, key)
+		return nil
+	}
+	e.Sources = filtered
+	m.edges[key] = e
+	return nil
+}
+
 func (m *MemoryStore) Neighbors(_ context.Context, id, rel string, dir Direction) ([]Edge, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

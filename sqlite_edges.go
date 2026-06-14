@@ -2,15 +2,109 @@ package parchment
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 )
 
 func (s *SQLiteStore) AddEdge(ctx context.Context, e Edge) error {
+	sources := e.Sources
+	if len(sources) == 0 {
+		sources = []string{"manual"}
+	}
+	srcsJSON, _ := json.Marshal(sources)
 	_, err := s.writer.ExecContext(ctx,
-		"INSERT OR IGNORE INTO edges (from_id, relation, to_id, weight) VALUES (?, ?, ?, ?)",
-		e.From, e.Relation, e.To, e.Weight)
+		"INSERT OR IGNORE INTO edges (from_id, relation, to_id, weight, sources) VALUES (?, ?, ?, ?, ?)",
+		e.From, e.Relation, e.To, e.Weight, string(srcsJSON))
 	return err
+}
+
+// AddEdgeSource creates the edge with source if absent, or adds source to an
+// existing edge's source set. Idempotent — re-adding a present source is a no-op.
+func (s *SQLiteStore) AddEdgeSource(ctx context.Context, from, relation, to, source string) error {
+	srcsJSON, _ := json.Marshal([]string{source})
+	res, err := s.writer.ExecContext(ctx,
+		"INSERT OR IGNORE INTO edges (from_id, relation, to_id, weight, sources) VALUES (?, ?, ?, 0.0, ?)",
+		from, relation, to, string(srcsJSON))
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		return nil // new edge created
+	}
+	// Edge already exists — merge source into its set.
+	var existing string
+	if err := s.reader.QueryRowContext(ctx,
+		"SELECT sources FROM edges WHERE from_id=? AND relation=? AND to_id=?",
+		from, relation, to).Scan(&existing); err != nil {
+		return err
+	}
+	merged := addToSourceSet(existing, source)
+	if merged == existing {
+		return nil // source already present
+	}
+	_, err = s.writer.ExecContext(ctx,
+		"UPDATE edges SET sources=? WHERE from_id=? AND relation=? AND to_id=?",
+		merged, from, relation, to)
+	return err
+}
+
+// RemoveEdgeSource removes source from the edge's source set.
+// The edge is deleted when the source set becomes empty.
+func (s *SQLiteStore) RemoveEdgeSource(ctx context.Context, from, relation, to, source string) error {
+	var existing string
+	err := s.reader.QueryRowContext(ctx,
+		"SELECT sources FROM edges WHERE from_id=? AND relation=? AND to_id=?",
+		from, relation, to).Scan(&existing)
+	if err != nil {
+		return nil // edge not found — no-op
+	}
+	remaining := removeFromSourceSet(existing, source)
+	if remaining == "" {
+		_, err = s.writer.ExecContext(ctx,
+			"DELETE FROM edges WHERE from_id=? AND relation=? AND to_id=?",
+			from, relation, to)
+		return err
+	}
+	if remaining == existing {
+		return nil // source not in set — no-op
+	}
+	_, err = s.writer.ExecContext(ctx,
+		"UPDATE edges SET sources=? WHERE from_id=? AND relation=? AND to_id=?",
+		remaining, from, relation, to)
+	return err
+}
+
+// addToSourceSet returns a JSON array string with source added if not present.
+func addToSourceSet(srcsJSON, source string) string {
+	sources := make([]string, 0, 1)
+	_ = json.Unmarshal([]byte(srcsJSON), &sources)
+	for _, s := range sources {
+		if s == source {
+			return srcsJSON // already present
+		}
+	}
+	sources = append(sources, source)
+	b, _ := json.Marshal(sources)
+	return string(b)
+}
+
+// removeFromSourceSet returns a JSON array string with source removed.
+// Returns "" when the resulting set is empty.
+func removeFromSourceSet(srcsJSON, source string) string {
+	var sources []string
+	_ = json.Unmarshal([]byte(srcsJSON), &sources)
+	filtered := sources[:0]
+	for _, s := range sources {
+		if s != source {
+			filtered = append(filtered, s)
+		}
+	}
+	if len(filtered) == 0 {
+		return ""
+	}
+	b, _ := json.Marshal(filtered)
+	return string(b)
 }
 
 // BulkAddEdge inserts all edges in a single transaction — orders of magnitude
@@ -26,13 +120,18 @@ func (s *SQLiteStore) BulkAddEdge(ctx context.Context, edges []Edge) error {
 	}
 	defer tx.Rollback() //nolint:errcheck // deferred rollback on error path
 	stmt, err := tx.PrepareContext(ctx,
-		"INSERT OR IGNORE INTO edges (from_id, relation, to_id, weight) VALUES (?, ?, ?, ?)")
+		"INSERT OR IGNORE INTO edges (from_id, relation, to_id, weight, sources) VALUES (?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
 	defer stmt.Close() //nolint:errcheck // stmt is closed before tx commits
 	for _, e := range edges {
-		if _, err := stmt.ExecContext(ctx, e.From, e.Relation, e.To, e.Weight); err != nil {
+		sources := e.Sources
+		if len(sources) == 0 {
+			sources = []string{"manual"}
+		}
+		srcsJSON, _ := json.Marshal(sources)
+		if _, err := stmt.ExecContext(ctx, e.From, e.Relation, e.To, e.Weight, string(srcsJSON)); err != nil {
 			return err
 		}
 	}
@@ -64,7 +163,7 @@ func (s *SQLiteStore) Neighbors(ctx context.Context, id, rel string, dir Directi
 	var edges []Edge
 
 	if dir == Outgoing || dir == Both { //nolint:dupl // Outgoing block; symmetric to Incoming
-		q := "SELECT from_id, relation, to_id, weight FROM edges WHERE from_id = ?"
+		q := "SELECT from_id, relation, to_id, weight, sources FROM edges WHERE from_id = ?"
 		args := []any{id}
 		if rel != "" {
 			q += " AND relation = ?"
@@ -76,7 +175,9 @@ func (s *SQLiteStore) Neighbors(ctx context.Context, id, rel string, dir Directi
 		}
 		for rows.Next() {
 			var e Edge
-			if err := rows.Scan(&e.From, &e.Relation, &e.To, &e.Weight); err == nil {
+			var srcsJSON string
+			if err := rows.Scan(&e.From, &e.Relation, &e.To, &e.Weight, &srcsJSON); err == nil {
+				_ = json.Unmarshal([]byte(srcsJSON), &e.Sources)
 				edges = append(edges, e)
 			}
 		}
@@ -84,7 +185,7 @@ func (s *SQLiteStore) Neighbors(ctx context.Context, id, rel string, dir Directi
 	}
 
 	if dir == Incoming || dir == Both { //nolint:dupl // Incoming block; symmetric to Outgoing
-		q := "SELECT from_id, relation, to_id, weight FROM edges WHERE to_id = ?"
+		q := "SELECT from_id, relation, to_id, weight, sources FROM edges WHERE to_id = ?"
 		args := []any{id}
 		if rel != "" {
 			q += " AND relation = ?"
@@ -96,7 +197,9 @@ func (s *SQLiteStore) Neighbors(ctx context.Context, id, rel string, dir Directi
 		}
 		for rows.Next() {
 			var e Edge
-			if err := rows.Scan(&e.From, &e.Relation, &e.To, &e.Weight); err == nil {
+			var srcsJSON string
+			if err := rows.Scan(&e.From, &e.Relation, &e.To, &e.Weight, &srcsJSON); err == nil {
+				_ = json.Unmarshal([]byte(srcsJSON), &e.Sources)
 				edges = append(edges, e)
 			}
 		}
@@ -119,7 +222,7 @@ func (s *SQLiteStore) ListEdges(ctx context.Context, ids, relations []string) ([
 		args[len(ids)+i] = id
 	}
 	inClause := strings.Join(placeholders, ",")
-	q := "SELECT from_id, relation, to_id, weight FROM edges WHERE from_id IN (" + inClause + ") AND to_id IN (" + inClause + ")" //nolint:gosec // G202: inClause is composed entirely of "?" placeholders, not user data
+	q := "SELECT from_id, relation, to_id, weight, sources FROM edges WHERE from_id IN (" + inClause + ") AND to_id IN (" + inClause + ")" //nolint:gosec // G202: inClause is composed entirely of "?" placeholders, not user data
 	if len(relations) > 0 {
 		rph := make([]string, len(relations))
 		for i, r := range relations {
@@ -136,7 +239,9 @@ func (s *SQLiteStore) ListEdges(ctx context.Context, ids, relations []string) ([
 	var edges []Edge
 	for rows.Next() {
 		var e Edge
-		if err := rows.Scan(&e.From, &e.Relation, &e.To, &e.Weight); err == nil {
+		var srcsJSON string
+		if err := rows.Scan(&e.From, &e.Relation, &e.To, &e.Weight, &srcsJSON); err == nil {
+			_ = json.Unmarshal([]byte(srcsJSON), &e.Sources)
 			edges = append(edges, e)
 		}
 	}

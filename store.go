@@ -91,6 +91,12 @@ type GraphStore interface {
 	AddEdge(ctx context.Context, e Edge) error
 	BulkAddEdge(ctx context.Context, edges []Edge) error
 	RemoveEdge(ctx context.Context, e Edge) error
+	// AddEdgeSource creates the edge if absent (with source in its source set) or
+	// adds source to an existing edge's source set. Idempotent.
+	AddEdgeSource(ctx context.Context, from, relation, to, source string) error
+	// RemoveEdgeSource removes source from the edge's source set.
+	// The edge is deleted when the source set becomes empty.
+	RemoveEdgeSource(ctx context.Context, from, relation, to, source string) error
 	UpdateEdgeWeight(ctx context.Context, from, to, relation string, weight float64) error
 	Neighbors(ctx context.Context, id, rel string, dir Direction) ([]Edge, error)
 	Walk(ctx context.Context, root string, rel string, dir Direction, maxDepth int, fn WalkFn) error

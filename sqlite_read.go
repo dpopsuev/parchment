@@ -71,6 +71,10 @@ func (s *SQLiteStore) Delete(ctx context.Context, id string) error {
 		return err
 	}
 
+	if err := deleteAttachmentsInTx(ctx, tx, id); err != nil {
+		return err
+	}
+
 	if art != nil && rowid > 0 {
 		deleteFTSInTx(ctx, tx, rowid, art)
 	}

@@ -117,12 +117,26 @@ type ScopeStore interface {
 	ListScopeInfo(ctx context.Context) ([]ScopeInfo, error)
 }
 
+// AttachmentStore manages binary attachments keyed by (artifact_id, name).
+// Attachments are stored in a separate table and not returned by List — only
+// by explicit Get calls — so bulk queries remain unaffected.
+type AttachmentStore interface {
+	// PutAttachment stores data under name for artifactID, overwriting any
+	// existing attachment with the same name.
+	PutAttachment(ctx context.Context, artifactID, name, contentType string, data []byte) error
+	// GetAttachments returns all attachments for artifactID, ordered by name.
+	GetAttachments(ctx context.Context, artifactID string) ([]Attachment, error)
+	// DeleteAttachment removes the named attachment. No-op if absent.
+	DeleteAttachment(ctx context.Context, artifactID, name string) error
+}
+
 // Store is the full persistence interface, composed from role-specific interfaces.
 type Store interface {
 	ArtifactStore
 	GraphStore
 	ScopeStore
 	EventStore
+	AttachmentStore
 	Close() error
 }
 

@@ -22,9 +22,10 @@ type MemoryStore struct {
 	embeddings      map[string][]float32
 	embeddingHashes map[string]string
 	// metrics tracks access counts and timestamps per artifact ID.
-	metrics map[string]ArtifactMetrics
-	events  []Event
-	eventID int64
+	metrics     map[string]ArtifactMetrics
+	attachments map[string]map[string]Attachment // outer: artifactID, inner: name
+	events      []Event
+	eventID     int64
 }
 
 // Compile-time interface verification.
@@ -40,6 +41,7 @@ func NewMemoryStore() *MemoryStore {
 		embeddings:      make(map[string][]float32),
 		embeddingHashes: make(map[string]string),
 		metrics:         make(map[string]ArtifactMetrics),
+		attachments:     make(map[string]map[string]Attachment),
 	}
 }
 
@@ -137,6 +139,7 @@ func (m *MemoryStore) Delete(_ context.Context, id string) error {
 			delete(m.edges, k)
 		}
 	}
+	delete(m.attachments, id)
 	return nil
 }
 
@@ -258,6 +261,39 @@ func (m *MemoryStore) RemoveEdgeSource(_ context.Context, from, relation, to, so
 	}
 	e.Sources = filtered
 	m.edges[key] = e
+	return nil
+}
+
+func (m *MemoryStore) PutAttachment(_ context.Context, artifactID, name, contentType string, data []byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.attachments[artifactID] == nil {
+		m.attachments[artifactID] = make(map[string]Attachment)
+	}
+	// Copy data to avoid aliasing the caller's slice.
+	stored := make([]byte, len(data))
+	copy(stored, data)
+	m.attachments[artifactID][name] = Attachment{Name: name, ContentType: contentType, Data: stored}
+	return nil
+}
+
+func (m *MemoryStore) GetAttachments(_ context.Context, artifactID string) ([]Attachment, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	byName := m.attachments[artifactID]
+	result := make([]Attachment, 0, len(byName))
+	for _, a := range byName {
+		result = append(result, a)
+	}
+	return result, nil
+}
+
+func (m *MemoryStore) DeleteAttachment(_ context.Context, artifactID, name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if byName, ok := m.attachments[artifactID]; ok {
+		delete(byName, name)
+	}
 	return nil
 }
 

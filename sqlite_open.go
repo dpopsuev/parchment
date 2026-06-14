@@ -326,6 +326,17 @@ func runSchemaEvolutions(db *sql.DB) { //nolint:cyclop,gocyclo // linear DDL seq
 	// names (e.g. ["manual"], ["wikilink"], ["locus"]). RemoveEdgeSource deletes
 	// the edge only when the set becomes empty.
 	exec(`ALTER TABLE edges ADD COLUMN sources TEXT NOT NULL DEFAULT '["manual"]'`)
+
+	// v3.x: binary attachments for vision-capable agents. Stored separately so
+	// bulk artifact queries remain unaffected. Data is raw bytes; base64
+	// encoding/decoding is the caller's responsibility at the transport layer.
+	exec(`CREATE TABLE IF NOT EXISTS artifact_attachments (
+		artifact_id  TEXT NOT NULL,
+		name         TEXT NOT NULL,
+		content_type TEXT NOT NULL,
+		data         BLOB NOT NULL,
+		PRIMARY KEY (artifact_id, name)
+	)`)
 }
 
 func generateUID() string {

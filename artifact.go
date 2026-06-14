@@ -54,6 +54,14 @@ type Edge struct {
 	Sources  []string `json:"sources,omitempty"` // who declared this edge; empty = manual
 }
 
+// Attachment is a named binary blob associated with an artifact.
+// Stored in a separate table so bulk artifact queries remain fast.
+type Attachment struct {
+	Name        string `json:"name"`
+	ContentType string `json:"content_type"`
+	Data        []byte `json:"data"`
+}
+
 
 
 // Well-known edge relations — work tracking.

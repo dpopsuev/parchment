@@ -12,7 +12,8 @@ import (
 	"sync"
 	"time"
 
-	_ "modernc.org/sqlite" // SQLite driver registration
+	_ "modernc.org/sqlite"     // SQLite driver registration
+	_ "modernc.org/sqlite/vec" // sqlite-vec extension for KNN vector search
 )
 
 const schema = `
@@ -160,6 +161,7 @@ type SQLiteStore struct {
 	dbPath     string
 	stopWAL    context.CancelFunc
 	walStopped sync.WaitGroup
+	vecTables  sync.Map // model → struct{}{}; tracks which vec0 virtual tables exist
 }
 
 // Writer returns the writer connection for operations like WAL checkpoint.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math"
 	"time"
@@ -38,10 +39,31 @@ func blobToVec(b []byte) []float32 {
 }
 
 func (s *SQLiteStore) PutEmbedding(ctx context.Context, artifactID, model, contentHash string, vec []float32) error {
+	if err := s.ensureVecTable(ctx, model, len(vec)); err != nil {
+		slog.WarnContext(ctx, "vec0 table init failed, falling back to blob-only",
+			slog.String(LogKeyID, artifactID), slog.Any(LogKeyError, err))
+	}
+
 	_, err := s.writer.ExecContext(ctx,
 		`INSERT INTO artifact_embeddings (artifact_id, model, vector, content_hash) VALUES (?, ?, ?, ?)
 		 ON CONFLICT(artifact_id, model) DO UPDATE SET vector=excluded.vector, content_hash=excluded.content_hash`,
 		artifactID, model, vecToBlob(vec), contentHash)
+	if err != nil {
+		return err
+	}
+
+	var rowid int64
+	if err := s.writer.QueryRowContext(ctx,
+		`SELECT rowid FROM artifact_embeddings WHERE artifact_id=? AND model=?`,
+		artifactID, model).Scan(&rowid); err != nil {
+		return err
+	}
+
+	tbl := vecTableName(model)
+	delQ := fmt.Sprintf(`DELETE FROM %s WHERE rowid=?`, tbl)                       //nolint:gosec,gocritic // tbl is sanitized alphanumeric; SQL identifier, not a Go string
+	_, _ = s.writer.ExecContext(ctx, delQ, rowid)
+	insQ := fmt.Sprintf(`INSERT INTO %s(rowid, embedding) VALUES (?, ?)`, tbl)    //nolint:gosec,gocritic // tbl is sanitized alphanumeric; SQL identifier, not a Go string
+	_, err = s.writer.ExecContext(ctx, insQ, rowid, vecToBlob(vec))
 	return err
 }
 
@@ -67,12 +89,47 @@ func (s *SQLiteStore) GetEmbeddingHash(ctx context.Context, artifactID, model st
 }
 
 func (s *SQLiteStore) SearchSemantic(ctx context.Context, model string, query []float32, n int) ([]SearchResult, error) {
+	tbl := vecTableName(model)
+	if s.hasVecTable(model) {
+		return s.searchVec0(ctx, tbl, model, query, n)
+	}
+	return s.searchBruteForce(ctx, model, query, n)
+}
+
+func (s *SQLiteStore) searchVec0(ctx context.Context, tbl, model string, query []float32, n int) ([]SearchResult, error) {
+	q := fmt.Sprintf( //nolint:gosec,gocritic // tbl is sanitized alphanumeric; SQL identifier, not a Go string
+		`SELECT v.rowid, v.distance, e.artifact_id
+		 FROM %s v
+		 JOIN artifact_embeddings e ON e.rowid = v.rowid AND e.model = ?
+		 WHERE v.embedding MATCH ? AND v.k = ?
+		 ORDER BY v.distance`, tbl)
+	rows, err := s.reader.QueryContext(ctx, q, model, vecToBlob(query), n)
+	if err != nil {
+		slog.WarnContext(ctx, "vec0 query failed, falling back to brute force", slog.Any(LogKeyError, err))
+		return s.searchBruteForce(ctx, model, query, n)
+	}
+	defer rows.Close() //nolint:errcheck // best-effort close
+
+	var results []SearchResult
+	for rows.Next() {
+		var rowid int64
+		var distance float64
+		var artifactID string
+		if err := rows.Scan(&rowid, &distance, &artifactID); err != nil {
+			continue
+		}
+		results = append(results, SearchResult{ID: artifactID, Score: float32(1.0 - distance)})
+	}
+	return results, rows.Err()
+}
+
+func (s *SQLiteStore) searchBruteForce(ctx context.Context, model string, query []float32, n int) ([]SearchResult, error) {
 	rows, err := s.reader.QueryContext(ctx,
 		`SELECT artifact_id, vector FROM artifact_embeddings WHERE model=?`, model)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed //nolint:errcheck // best-effort close on read-only query
+	defer rows.Close() //nolint:errcheck // best-effort close
 
 	var results []SearchResult
 	for rows.Next() {
@@ -85,7 +142,6 @@ func (s *SQLiteStore) SearchSemantic(ctx context.Context, model string, query []
 		results = append(results, SearchResult{ID: id, Score: sim})
 	}
 
-	// Sort descending by cosine similarity.
 	for i := 1; i < len(results); i++ {
 		for j := i; j > 0 && results[j].Score > results[j-1].Score; j-- {
 			results[j], results[j-1] = results[j-1], results[j]
@@ -96,6 +152,38 @@ func (s *SQLiteStore) SearchSemantic(ctx context.Context, model string, query []
 		n = len(results)
 	}
 	return results[:n], nil
+}
+
+// ─── vec0 table management ───────────────────────────────────────────────────
+
+func vecTableName(model string) string {
+	safe := make([]byte, 0, len(model))
+	for _, c := range []byte(model) {
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' {
+			safe = append(safe, c)
+		} else {
+			safe = append(safe, '_')
+		}
+	}
+	return "vec_" + string(safe)
+}
+
+func (s *SQLiteStore) hasVecTable(model string) bool {
+	_, ok := s.vecTables.Load(model)
+	return ok
+}
+
+func (s *SQLiteStore) ensureVecTable(ctx context.Context, model string, dims int) error {
+	if _, ok := s.vecTables.Load(model); ok {
+		return nil
+	}
+	tbl := vecTableName(model)
+	ddl := fmt.Sprintf(`CREATE VIRTUAL TABLE IF NOT EXISTS %s USING vec0(embedding float[%d] distance_metric=cosine)`, tbl, dims) //nolint:gosec,gocritic // tbl is sanitized alphanumeric; dims is int
+	if _, err := s.writer.ExecContext(ctx, ddl); err != nil {
+		return fmt.Errorf("create vec0 table %s: %w", tbl, err)
+	}
+	s.vecTables.Store(model, struct{}{})
+	return nil
 }
 
 // ─── MetricsStore ─────────────────────────────────────────────────────────────

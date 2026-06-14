@@ -204,60 +204,11 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("create schema: %w", err)
 	}
 
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
-		"ALTER TABLE artifacts ADD COLUMN inserted_at TEXT NOT NULL DEFAULT ''")
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: best-effort backfill
-		"UPDATE artifacts SET inserted_at = created_at WHERE inserted_at = ''")
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist (old DBs have key/auto columns)
-		"ALTER TABLE scope_keys ADD COLUMN labels TEXT NOT NULL DEFAULT ''")
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
-		"ALTER TABLE artifacts ADD COLUMN alias TEXT NOT NULL DEFAULT ''")
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
-		"ALTER TABLE artifacts ADD COLUMN components TEXT NOT NULL DEFAULT '{}'")
-	// Drop columns now managed via the edges table.
-	writer.Exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS parent")     //nolint:errcheck,gosec // idempotent migration
-	writer.Exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS depends_on") //nolint:errcheck,gosec // idempotent migration
-	writer.Exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS features")   //nolint:errcheck,gosec // idempotent migration
-	writer.Exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS criteria")   //nolint:errcheck,gosec // idempotent migration
-	writer.Exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS links")      //nolint:errcheck,gosec // idempotent migration
-	writer.Exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS components") //nolint:errcheck,gosec // idempotent migration
-	writer.Exec("DROP INDEX IF EXISTS idx_art_parent")                    //nolint:errcheck,gosec // idempotent migration
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: index may already exist
-		"CREATE UNIQUE INDEX IF NOT EXISTS idx_art_alias ON artifacts(alias) WHERE alias != ''")
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
-		"ALTER TABLE artifacts ADD COLUMN annotations TEXT NOT NULL DEFAULT '[]'")
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: index may already exist
-		"CREATE INDEX IF NOT EXISTS idx_art_scope_inserted ON artifacts(scope, inserted_at)")
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: index may already exist
-		"CREATE INDEX IF NOT EXISTS idx_art_scope_updated ON artifacts(scope, updated_at)")
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
-		"ALTER TABLE edges ADD COLUMN weight REAL NOT NULL DEFAULT 0.0")
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: table may already exist
-		`CREATE TABLE IF NOT EXISTS artifact_labels (
-			artifact_id TEXT NOT NULL,
-			label       TEXT NOT NULL,
-			PRIMARY KEY (artifact_id, label)
-		)`)
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: index may already exist
-		"CREATE INDEX IF NOT EXISTS idx_artifact_labels_label ON artifact_labels(label, artifact_id)")
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: table may already exist
-		`CREATE TABLE IF NOT EXISTS artifact_properties (
-			artifact_id TEXT NOT NULL,
-			key         TEXT NOT NULL,
-			value_text  TEXT NOT NULL DEFAULT '',
-			value_num   REAL,
-			PRIMARY KEY (artifact_id, key)
-		)`)
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: index may already exist
-		"CREATE INDEX IF NOT EXISTS idx_artifact_properties_key ON artifact_properties(key, value_text)")
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: column may already exist
-		"ALTER TABLE artifact_embeddings ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''")
-	// Backfill artifact_labels from existing artifacts JSON column.
-	writer.ExecContext(context.Background(), //nolint:errcheck,gosec // migration: best-effort backfill
-		`INSERT OR IGNORE INTO artifact_labels (artifact_id, label)
-		 SELECT a.id, json_each.value
-		 FROM artifacts a, json_each(a.labels)
-		 WHERE json_each.value != ''`)
+	// Pre-framework schema evolutions: idempotent DDL that extends the base
+	// schema for existing databases. All statements use IF NOT EXISTS / IF EXISTS
+	// guards so they are safe to run on every open. New schema changes must go
+	// here (not scattered through other files) and must be idempotent.
+	runSchemaEvolutions(writer)
 
 	ensureEventSchema(writer)
 
@@ -304,6 +255,72 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 	}()
 
 	return st, nil
+}
+
+// runSchemaEvolutions applies idempotent DDL to extend the base schema for
+// existing databases. Each statement is safe to run on every open — it uses
+// IF NOT EXISTS / IF EXISTS guards. Add new structural changes here in order.
+func runSchemaEvolutions(db *sql.DB) { //nolint:cyclop,gocyclo // linear DDL sequence; splitting adds no clarity
+	ctx := context.Background()
+	exec := func(q string) { db.ExecContext(ctx, q) } //nolint:errcheck,gosec // idempotent DDL; errors are benign (column/table already exists)
+
+	// v0.x → v1.x: inserted_at tracking.
+	exec("ALTER TABLE artifacts ADD COLUMN inserted_at TEXT NOT NULL DEFAULT ''")
+	exec("UPDATE artifacts SET inserted_at = created_at WHERE inserted_at = ''")
+
+	// v1.x: scope label overrides.
+	exec("ALTER TABLE scope_keys ADD COLUMN labels TEXT NOT NULL DEFAULT ''")
+
+	// v1.x: alias column for human-readable IDs.
+	exec("ALTER TABLE artifacts ADD COLUMN alias TEXT NOT NULL DEFAULT ''")
+	exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_art_alias ON artifacts(alias) WHERE alias != ''")
+
+	// v1.x → v2.x: edge table takes over parent/depends_on/features/criteria/links.
+	exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS parent")
+	exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS depends_on")
+	exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS features")
+	exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS criteria")
+	exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS links")
+	exec("DROP INDEX IF EXISTS idx_art_parent")
+
+	// v2.x: annotations column for compliance metadata.
+	exec("ALTER TABLE artifacts ADD COLUMN annotations TEXT NOT NULL DEFAULT '[]'")
+
+	// v2.x: cursor-pagination indexes.
+	exec("CREATE INDEX IF NOT EXISTS idx_art_scope_inserted ON artifacts(scope, inserted_at)")
+	exec("CREATE INDEX IF NOT EXISTS idx_art_scope_updated ON artifacts(scope, updated_at)")
+
+	// v2.x: weighted edges.
+	exec("ALTER TABLE edges ADD COLUMN weight REAL NOT NULL DEFAULT 0.0")
+
+	// v2.x: artifact_labels denormalized table for fast label queries.
+	exec(`CREATE TABLE IF NOT EXISTS artifact_labels (
+		artifact_id TEXT NOT NULL,
+		label       TEXT NOT NULL,
+		PRIMARY KEY (artifact_id, label)
+	)`)
+	exec("CREATE INDEX IF NOT EXISTS idx_artifact_labels_label ON artifact_labels(label, artifact_id)")
+	exec(`INSERT OR IGNORE INTO artifact_labels (artifact_id, label)
+		SELECT a.id, json_each.value
+		FROM artifacts a, json_each(a.labels)
+		WHERE json_each.value != ''`)
+
+	// v2.x: artifact_properties for structured extra fields.
+	exec(`CREATE TABLE IF NOT EXISTS artifact_properties (
+		artifact_id TEXT NOT NULL,
+		key         TEXT NOT NULL,
+		value_text  TEXT NOT NULL DEFAULT '',
+		value_num   REAL,
+		PRIMARY KEY (artifact_id, key)
+	)`)
+	exec("CREATE INDEX IF NOT EXISTS idx_artifact_properties_key ON artifact_properties(key, value_text)")
+
+	// v2.x: components column (added, then dropped — kept here for databases
+	// that received the ADD but not yet the DROP).
+	exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS components")
+
+	// v3.x: embedding content hash for staleness detection.
+	exec("ALTER TABLE artifact_embeddings ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''")
 }
 
 func generateUID() string {

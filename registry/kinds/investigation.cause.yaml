@@ -24,7 +24,7 @@ spec:
     targets:
       explains: [investigation.observation]
       causes: [investigation.cause, investigation.observation]
-      resolves: [investigation.investigation]
+      resolves: [investigation.case]
   whenToCreate: |
     Create a cause to record a causal hypothesis during an investigation. One
     cause per distinct contributing factor. Confirmed causes link via explains

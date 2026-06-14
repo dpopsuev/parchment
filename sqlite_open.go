@@ -94,6 +94,11 @@ CREATE VIRTUAL TABLE IF NOT EXISTS artifacts_fts USING fts5(
 	content='artifacts',
 	content_rowid='rowid'
 );
+
+CREATE TABLE IF NOT EXISTS migrations (
+	id         TEXT PRIMARY KEY,
+	applied_at TEXT NOT NULL
+);
 `
 
 // DefaultSQLitePath returns the default database path.

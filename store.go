@@ -125,6 +125,16 @@ type DBSizer interface {
 	DBSizeBytes(ctx context.Context) (int64, error)
 }
 
+// MigrationStore is an optional interface for stores that support migration tracking.
+// Stores that do not implement it (e.g. MemoryStore) run migrations but do not
+// persist the applied set — every run re-executes all migrations (acceptable for tests).
+type MigrationStore interface {
+	// AppliedMigrations returns the IDs of migrations that have been applied.
+	AppliedMigrations(ctx context.Context) ([]string, error)
+	// MarkMigrated records a migration ID as applied with the current timestamp.
+	MarkMigrated(ctx context.Context, id string) error
+}
+
 // neighborArtifacts is the shared implementation for Store.NeighborArtifacts.
 func neighborArtifacts(ctx context.Context, s Store, id, rel string, dir Direction) ([]*Artifact, error) {
 	edges, err := s.Neighbors(ctx, id, rel, dir)

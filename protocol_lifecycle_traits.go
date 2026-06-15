@@ -272,12 +272,26 @@ func (p *Protocol) isEdgeAllowed(sourceLabels []string, relation string, targetL
 	return findRelationship(p.relationships, sourceLabels, relation, targetLabels) != nil
 }
 
-// isEdgeAllowedErr returns a descriptive error when the edge is not allowed.
+// isEdgeAllowedErr returns a descriptive error when the edge is not allowed,
+// including the list of valid outbound relations for the source kind.
 func (p *Protocol) isEdgeAllowedErr(sourceLabels []string, relation string, targetLabels []string) error {
-	return fmt.Errorf("%s→%s is not a valid %s relation", //nolint:err113 // domain constraint
-		labelValue(sourceLabels, LabelPrefixKind),
-		labelValue(targetLabels, LabelPrefixKind),
-		relation)
+	srcKind := labelValue(sourceLabels, LabelPrefixKind)
+	tgtKind := labelValue(targetLabels, LabelPrefixKind)
+	valid := p.ValidRelationsFor(srcKind)
+	validNames := make([]string, 0, len(valid))
+	for _, r := range valid {
+		validNames = append(validNames, r.Relation)
+	}
+	seen := make(map[string]bool)
+	deduped := validNames[:0]
+	for _, n := range validNames {
+		if !seen[n] {
+			seen[n] = true
+			deduped = append(deduped, n)
+		}
+	}
+	return fmt.Errorf("%s→%s is not a valid %s relation; valid for %s: %s", //nolint:err113 // domain constraint
+		srcKind, tgtKind, relation, srcKind, strings.Join(deduped, ", "))
 }
 
 // isCycleGuarded returns true if any Relationship for this source+relation has CycleGuard set.

@@ -145,6 +145,135 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 			t.Error("expected search results")
 		}
 	})
+
+	t.Run("AddEdgeSource_RemoveEdgeSource", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(t)
+		ctx := context.Background()
+		s.Put(ctx, &Artifact{ID: "ES-A", Labels: []string{"kind:effort.task"}, Title: "a"}) //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "ES-B", Labels: []string{"kind:effort.task"}, Title: "b"}) //nolint:errcheck // test seeding
+
+		if err := s.AddEdgeSource(ctx, "ES-A", "mentions", "ES-B", "wikilink"); err != nil {
+			t.Fatal(err)
+		}
+		edges, _ := s.Neighbors(ctx, "ES-A", "mentions", Outgoing)
+		if len(edges) != 1 {
+			t.Fatalf("expected 1 edge, got %d", len(edges))
+		}
+		if err := s.AddEdgeSource(ctx, "ES-A", "mentions", "ES-B", "manual"); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.RemoveEdgeSource(ctx, "ES-A", "mentions", "ES-B", "wikilink"); err != nil {
+			t.Fatal(err)
+		}
+		edges, _ = s.Neighbors(ctx, "ES-A", "mentions", Outgoing)
+		if len(edges) != 1 {
+			t.Fatal("edge should survive when one source remains")
+		}
+		if err := s.RemoveEdgeSource(ctx, "ES-A", "mentions", "ES-B", "manual"); err != nil {
+			t.Fatal(err)
+		}
+		edges, _ = s.Neighbors(ctx, "ES-A", "mentions", Outgoing)
+		if len(edges) != 0 {
+			t.Error("edge should be deleted when all sources removed")
+		}
+	})
+
+	t.Run("GetByAlias", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(t)
+		ctx := context.Background()
+		s.Put(ctx, &Artifact{ID: "ALIAS-1", Alias: "my-alias", Labels: []string{"kind:effort.task"}, Title: "aliased"}) //nolint:errcheck // test seeding
+
+		got, err := s.GetByAlias(ctx, "my-alias")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.ID != "ALIAS-1" {
+			t.Errorf("got ID %q, want ALIAS-1", got.ID)
+		}
+	})
+
+	t.Run("Children", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(t)
+		ctx := context.Background()
+		s.Put(ctx, &Artifact{ID: "P-1", Labels: []string{"kind:effort.goal"}, Title: "parent"}) //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "C-1", Labels: []string{"kind:effort.task"}, Title: "child"})  //nolint:errcheck // test seeding
+		s.AddEdge(ctx, Edge{From: "P-1", To: "C-1", Relation: RelParentOf})                     //nolint:errcheck // test seeding
+
+		children, err := s.Children(ctx, "P-1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(children) != 1 || children[0].ID != "C-1" {
+			t.Errorf("expected [C-1], got %v", children)
+		}
+	})
+
+	t.Run("ListByLabel", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(t)
+		ctx := context.Background()
+		s.Put(ctx, &Artifact{ID: "LBL-1", Labels: []string{"kind:effort.task", "priority:high"}, Title: "high"})  //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "LBL-2", Labels: []string{"kind:effort.task", "priority:low"}, Title: "low"})    //nolint:errcheck // test seeding
+
+		arts, err := s.ListByLabel(ctx, "priority:high")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(arts) != 1 || arts[0].ID != "LBL-1" {
+			t.Errorf("expected [LBL-1], got %v", arts)
+		}
+	})
+
+	t.Run("Attachment_PutGetDelete", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(t)
+		ctx := context.Background()
+		s.Put(ctx, &Artifact{ID: "ATT-1", Labels: []string{"kind:effort.task"}, Title: "with attachment"}) //nolint:errcheck // test seeding
+
+		data := []byte("hello world")
+		if err := s.PutAttachment(ctx, "ATT-1", "test.txt", "text/plain", data); err != nil {
+			t.Fatal(err)
+		}
+		atts, err := s.GetAttachments(ctx, "ATT-1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(atts) != 1 || string(atts[0].Data) != "hello world" {
+			t.Errorf("expected attachment data 'hello world', got %v", atts)
+		}
+		if err := s.DeleteAttachment(ctx, "ATT-1", "test.txt"); err != nil {
+			t.Fatal(err)
+		}
+		atts, _ = s.GetAttachments(ctx, "ATT-1")
+		if len(atts) != 0 {
+			t.Error("attachment should be deleted")
+		}
+	})
+
+	t.Run("Embedding_PutSearchSemantic", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(t)
+		ctx := context.Background()
+		s.Put(ctx, &Artifact{ID: "EMB-1", Labels: []string{"kind:knowledge.note"}, Title: "close"}) //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "EMB-2", Labels: []string{"kind:knowledge.note"}, Title: "far"})   //nolint:errcheck // test seeding
+
+		s.PutEmbedding(ctx, "EMB-1", "test", "", []float32{0.9, 0.1, 0.0}) //nolint:errcheck // test seeding
+		s.PutEmbedding(ctx, "EMB-2", "test", "", []float32{0.0, 0.0, 1.0}) //nolint:errcheck // test seeding
+
+		results, err := s.SearchSemantic(ctx, "test", []float32{1.0, 0.0, 0.0}, 5)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(results) < 2 {
+			t.Fatalf("expected 2 results, got %d", len(results))
+		}
+		if results[0].ID != "EMB-1" {
+			t.Errorf("closest should be EMB-1, got %s", results[0].ID)
+		}
+	})
 }
 
 // TestSQLiteStore_Contract runs the full Store contract against SQLiteStore.

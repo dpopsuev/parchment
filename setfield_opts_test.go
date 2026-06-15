@@ -106,7 +106,7 @@ func TestSetField_Labels_ReplacesEntireSet(t *testing.T) {
 	proto, _ := newProto(t)
 
 	art, _ := proto.CreateArtifact(ctx, parchment.CreateInput{
-		Labels: []string{"kind:knowledge.note", "scope:test", "priority:high"},
+		Labels: []string{"kind:knowledge.note", "project:test", "priority:high"},
 		Title:  "test artifact",
 	})
 
@@ -122,7 +122,7 @@ func TestSetField_Labels_ReplacesEntireSet(t *testing.T) {
 	if len(after.Labels) > 3 { // compliance:ok may be added by StampCompliance
 		t.Logf("labels after SetField: %v", after.Labels)
 	}
-	for _, destroyed := range []string{"kind:knowledge.note", "scope:test", "priority:high"} {
+	for _, destroyed := range []string{"kind:knowledge.note", "project:test", "priority:high"} {
 		found := false
 		for _, l := range after.Labels {
 			if l == destroyed {

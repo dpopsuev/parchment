@@ -17,7 +17,7 @@ func TestCheck_DetectsUnknownKind(t *testing.T) {
 	// Directly insert an artifact with unknown kind via store
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "BAD-001",
-		Labels: []string{"kind:phantom", "scope:test"},
+		Labels: []string{"kind:phantom", "project:test"},
 		Title:  "bad kind artifact",
 	})
 
@@ -49,7 +49,7 @@ func TestCheck_DetectsInvalidParent(t *testing.T) {
 	parentTask := createTask(t, proto, "parent task")
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "CHILD-001",
-		Labels: []string{"kind:effort.task", "status:draft", "scope:test"},
+		Labels: []string{"kind:effort.task", "status:draft", "project:test"},
 		Title:  "child task",
 	})
 	store.AddEdge(ctx, parchment.Edge{From: parentTask.ID, To: "CHILD-001", Relation: parchment.RelParentOf}) //nolint:errcheck // test seeding
@@ -77,7 +77,7 @@ func TestCheck_DetectsEmptyArtifact(t *testing.T) {
 	// Insert a draft task with no goal, no sections, no parent, no edges
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "EMPTY-001",
-		Labels: []string{"kind:effort.task", "work.draft", "scope:test"},
+		Labels: []string{"kind:effort.task", "work.draft", "project:test"},
 		Title:  "empty task",
 	})
 

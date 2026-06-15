@@ -162,7 +162,7 @@ func TestTopoSort_CollectsArbitraryDepth(t *testing.T) {
 	put := func(id, parent string) {
 		t.Helper()
 		if err := proto.Store().Put(ctx, &parchment.Artifact{
-			ID: id, Labels: []string{"kind:effort.task", "status:draft", "scope:test"}, Title: id,
+			ID: id, Labels: []string{"kind:effort.task", "status:draft", "project:test"}, Title: id,
 		}); err != nil {
 			t.Fatalf("put %s: %v", id, err)
 		}

@@ -86,7 +86,7 @@ func TestStampCompliance_SystemLabels_NotChecked(t *testing.T) {
 	// kind:task, status:draft etc must never trigger compliance checks
 	art := &parchment.Artifact{
 		ID:     "T-1",
-		Labels: []string{"kind:effort.task", "status:draft", "scope:scribe"},
+		Labels: []string{"kind:effort.task", "status:draft", "project:scribe"},
 	}
 	tr := map[string]parchment.LabelTrait{
 		"kind:effort.task": {RequiredSections: []string{"must_have"}},

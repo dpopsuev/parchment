@@ -24,7 +24,7 @@ func BenchmarkBulkPut_50K(b *testing.B) {
 		arts[i] = &parchment.Artifact{
 			ID:     fmt.Sprintf("SYM-%d", i),
 			Title:  fmt.Sprintf("symbol%d", i),
-			Labels: []string{"kind:symbol", "status:active", "scope:bench", "file:bench/main.go", "pkg:bench"},
+			Labels: []string{"kind:symbol", "status:active", "project:bench", "file:bench/main.go", "pkg:bench"},
 		}
 	}
 
@@ -57,7 +57,7 @@ func TestBulkPut_50K_Under5s(t *testing.T) {
 		arts[i] = &parchment.Artifact{
 			ID:     fmt.Sprintf("SYM-%d", i),
 			Title:  fmt.Sprintf("symbol%d", i),
-			Labels: []string{"kind:symbol", "status:active", "scope:perf", "file:src/main.go", "pkg:main"},
+			Labels: []string{"kind:symbol", "status:active", "project:perf", "file:src/main.go", "pkg:main"},
 		}
 	}
 

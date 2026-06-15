@@ -24,7 +24,7 @@ func TestArtifact_ScanHydration_KindFromLabel(t *testing.T) {
 	art := &parchment.Artifact{
 		ID:     "TEST-1",
 		Title:  "hydration test",
-		Labels: []string{"kind:effort.task", "scope:test", "status:active"},
+		Labels: []string{"kind:effort.task", "project:test", "status:active"},
 	}
 	if err := s.Put(ctx, art); err != nil {
 		t.Fatal(err)
@@ -62,7 +62,7 @@ func TestArtifact_ScanHydration_ListAlsoHydrates(t *testing.T) {
 		art := &parchment.Artifact{
 			ID:     "TEST-" + kind,
 			Title:  "test " + kind,
-			Labels: []string{"kind:" + kind, "scope:test", "status:draft"},
+			Labels: []string{"kind:" + kind, "project:test", "status:draft"},
 		}
 		_ = i
 		if err := s.Put(ctx, art); err != nil {

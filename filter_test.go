@@ -17,7 +17,7 @@ func TestFilter_MatchLabels_ExcludeLabels_UsesLabelCheck(t *testing.T) {
 	t.Parallel()
 	art := &parchment.Artifact{
 		ID:     "TSK-1",
-		Labels: []string{"kind:effort.task", "status:active", "security", "go", "scope:test"},
+		Labels: []string{"kind:effort.task", "status:active", "security", "go", "project:test"},
 	}
 	f := parchment.Filter{ExcludeLabels: []string{"security"}}
 	if f.Matches(art) {
@@ -28,15 +28,15 @@ func TestFilter_MatchLabels_ExcludeLabels_UsesLabelCheck(t *testing.T) {
 func TestFilter_MatchLabels_ScopeLabel_DirectMatch(t *testing.T) {
 	// Scope is now a label; direct label match replaces ScopeLabelIndex expansion.
 	// Given: artifact has scope:infra label
-	// When: Filter.Labels=["scope:infra"]
+	// When: Filter.Labels=["project:infra"]
 	// Then: Matches returns true
 	t.Parallel()
 	art := &parchment.Artifact{
 		ID:     "TSK-2",
-		Labels: []string{"kind:effort.task", "status:active", "scope:infra"},
+		Labels: []string{"kind:effort.task", "status:active", "project:infra"},
 	}
 	f := parchment.Filter{
-		Labels: []string{"scope:infra"},
+		Labels: []string{"project:infra"},
 	}
 	if !f.Matches(art) {
 		t.Error("artifact with scope label should match scope label filter")

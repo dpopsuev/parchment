@@ -58,7 +58,7 @@ func TestCheck_HumanIDsNoViolation(t *testing.T) {
 
 	_ = s.Put(ctx, &parchment.Artifact{
 		ID:    "SCR-TSK-001",
-		Labels: []string{"kind:effort.task", "status:active", "scope:scribe"},
+		Labels: []string{"kind:effort.task", "status:active", "project:scribe"},
 		Title: "human id task",
 	})
 

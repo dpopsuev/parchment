@@ -7,21 +7,21 @@ import (
 )
 
 func TestResolvedScope_FromLabel(t *testing.T) {
-	art := &parchment.Artifact{Labels: []string{"scope:scribe"}}
+	art := &parchment.Artifact{Labels: []string{"project:scribe"}}
 	if got := parchment.LabelValue(art.Labels, parchment.LabelPrefixScope); got != "scribe" {
 		t.Errorf("expected scribe, got %q", got)
 	}
 }
 
 func TestResolvedScope_FromLabelWithKind(t *testing.T) {
-	art := &parchment.Artifact{Labels: []string{"kind:effort.task", "scope:parchment"}}
+	art := &parchment.Artifact{Labels: []string{"kind:effort.task", "project:parchment"}}
 	if got := parchment.LabelValue(art.Labels, parchment.LabelPrefixScope); got != "parchment" {
 		t.Errorf("expected parchment, got %q", got)
 	}
 }
 
 func TestResolvedScope_FirstLabelWins(t *testing.T) {
-	art := &parchment.Artifact{Labels: []string{"scope:scribe", "scope:parchment"}}
+	art := &parchment.Artifact{Labels: []string{"project:scribe", "project:parchment"}}
 	if got := parchment.LabelValue(art.Labels, parchment.LabelPrefixScope); got != "scribe" {
 		t.Errorf("expected scribe (first label wins), got %q", got)
 	}
@@ -37,7 +37,7 @@ func TestCreateArtifact_MirrorsScopeToLabel(t *testing.T) {
 	}
 	var hasScopeLabel bool
 	for _, l := range art.Labels {
-		if l == "scope:myproject" {
+		if l == "project:myproject" {
 			hasScopeLabel = true
 		}
 	}

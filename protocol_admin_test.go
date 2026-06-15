@@ -19,7 +19,7 @@ func TestCheckFix_FixesInvalidParent(t *testing.T) {
 	// Manually insert child of task (invalid: task has empty Children = leaf)
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "BAD-CHILD-1",
-		Labels: []string{"kind:effort.task", "status:draft", "scope:test"},
+		Labels: []string{"kind:effort.task", "status:draft", "project:test"},
 		Title:  "bad child",
 	})
 	store.AddEdge(ctx, parchment.Edge{From: parentTask.ID, To: "BAD-CHILD-1", Relation: parchment.RelParentOf}) //nolint:errcheck // test seeding
@@ -228,7 +228,7 @@ func TestGetConfig_WithScopedConfig(t *testing.T) {
 	// Create a config artifact with a section acting as key=value
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
 		ID:     "cfg-1",
-		Labels: []string{"kind:support.config", "work.active", "scope:test"},
+		Labels: []string{"kind:support.config", "work.active", "project:test"},
 		Title:  "test config",
 		Sections: []parchment.Section{
 			{Name: "default_scope", Text: "test"},

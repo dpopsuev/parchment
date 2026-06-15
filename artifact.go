@@ -167,8 +167,10 @@ const LabelPrefixKind = "kind:"
 // LabelPrefixStatus is the label namespace for status.
 const LabelPrefixStatus = "status:"
 
-// LabelPrefixScope is the label namespace for scope membership.
-const LabelPrefixScope = "scope:"
+// LabelPrefixScope is the label namespace for project membership.
+// Value changed from "scope:" to "project:" to support composable
+// multi-label organization (project: + area: + context: + domain:).
+const LabelPrefixScope = "project:"
 
 // LabelPrefixPriority is the label namespace for priority.
 const LabelPrefixPriority = "priority:"

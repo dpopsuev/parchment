@@ -14,7 +14,7 @@ func setupTemplateProto(t *testing.T) *parchment.Protocol {
 	ctx := context.Background()
 
 	store.Put(ctx, &parchment.Artifact{ //nolint:errcheck // test seeding
-		ID: "TPL-1", Labels: []string{"kind:support.template", "work.active", "scope:test"}, Title: "Bug Template",
+		ID: "TPL-1", Labels: []string{"kind:support.template", "work.active", "project:test"}, Title: "Bug Template",
 		Sections: []parchment.Section{
 			{Name: "content", Text: "raw markdown"},
 			{Name: "observed", Text: "Observed vs expected behavior"},

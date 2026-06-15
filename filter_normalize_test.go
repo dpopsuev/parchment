@@ -38,8 +38,8 @@ func TestFilter_Labels_StatusFilter(t *testing.T) {
 
 func TestFilter_Labels_ScopePreserved(t *testing.T) {
 	// Scope is now a label; filter via Labels predicate.
-	f := parchment.Filter{Labels: []string{"scope:scribe"}}
-	art := &parchment.Artifact{Labels: []string{"kind:effort.task", "work.active", "scope:scribe"}}
+	f := parchment.Filter{Labels: []string{"project:scribe"}}
+	art := &parchment.Artifact{Labels: []string{"kind:effort.task", "work.active", "project:scribe"}}
 	if !f.Matches(art) {
 		t.Error("filter with scope label should match artifact with same scope label")
 	}

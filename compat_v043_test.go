@@ -23,26 +23,26 @@ func buildV042DB(t *testing.T, path string) {
 	}
 
 	artifacts := []*Artifact{
-		{ID: "SCR-GOL-1", Labels: []string{"kind:effort.goal", "status:active", "scope:scribe"}, Title: "Ship v1"},
-		{ID: "SCR-CAM-1", Labels: []string{"kind:effort.campaign", "status:active", "scope:scribe"},
+		{ID: "SCR-GOL-1", Labels: []string{"kind:effort.goal", "status:active", "project:scribe"}, Title: "Ship v1"},
+		{ID: "SCR-CAM-1", Labels: []string{"kind:effort.campaign", "status:active", "project:scribe"},
 			Title: "Q2 Campaign",
 			Sections: []Section{
 				{Name: "mission", Text: "ship the thing"},
 			},
 		},
-		{ID: "SCR-TSK-1", Labels: []string{"kind:effort.task", "status:draft", "scope:scribe"},
+		{ID: "SCR-TSK-1", Labels: []string{"kind:effort.task", "status:draft", "project:scribe"},
 			Title: "Implement feature A",
 			Sections: []Section{
 				{Name: "context", Text: "needs doing"},
 			},
 		},
-		{ID: "SCR-TSK-2", Labels: []string{"kind:effort.task", "status:active", "scope:scribe"},
+		{ID: "SCR-TSK-2", Labels: []string{"kind:effort.task", "status:active", "project:scribe"},
 			Title: "Implement feature B",
 			Sections: []Section{
 				{Name: "context", Text: "blocked on A"},
 			},
 		},
-		{ID: "SCR-BUG-1", Labels: []string{"kind:intent.bug", "status:open", "scope:scribe"},
+		{ID: "SCR-BUG-1", Labels: []string{"kind:intent.bug", "status:open", "project:scribe"},
 			Title: "Crash on startup",
 		},
 	}

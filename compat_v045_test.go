@@ -20,16 +20,16 @@ func buildV044DB(t *testing.T, path string) {
 	}
 	ctx := context.Background()
 	artifacts := []*Artifact{
-		{ID: "SCR-GOL-1", Labels: []string{"kind:effort.goal", "status:active", "scope:scribe"}, Title: "Ship v2"},
-		{ID: "SCR-CAM-1", Labels: []string{"kind:effort.campaign", "status:active", "scope:scribe"},
+		{ID: "SCR-GOL-1", Labels: []string{"kind:effort.goal", "status:active", "project:scribe"}, Title: "Ship v2"},
+		{ID: "SCR-CAM-1", Labels: []string{"kind:effort.campaign", "status:active", "project:scribe"},
 			Title:    "Migration campaign",
 			Sections: []Section{{Name: "mission", Text: "stay safe"}},
 		},
-		{ID: "SCR-TSK-1", Labels: []string{"kind:effort.task", "status:draft", "scope:scribe"},
+		{ID: "SCR-TSK-1", Labels: []string{"kind:effort.task", "status:draft", "project:scribe"},
 			Title:    "Task alpha",
 			Sections: []Section{{Name: "context", Text: "do it"}},
 		},
-		{ID: "SCR-TSK-2", Labels: []string{"kind:effort.task", "status:active", "scope:scribe"},
+		{ID: "SCR-TSK-2", Labels: []string{"kind:effort.task", "status:active", "project:scribe"},
 			Title:    "Task beta",
 			Sections: []Section{{Name: "context", Text: "after alpha"}},
 		},
@@ -130,7 +130,7 @@ func TestV045_PartialIndexDoesNotConflict(t *testing.T) {
 	ctx := context.Background()
 	err = s.Put(ctx, &Artifact{
 		ID:    "SCR-TSK-99",
-		Labels: []string{"kind:effort.task", "status:draft", "scope:scribe"},
+		Labels: []string{"kind:effort.task", "status:draft", "project:scribe"},
 		Title: "No alias",
 	})
 	if err != nil {

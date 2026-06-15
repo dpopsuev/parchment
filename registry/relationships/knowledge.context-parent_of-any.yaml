@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: context-parent_of-any
+spec:
+  from: kind:knowledge.context
+  relation: parent_of
+  to: "*"

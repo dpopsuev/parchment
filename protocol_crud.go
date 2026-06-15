@@ -78,6 +78,9 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	if in.Title == "" {
 		return nil, fmt.Errorf("title is required") //nolint:err113 // sentinel; no caller uses errors.Is on this
 	}
+	if err := validateInputLimits(in.Title, in.Sections, in.Labels); err != nil {
+		return nil, err
+	}
 	kind := labelValue(in.Labels, LabelPrefixKind)
 	if err := ValidateKind(kind, p.vocab); err != nil {
 		return nil, err
@@ -514,9 +517,33 @@ func matchesQuery(art *Artifact, q string) bool {
 // SetFieldOptions holds optional flags for SetField.
 // --- Sections ---
 
+const (
+	maxTitleLen      = 500
+	maxSectionBytes  = 100_000
+	maxLabelsPerArt  = 50
+)
+
+func validateInputLimits(title string, sections []Section, labels []string) error {
+	if len(title) > maxTitleLen {
+		return fmt.Errorf("title exceeds %d characters", maxTitleLen) //nolint:err113 // input validation
+	}
+	for _, s := range sections {
+		if len(s.Text) > maxSectionBytes {
+			return fmt.Errorf("section %q exceeds %d bytes", s.Name, maxSectionBytes) //nolint:err113 // input validation
+		}
+	}
+	if len(labels) > maxLabelsPerArt {
+		return fmt.Errorf("too many labels (%d > %d)", len(labels), maxLabelsPerArt) //nolint:err113 // input validation
+	}
+	return nil
+}
+
 func (p *Protocol) AttachSection(ctx context.Context, id, name, text string) (bool, error) {
 	if id == "" || name == "" {
 		return false, fmt.Errorf("id and name are required") //nolint:err113 // sentinel; no caller uses errors.Is on this
+	}
+	if len(text) > maxSectionBytes {
+		return false, fmt.Errorf("section text exceeds %d bytes", maxSectionBytes) //nolint:err113 // input validation
 	}
 	art, err := p.store.Get(ctx, id)
 	if err != nil {

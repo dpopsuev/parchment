@@ -238,6 +238,34 @@ func (p *Protocol) IsKnownKind(kind string) bool {
 	return ok
 }
 
+// ValidRelationsFor returns all relation names valid for outbound edges from the given kind,
+// with target constraints. Used by schema introspection so agents know what they can link.
+func (p *Protocol) ValidRelationsFor(kind string) []RelationSummary {
+	kindLabel := LabelPrefixKind + kind
+	seen := make(map[string]bool)
+	var out []RelationSummary
+	for _, r := range p.relationships {
+		if r.From != kindLabel && r.From != "*" {
+			continue
+		}
+		key := r.Relation + "→" + r.To
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		target := strings.TrimPrefix(r.To, LabelPrefixKind)
+		out = append(out, RelationSummary{Relation: r.Relation, Target: target})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Relation < out[j].Relation })
+	return out
+}
+
+// RelationSummary describes a valid outbound relation for a kind.
+type RelationSummary struct {
+	Relation string `json:"relation"`
+	Target   string `json:"target"`
+}
+
 // isEdgeAllowed reports whether any Relationship permits this source→relation→target edge.
 // Closed world: if no Relationship matches, the edge is denied.
 func (p *Protocol) isEdgeAllowed(sourceLabels []string, relation string, targetLabels []string) bool {

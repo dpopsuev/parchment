@@ -49,11 +49,13 @@ func findRelationship(rels []RelationshipTrait, fromLabels []string, relation st
 		if r.Relation != relation {
 			continue
 		}
-		fromMatch := false
-		for _, fl := range fromLabels {
-			if r.From == fl {
-				fromMatch = true
-				break
+		fromMatch := r.From == "*"
+		if !fromMatch {
+			for _, fl := range fromLabels {
+				if r.From == fl {
+					fromMatch = true
+					break
+				}
 			}
 		}
 		if !fromMatch {

@@ -72,6 +72,7 @@ type CreateInput struct {
 	Sections   []Section           `json:"sections,omitempty"`
 	Patch      map[string]string   `json:"patch,omitempty"`
 	SkipHooks  bool                `json:"skip_hooks,omitempty"`
+	Children   []CreateInput       `json:"children,omitempty"`
 }
 
 func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifact, error) { //nolint:gocyclo,funlen,gocritic // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol/; hugeParam: value semantics intentional
@@ -258,6 +259,17 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	if len(art.Sections) > 0 {
 		_, _ = p.SyncWikilinks(ctx, art.ID)
 	}
+
+	for i := range in.Children {
+		child := in.Children[i]
+		child.Parent = art.ID
+		if _, err := p.CreateArtifact(ctx, child); err != nil {
+			slog.WarnContext(ctx, "inline child creation failed",
+				slog.String(LogKeyID, art.ID), slog.String(LogKeyTitle, child.Title),
+				slog.Any(LogKeyError, err))
+		}
+	}
+
 	return art, nil
 }
 

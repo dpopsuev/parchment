@@ -2,9 +2,7 @@ package parchment
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
@@ -348,11 +346,6 @@ func runSchemaEvolutions(db *sql.DB) { //nolint:cyclop,gocyclo // linear DDL seq
 		SELECT id, alias FROM artifacts WHERE alias != ''`)
 }
 
-func generateUID() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	return hex.EncodeToString(b)
-}
 
 func (s *SQLiteStore) Close() error {
 	s.stopWAL()

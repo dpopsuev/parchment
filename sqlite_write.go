@@ -96,8 +96,8 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	annotations, _ := json.Marshal(art.Annotations)
 
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO artifacts (uid, id, alias, kind, scope, status, title, goal, labels, priority, sprint, sections, extra, annotations, created_at, updated_at, inserted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO artifacts (id, alias, kind, scope, status, title, goal, labels, priority, sprint, sections, extra, annotations, created_at, updated_at, inserted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			alias=excluded.alias, kind=excluded.kind, scope=excluded.scope,
 			status=excluded.status, title=excluded.title, goal=excluded.goal,
@@ -106,7 +106,7 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 			sections=excluded.sections,
 			extra=excluded.extra,
 			annotations=excluded.annotations, updated_at=excluded.updated_at`,
-		art.ID, art.ID, art.Alias, kind, scope, status, art.Title, art.Goal(),
+		art.ID, art.Alias, kind, scope, status, art.Title, art.Goal(),
 		string(labels), priority, sprint,
 		string(sections), string(extra),
 		string(annotations),
@@ -151,10 +151,10 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 	defer tx.Rollback() //nolint:errcheck // deferred rollback
 
 	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO artifacts (uid, id, alias, kind, scope, status, title, goal,
+		INSERT INTO artifacts (id, alias, kind, scope, status, title, goal,
 			labels, priority, sprint, sections,
 			extra, annotations, created_at, updated_at, inserted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			alias=excluded.alias, kind=excluded.kind, scope=excluded.scope,
 			status=excluded.status, title=excluded.title,
@@ -194,7 +194,7 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 		annotations, _ := json.Marshal(art.Annotations)
 
 		_, execErr := stmt.ExecContext(ctx,
-			art.ID, art.ID, art.Alias, kind, scope, status,
+			art.ID, art.Alias, kind, scope, status,
 			art.Title, art.Goal(), string(labels), priority, sprint,
 			string(sections), string(extra),
 			string(annotations),
@@ -443,17 +443,16 @@ func scanArtifactRows(rows *sql.Rows) (*Artifact, error) {
 
 // artifactColumns is the explicit column list for SELECT queries.
 // Must match the scan order in scanRow exactly.
-const artifactColumns = `uid, id, alias, kind, scope, status, title, goal, labels, priority, sprint, sections, extra, annotations, created_at, updated_at, inserted_at`
+const artifactColumns = `id, alias, kind, scope, status, title, goal, labels, priority, sprint, sections, extra, annotations, created_at, updated_at, inserted_at`
 
 func scanRow(s rowScanner) (*Artifact, error) {
 	var art Artifact
-	var uid string // internal upsert key — not exposed on Artifact
 	var kindCol, scopeCol, statusCol, priorityCol, sprintCol, goalCol string
 	var labels, sections, extra, annotations string
 	var createdAt, updatedAt, insertedAt string
 
 	err := s.Scan(
-		&uid, &art.ID, &art.Alias, &kindCol, &scopeCol, &statusCol, &art.Title, &goalCol,
+		&art.ID, &art.Alias, &kindCol, &scopeCol, &statusCol, &art.Title, &goalCol,
 		&labels, &priorityCol, &sprintCol,
 		&sections, &extra,
 		&annotations,

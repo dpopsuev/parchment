@@ -16,8 +16,7 @@ import (
 
 const schema = `
 CREATE TABLE IF NOT EXISTS artifacts (
-	uid         TEXT PRIMARY KEY,
-	id          TEXT NOT NULL UNIQUE,
+	id          TEXT PRIMARY KEY,
 	alias       TEXT NOT NULL DEFAULT '',
 	kind        TEXT NOT NULL,
 	scope       TEXT NOT NULL DEFAULT '',
@@ -344,6 +343,48 @@ func runSchemaEvolutions(db *sql.DB) { //nolint:cyclop,gocyclo // linear DDL seq
 	)`)
 	exec(`INSERT OR IGNORE INTO artifact_aliases (artifact_id, alias)
 		SELECT id, alias FROM artifacts WHERE alias != ''`)
+
+	// v4.x: drop uid column — recreate artifacts table with id as PRIMARY KEY.
+	// SQLite cannot ALTER TABLE DROP COLUMN on a PRIMARY KEY, so we recreate.
+	var hasUID int
+	_ = db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('artifacts') WHERE name='uid'").Scan(&hasUID)
+	if hasUID > 0 {
+		exec("PRAGMA foreign_keys = OFF")
+		exec(`CREATE TABLE artifacts_new (
+			id          TEXT PRIMARY KEY,
+			alias       TEXT NOT NULL DEFAULT '',
+			kind        TEXT NOT NULL,
+			scope       TEXT NOT NULL DEFAULT '',
+			status      TEXT NOT NULL,
+			title       TEXT NOT NULL,
+			goal        TEXT NOT NULL DEFAULT '',
+			labels      TEXT NOT NULL DEFAULT '[]',
+			priority    TEXT NOT NULL DEFAULT '',
+			sprint      TEXT NOT NULL DEFAULT '',
+			sections    TEXT NOT NULL DEFAULT '[]',
+			extra       TEXT NOT NULL DEFAULT '{}',
+			annotations TEXT NOT NULL DEFAULT '[]',
+			created_at  TEXT NOT NULL,
+			updated_at  TEXT NOT NULL,
+			inserted_at TEXT NOT NULL DEFAULT ''
+		)`)
+		exec(`INSERT INTO artifacts_new
+			SELECT id, alias, kind, scope, status, title, goal, labels,
+				priority, sprint, sections, extra, annotations,
+				created_at, updated_at, inserted_at
+			FROM artifacts`)
+		exec("DROP TABLE artifacts")
+		exec("ALTER TABLE artifacts_new RENAME TO artifacts")
+		exec("CREATE INDEX IF NOT EXISTS idx_art_kind ON artifacts(kind)")
+		exec("CREATE INDEX IF NOT EXISTS idx_art_scope ON artifacts(scope)")
+		exec("CREATE INDEX IF NOT EXISTS idx_art_status ON artifacts(status)")
+		exec("CREATE INDEX IF NOT EXISTS idx_art_sprint ON artifacts(sprint)")
+		exec("CREATE INDEX IF NOT EXISTS idx_art_scope_inserted ON artifacts(scope, inserted_at)")
+		exec("CREATE INDEX IF NOT EXISTS idx_art_scope_updated ON artifacts(scope, updated_at)")
+		exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_art_alias ON artifacts(alias) WHERE alias != ''")
+		exec("PRAGMA foreign_keys = ON")
+		slog.InfoContext(ctx, "schema evolution: dropped uid column from artifacts table")
+	}
 }
 
 

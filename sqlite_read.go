@@ -43,9 +43,17 @@ func (s *SQLiteStore) AddAlias(ctx context.Context, artifactID, alias string) er
 }
 
 // RemoveAlias removes an alias from the junction table.
+// Tries exact (artifact_id, alias) match first; falls back to alias-only
+// delete for stale references where artifact_id was renamed.
 func (s *SQLiteStore) RemoveAlias(ctx context.Context, artifactID, alias string) error {
-	_, err := s.writer.ExecContext(ctx,
+	res, err := s.writer.ExecContext(ctx,
 		"DELETE FROM artifact_aliases WHERE artifact_id = ? AND alias = ?", artifactID, alias)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		_, err = s.writer.ExecContext(ctx, "DELETE FROM artifact_aliases WHERE alias = ?", alias)
+	}
 	return err
 }
 

@@ -163,8 +163,8 @@ func TestV045_NewArtifactsGetUUIDs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateArtifact: %v", err)
 	}
-	if !isUUIDShaped(art.ID) {
-		t.Errorf("new artifact ID %q should be UUID-shaped", art.ID)
+	if !isAutoID(art.ID) {
+		t.Errorf("new artifact ID %q should be an auto-generated ID", art.ID)
 	}
 
 	// Existing scope-derived artifacts are unaffected.

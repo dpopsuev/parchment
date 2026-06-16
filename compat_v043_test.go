@@ -190,8 +190,8 @@ func TestV043_NewArtifactsGetUUIDs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateArtifact: %v", err)
 	}
-	if !isUUIDShaped(art.ID) {
-		t.Errorf("new artifact ID %q should be UUID-shaped after migration", art.ID)
+	if !isAutoID(art.ID) {
+		t.Errorf("new artifact ID %q should be an auto-generated ID after migration", art.ID)
 	}
 
 	// Old human-readable ID still accessible.

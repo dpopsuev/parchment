@@ -124,9 +124,12 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		}
 	}
 	var id string
-	if in.ExplicitID != "" {
+	switch {
+	case in.ExplicitID != "":
 		id = in.ExplicitID
-	} else {
+	case in.Title != "":
+		id = Slugify(in.Title)
+	default:
 		id = GenerateUUID()
 	}
 	status := statusFromLabels(in.Labels)

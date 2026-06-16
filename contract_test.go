@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -111,6 +112,38 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 		}
 		if id1 == id2 {
 			t.Errorf("GenerateUUID produced duplicate: %s", id1)
+		}
+	})
+
+	t.Run("Slugify_DeriveFromTitle", func(t *testing.T) {
+		t.Parallel()
+		slug := Slugify("Faceted Classification (PMEST)")
+		if !strings.HasPrefix(slug, "faceted-classification-pmest-") {
+			t.Errorf("slug %q should start with faceted-classification-pmest-", slug)
+		}
+		if len(slug) > 70 {
+			t.Errorf("slug %q too long (%d chars)", slug, len(slug))
+		}
+		slug2 := Slugify("Faceted Classification (PMEST)")
+		if slug == slug2 {
+			t.Errorf("two Slugify calls should produce different suffixes")
+		}
+	})
+
+	t.Run("Slugify_LongTitle", func(t *testing.T) {
+		t.Parallel()
+		long := strings.Repeat("very-long-title-", 10)
+		slug := Slugify(long)
+		if len(slug) > 70 {
+			t.Errorf("slug %q too long (%d chars)", slug, len(slug))
+		}
+	})
+
+	t.Run("Slugify_EmptyTitle", func(t *testing.T) {
+		t.Parallel()
+		slug := Slugify("")
+		if len(slug) < 4 {
+			t.Errorf("slug for empty title should still have hex suffix, got %q", slug)
 		}
 	})
 

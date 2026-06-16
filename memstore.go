@@ -816,8 +816,15 @@ func (m *MemoryStore) RenameID(_ context.Context, oldID, newID string) error {
 	art.ID = newID
 	art.Alias = oldID
 	m.artifacts[newID] = art
-	m.aliases[oldID] = newID
 	delete(m.artifacts, oldID)
+
+	// Cascade existing aliases to point to the new ID.
+	for alias, target := range m.aliases {
+		if target == oldID {
+			m.aliases[alias] = newID
+		}
+	}
+	m.aliases[oldID] = newID
 
 	// 2. Update edges.
 	for key, e := range m.edges {

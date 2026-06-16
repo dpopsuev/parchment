@@ -424,7 +424,10 @@ func (s *SQLiteStore) RenameID(ctx context.Context, oldID, newID string) error {
 		return fmt.Errorf("rename artifact_labels: %w", err)
 	}
 
-	// 4. Update parent fields on children.
+	// 4. Cascade artifact_aliases junction table so existing aliases follow the rename.
+	if _, err := tx.ExecContext(ctx, "UPDATE artifact_aliases SET artifact_id = ? WHERE artifact_id = ?", newID, oldID); err != nil {
+		return fmt.Errorf("rename artifact_aliases: %w", err)
+	}
 
 	// 5. Register old ID as alias for backward-compat lookup.
 	if _, err := tx.ExecContext(ctx, "UPDATE artifacts SET alias = ? WHERE id = ?", oldID, newID); err != nil {

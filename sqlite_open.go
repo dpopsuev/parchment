@@ -277,14 +277,6 @@ func runSchemaEvolutions(db *sql.DB) { //nolint:cyclop,gocyclo // linear DDL seq
 	exec("ALTER TABLE artifacts ADD COLUMN alias TEXT NOT NULL DEFAULT ''")
 	exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_art_alias ON artifacts(alias) WHERE alias != ''")
 
-	// v1.x → v2.x: edge table takes over parent/depends_on/features/criteria/links.
-	exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS parent")
-	exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS depends_on")
-	exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS features")
-	exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS criteria")
-	exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS links")
-	exec("DROP INDEX IF EXISTS idx_art_parent")
-
 	// v2.x: annotations column for compliance metadata.
 	exec("ALTER TABLE artifacts ADD COLUMN annotations TEXT NOT NULL DEFAULT '[]'")
 
@@ -316,10 +308,6 @@ func runSchemaEvolutions(db *sql.DB) { //nolint:cyclop,gocyclo // linear DDL seq
 		PRIMARY KEY (artifact_id, key)
 	)`)
 	exec("CREATE INDEX IF NOT EXISTS idx_artifact_properties_key ON artifact_properties(key, value_text)")
-
-	// v2.x: components column (added, then dropped — kept here for databases
-	// that received the ADD but not yet the DROP).
-	exec("ALTER TABLE artifacts DROP COLUMN IF EXISTS components")
 
 	// v3.x: embedding content hash for staleness detection.
 	exec("ALTER TABLE artifact_embeddings ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''")

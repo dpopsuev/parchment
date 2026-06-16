@@ -72,9 +72,6 @@ type ValueTensor struct {
 	// Recency: exponential decay from UpdatedAt.
 	// 1.0 = updated now. 0.0 = not updated within the recency window.
 	Recency float64 `json:"recency"`
-
-	// ComputedAt records when this tensor was last computed.
-	ComputedAt time.Time `json:"computed_at"`
 }
 
 // ─── EvictionLabel ───────────────────────────────────────────────────────────
@@ -174,7 +171,6 @@ func ComputeTensor(art *Artifact, metrics ArtifactMetrics, qualityScore float64,
 		StructuralHeat: structuralHeatFromCount(incomingEdges),
 		QualityScore:   qualityScore,
 		Recency:        computeRecency(art.UpdatedAt, recencyWindowDays),
-		ComputedAt:     time.Now().UTC(),
 	}
 }
 

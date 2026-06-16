@@ -18,21 +18,15 @@ func (s *SQLiteStore) Get(ctx context.Context, id string) (*Artifact, error) {
 	return art, nil
 }
 
-// GetByAlias returns the artifact matching the given alias. Checks the
-// artifact_aliases junction table first, falls back to the legacy alias column.
+// GetByAlias returns the artifact matching the given alias via the junction table.
 func (s *SQLiteStore) GetByAlias(ctx context.Context, alias string) (*Artifact, error) {
 	var artID string
 	err := s.reader.QueryRowContext(ctx,
 		"SELECT artifact_id FROM artifact_aliases WHERE alias = ?", alias).Scan(&artID)
-	if err == nil {
-		return s.Get(ctx, artID)
-	}
-	row := s.reader.QueryRowContext(ctx, "SELECT "+artifactColumns+" FROM artifacts WHERE alias = ?", alias)
-	art, err := scanArtifact(row)
 	if err != nil {
 		return nil, fmt.Errorf("artifact with alias %q: %w", alias, ErrArtifactNotFound)
 	}
-	return art, nil
+	return s.Get(ctx, artID)
 }
 
 // AddAlias registers an additional alias for an artifact in the junction table.

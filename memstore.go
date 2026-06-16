@@ -86,20 +86,12 @@ func (m *MemoryStore) Put(_ context.Context, art *Artifact) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Remove stale alias mapping for this artifact if alias changed.
-	if old, ok := m.artifacts[art.ID]; ok && old.Alias != "" && old.Alias != art.Alias {
-		delete(m.aliases, old.Alias)
-	}
-	if art.Alias != "" {
-		m.aliases[art.Alias] = art.ID
-	}
-
 	clone := *art
 	m.artifacts[art.ID] = &clone
 	return nil
 }
 
-// GetByAlias returns the artifact whose Alias field matches alias.
+// GetByAlias returns the artifact matching the given alias via the in-memory alias map.
 func (m *MemoryStore) GetByAlias(_ context.Context, alias string) (*Artifact, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -812,9 +804,8 @@ func (m *MemoryStore) RenameID(_ context.Context, oldID, newID string) error {
 		return fmt.Errorf("artifact %s not found", oldID) //nolint:err113 // runtime value required
 	}
 
-	// 1. Rename artifact, set alias.
+	// 1. Rename artifact.
 	art.ID = newID
-	art.Alias = oldID
 	m.artifacts[newID] = art
 	delete(m.artifacts, oldID)
 
@@ -904,7 +895,4 @@ func (m *MemoryStore) putLocked(art *Artifact) {
 	}
 	cp := *art
 	m.artifacts[art.ID] = &cp
-	if art.Alias != "" {
-		m.aliases[art.Alias] = art.ID
-	}
 }

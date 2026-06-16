@@ -8,7 +8,6 @@ import (
 // Artifact is the universal record for all work graph nodes.
 type Artifact struct {
 	ID          string              `json:"id"`
-	Alias       string              `json:"alias,omitempty"`
 	Aliases     []string            `json:"aliases,omitempty"`
 	Title       string              `json:"title"`
 	Labels      []string            `json:"labels,omitempty"`

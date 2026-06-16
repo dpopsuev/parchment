@@ -96,17 +96,17 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	annotations, _ := json.Marshal(art.Annotations)
 
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO artifacts (id, alias, kind, scope, status, title, goal, labels, priority, sprint, sections, extra, annotations, created_at, updated_at, inserted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO artifacts (id, kind, scope, status, title, goal, labels, priority, sprint, sections, extra, annotations, created_at, updated_at, inserted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
-			alias=excluded.alias, kind=excluded.kind, scope=excluded.scope,
+			kind=excluded.kind, scope=excluded.scope,
 			status=excluded.status, title=excluded.title, goal=excluded.goal,
 			labels=excluded.labels,
 			priority=excluded.priority, sprint=excluded.sprint,
 			sections=excluded.sections,
 			extra=excluded.extra,
 			annotations=excluded.annotations, updated_at=excluded.updated_at`,
-		art.ID, art.Alias, kind, scope, status, art.Title, art.Goal(),
+		art.ID, kind, scope, status, art.Title, art.Goal(),
 		string(labels), priority, sprint,
 		string(sections), string(extra),
 		string(annotations),
@@ -151,12 +151,12 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 	defer tx.Rollback() //nolint:errcheck // deferred rollback
 
 	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO artifacts (id, alias, kind, scope, status, title, goal,
+		INSERT INTO artifacts (id, kind, scope, status, title, goal,
 			labels, priority, sprint, sections,
 			extra, annotations, created_at, updated_at, inserted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
-			alias=excluded.alias, kind=excluded.kind, scope=excluded.scope,
+			kind=excluded.kind, scope=excluded.scope,
 			status=excluded.status, title=excluded.title,
 			goal=excluded.goal, labels=excluded.labels,
 			priority=excluded.priority, sprint=excluded.sprint, sections=excluded.sections,
@@ -194,7 +194,7 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 		annotations, _ := json.Marshal(art.Annotations)
 
 		_, execErr := stmt.ExecContext(ctx,
-			art.ID, art.Alias, kind, scope, status,
+			art.ID, kind, scope, status,
 			art.Title, art.Goal(), string(labels), priority, sprint,
 			string(sections), string(extra),
 			string(annotations),
@@ -275,12 +275,12 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 
 	_, err = tx.ExecContext(ctx, `
 		UPDATE artifacts SET
-			alias=?, kind=?, scope=?, status=?, title=?, goal=?,
+			kind=?, scope=?, status=?, title=?, goal=?,
 			labels=?, priority=?, sprint=?,
 			sections=?,
 			extra=?, annotations=?, updated_at=?
 		WHERE id=?`,
-		art.Alias, kind, scope, status, art.Title, art.Goal(),
+		kind, scope, status, art.Title, art.Goal(),
 		string(labels), priority, sprint,
 		string(sections),
 		string(extra), string(annotations),
@@ -414,12 +414,7 @@ func (s *SQLiteStore) RenameID(ctx context.Context, oldID, newID string) error {
 		return fmt.Errorf("rename artifact_aliases: %w", err)
 	}
 
-	// 5. Register old ID as alias for backward-compat lookup.
-	if _, err := tx.ExecContext(ctx, "UPDATE artifacts SET alias = ? WHERE id = ?", oldID, newID); err != nil {
-		return fmt.Errorf("set alias: %w", err)
-	}
-
-	// 6. Also insert into the alias ring junction table.
+	// 5. Register old ID as alias in the junction table.
 	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO artifact_aliases (artifact_id, alias) VALUES (?, ?)", newID, oldID); err != nil {
 		return fmt.Errorf("alias ring insert: %w", err)
 	}
@@ -443,7 +438,7 @@ func scanArtifactRows(rows *sql.Rows) (*Artifact, error) {
 
 // artifactColumns is the explicit column list for SELECT queries.
 // Must match the scan order in scanRow exactly.
-const artifactColumns = `id, alias, kind, scope, status, title, goal, labels, priority, sprint, sections, extra, annotations, created_at, updated_at, inserted_at`
+const artifactColumns = `id, kind, scope, status, title, goal, labels, priority, sprint, sections, extra, annotations, created_at, updated_at, inserted_at`
 
 func scanRow(s rowScanner) (*Artifact, error) {
 	var art Artifact
@@ -452,7 +447,7 @@ func scanRow(s rowScanner) (*Artifact, error) {
 	var createdAt, updatedAt, insertedAt string
 
 	err := s.Scan(
-		&art.ID, &art.Alias, &kindCol, &scopeCol, &statusCol, &art.Title, &goalCol,
+		&art.ID, &kindCol, &scopeCol, &statusCol, &art.Title, &goalCol,
 		&labels, &priorityCol, &sprintCol,
 		&sections, &extra,
 		&annotations,

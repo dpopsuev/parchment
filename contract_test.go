@@ -216,7 +216,8 @@ func storeContract(t *testing.T, newStore func(t *testing.T) Store) { //nolint:g
 		t.Parallel()
 		s := newStore(t)
 		ctx := context.Background()
-		s.Put(ctx, &Artifact{ID: "ALIAS-1", Alias: "my-alias", Labels: []string{"kind:effort.task"}, Title: "aliased"}) //nolint:errcheck // test seeding
+		s.Put(ctx, &Artifact{ID: "ALIAS-1", Labels: []string{"kind:effort.task"}, Title: "aliased"}) //nolint:errcheck // test seeding
+		s.AddAlias(ctx, "ALIAS-1", "my-alias")                                                       //nolint:errcheck // test seeding
 
 		got, err := s.GetByAlias(ctx, "my-alias")
 		if err != nil {

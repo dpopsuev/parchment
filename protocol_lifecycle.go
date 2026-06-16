@@ -146,7 +146,10 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 
 	switch field {
 	case FieldAlias:
-		art.Alias = value
+		if err := p.store.AddAlias(ctx, art.ID, value); err != nil {
+			return Result{ID: id, Error: fmt.Sprintf("add alias: %v", err)}
+		}
+		return Result{ID: id}
 	case "inserted_at":
 		return Result{ID: id, Error: "inserted_at is immutable"}
 	case "created_at":

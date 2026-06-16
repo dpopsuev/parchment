@@ -106,10 +106,8 @@ func TestV045_AliasDefaultsToEmptyForExistingRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, a := range arts {
-		if a.Alias != "" {
-			t.Errorf("%s: expected empty alias after migration, got %q", a.ID, a.Alias)
-		}
+	if len(arts) == 0 {
+		t.Error("expected artifacts after migration")
 	}
 }
 
@@ -172,7 +170,7 @@ func TestV045_NewArtifactsGetUUIDs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("existing artifact SCR-TSK-1 not readable: %v", err)
 	}
-	if old.Alias != "" {
-		t.Errorf("existing artifact should have empty alias, got %q", old.Alias)
+	if old.ID == "" {
+		t.Error("existing artifact should have a non-empty ID")
 	}
 }

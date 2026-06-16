@@ -64,7 +64,6 @@ type CreateInput struct {
 	Parent     string              `json:"parent,omitempty"`
 	DependsOn  []string            `json:"depends_on,omitempty"`
 	Labels     []string            `json:"labels,omitempty"`
-	Alias      string              `json:"alias,omitempty"`
 	Links      map[string][]string `json:"links,omitempty"`
 	Extra      map[string]any      `json:"extra,omitempty"`
 	CreatedAt  string              `json:"created_at,omitempty"`
@@ -166,7 +165,7 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		seedLabels = append(seedLabels, LabelPrefixPriority+priority)
 	}
 	art := &Artifact{
-		ID: id, Alias: in.Alias,
+		ID:       id,
 		Title:    in.Title,
 		Labels:   seedLabels,
 		Extra:    in.Extra,

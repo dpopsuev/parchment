@@ -431,6 +431,11 @@ func (s *SQLiteStore) RenameID(ctx context.Context, oldID, newID string) error {
 		return fmt.Errorf("set alias: %w", err)
 	}
 
+	// 6. Also insert into the alias ring junction table.
+	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO artifact_aliases (artifact_id, alias) VALUES (?, ?)", newID, oldID); err != nil {
+		return fmt.Errorf("alias ring insert: %w", err)
+	}
+
 	return tx.Commit()
 }
 

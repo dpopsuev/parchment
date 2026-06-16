@@ -349,6 +349,15 @@ func runSchemaEvolutions(db *sql.DB) { //nolint:cyclop,gocyclo // linear DDL seq
 		data         BLOB NOT NULL,
 		PRIMARY KEY (artifact_id, name)
 	)`)
+
+	// v3.x: alias ring — multiple aliases per artifact for synonym/thesaurus support.
+	exec(`CREATE TABLE IF NOT EXISTS artifact_aliases (
+		artifact_id TEXT NOT NULL,
+		alias       TEXT NOT NULL UNIQUE,
+		PRIMARY KEY (artifact_id, alias)
+	)`)
+	exec(`INSERT OR IGNORE INTO artifact_aliases (artifact_id, alias)
+		SELECT id, alias FROM artifacts WHERE alias != ''`)
 }
 
 func generateUID() string {

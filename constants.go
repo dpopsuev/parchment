@@ -8,6 +8,7 @@ var (
 	ErrConflict              = errors.New("version conflict: artifact was modified since last read")
 	ErrEdgeNotFound          = errors.New("edge not found")
 	ErrArtifactIDRequired    = errors.New("artifact ID is required")
+	ErrAliasTaken            = errors.New("alias already taken")
 )
 
 // SchemaScope is the reserved scope for ArtifactDefinition artifacts.

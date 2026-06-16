@@ -115,6 +115,25 @@ func (m *MemoryStore) GetByAlias(_ context.Context, alias string) (*Artifact, er
 	return &clone, nil
 }
 
+// AddAlias registers an alias in the in-memory alias map.
+func (m *MemoryStore) AddAlias(_ context.Context, artifactID, alias string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if existing, ok := m.aliases[alias]; ok && existing != artifactID {
+		return fmt.Errorf("alias %q: %w", alias, ErrAliasTaken)
+	}
+	m.aliases[alias] = artifactID
+	return nil
+}
+
+// RemoveAlias removes an alias from the in-memory alias map.
+func (m *MemoryStore) RemoveAlias(_ context.Context, _, alias string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.aliases, alias)
+	return nil
+}
+
 func (m *MemoryStore) Get(_ context.Context, id string) (*Artifact, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

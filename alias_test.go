@@ -190,3 +190,115 @@ func TestAlias_SQLite_RoundTrip(t *testing.T) {
 		t.Errorf("renamed alias resolved to %q, want %q", renamed.ID, art.ID)
 	}
 }
+
+// --- Alias Ring (multi-alias via junction table) ---
+
+func TestAddAlias_SingleAlias(t *testing.T) {
+	t.Parallel()
+	store := NewMemoryStore()
+	ctx := context.Background()
+
+	_ = store.Put(ctx, &Artifact{ID: "art1", Title: "Alpha"})
+	if err := store.AddAlias(ctx, "art1", "alpha"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.GetByAlias(ctx, "alpha")
+	if err != nil {
+		t.Fatalf("GetByAlias(alpha): %v", err)
+	}
+	if got.ID != "art1" {
+		t.Errorf("got ID=%s, want art1", got.ID)
+	}
+}
+
+func TestAddAlias_MultipleAliases(t *testing.T) {
+	t.Parallel()
+	store := NewMemoryStore()
+	ctx := context.Background()
+
+	_ = store.Put(ctx, &Artifact{ID: "art1", Title: "Alpha"})
+	for _, alias := range []string{"a", "b", "c"} {
+		if err := store.AddAlias(ctx, "art1", alias); err != nil {
+			t.Fatalf("AddAlias(%s): %v", alias, err)
+		}
+	}
+	for _, alias := range []string{"a", "b", "c"} {
+		got, err := store.GetByAlias(ctx, alias)
+		if err != nil {
+			t.Fatalf("GetByAlias(%s): %v", alias, err)
+		}
+		if got.ID != "art1" {
+			t.Errorf("alias %s resolved to %s, want art1", alias, got.ID)
+		}
+	}
+}
+
+func TestAddAlias_UniqueConstraint(t *testing.T) {
+	t.Parallel()
+	store := NewMemoryStore()
+	ctx := context.Background()
+
+	_ = store.Put(ctx, &Artifact{ID: "art1", Title: "Alpha"})
+	_ = store.Put(ctx, &Artifact{ID: "art2", Title: "Beta"})
+	if err := store.AddAlias(ctx, "art1", "shared"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddAlias(ctx, "art2", "shared"); err == nil {
+		t.Error("expected error for duplicate alias")
+	}
+}
+
+func TestRemoveAlias(t *testing.T) {
+	t.Parallel()
+	store := NewMemoryStore()
+	ctx := context.Background()
+
+	_ = store.Put(ctx, &Artifact{ID: "art1", Title: "Alpha"})
+	_ = store.AddAlias(ctx, "art1", "gone")
+	if err := store.RemoveAlias(ctx, "art1", "gone"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.GetByAlias(ctx, "gone"); err == nil {
+		t.Error("expected error after removing alias")
+	}
+}
+
+func TestAddAlias_SQLite(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	path := t.TempDir() + "/alias-ring.sqlite"
+	s, err := OpenSQLite(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close() //nolint:errcheck // test
+
+	_ = s.Put(ctx, &Artifact{ID: "art1", Title: "Alpha", Labels: []string{"kind:knowledge.note"}})
+
+	for _, alias := range []string{"x", "y", "z"} {
+		if err := s.AddAlias(ctx, "art1", alias); err != nil {
+			t.Fatalf("AddAlias(%s): %v", alias, err)
+		}
+	}
+	for _, alias := range []string{"x", "y", "z"} {
+		got, err := s.GetByAlias(ctx, alias)
+		if err != nil {
+			t.Fatalf("GetByAlias(%s): %v", alias, err)
+		}
+		if got.ID != "art1" {
+			t.Errorf("alias %s → %s, want art1", alias, got.ID)
+		}
+	}
+
+	// Remove one
+	if err := s.RemoveAlias(ctx, "art1", "y"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetByAlias(ctx, "y"); err == nil {
+		t.Error("y should not resolve after removal")
+	}
+	// Others still work
+	if _, err := s.GetByAlias(ctx, "x"); err != nil {
+		t.Error("x should still resolve")
+	}
+}

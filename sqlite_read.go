@@ -49,6 +49,25 @@ func (s *SQLiteStore) RemoveAlias(ctx context.Context, artifactID, alias string)
 	return err
 }
 
+// ListAliases returns all aliases for an artifact from the junction table.
+func (s *SQLiteStore) ListAliases(ctx context.Context, artifactID string) ([]string, error) {
+	rows, err := s.reader.QueryContext(ctx,
+		"SELECT alias FROM artifact_aliases WHERE artifact_id = ? ORDER BY alias", artifactID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck // rows.Close error is non-actionable in read path
+	var aliases []string
+	for rows.Next() {
+		var a string
+		if err := rows.Scan(&a); err != nil {
+			return aliases, err
+		}
+		aliases = append(aliases, a)
+	}
+	return aliases, rows.Err()
+}
+
 func (s *SQLiteStore) Search(ctx context.Context, query string) ([]string, error) {
 	rows, err := s.reader.QueryContext(ctx,
 		"SELECT id FROM artifacts_fts WHERE artifacts_fts MATCH ? ORDER BY rank",

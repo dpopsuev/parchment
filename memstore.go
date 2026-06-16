@@ -134,6 +134,19 @@ func (m *MemoryStore) RemoveAlias(_ context.Context, _, alias string) error {
 	return nil
 }
 
+// ListAliases returns all aliases for an artifact from the in-memory map.
+func (m *MemoryStore) ListAliases(_ context.Context, artifactID string) ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var out []string
+	for alias, id := range m.aliases {
+		if id == artifactID {
+			out = append(out, alias)
+		}
+	}
+	return out, nil
+}
+
 func (m *MemoryStore) Get(_ context.Context, id string) (*Artifact, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

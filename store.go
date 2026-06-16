@@ -64,6 +64,8 @@ type ArtifactStore interface {
 	AddAlias(ctx context.Context, artifactID, alias string) error
 	// RemoveAlias removes an alias from an artifact.
 	RemoveAlias(ctx context.Context, artifactID, alias string) error
+	// ListAliases returns all aliases registered for an artifact.
+	ListAliases(ctx context.Context, artifactID string) ([]string, error)
 
 	// ListByLabel returns all artifacts carrying the given label.
 	// Equivalent to List(ctx, Filter{Labels: []string{label}}) with a direct index path.

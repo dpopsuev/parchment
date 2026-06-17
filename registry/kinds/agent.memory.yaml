@@ -1,0 +1,36 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.agent.memory
+spec:
+  prefix: AME
+  code: ame
+  children: []
+  lifecycle:
+    defaultStatus: note.fleeting
+    transitions:
+      - from: note.fleeting
+        to: [note.mature, note.evergreen, archived]
+      - from: note.mature
+        to: [note.evergreen, note.fleeting, archived]
+      - from: note.evergreen
+        to: [note.mature, archived]
+      - from: archived
+        to: []
+  sections:
+    must: [content]
+    should: [context]
+  relations:
+    outgoing: [cites, documents, relates_to]
+  whenToCreate: |
+    Create an agent.memory when the agent discovers a fact, pattern, preference,
+    or decision that should persist across sessions. One memory per distinct
+    learning — not per session, not per day.
+    Examples: "user prefers single bundled PRs for refactors", "module X requires
+    workaround Y due to upstream bug Z", "test suite needs --no-cache flag".
+  agentNote: |
+    agent.memory is the agent's cross-session recall. Unlike knowledge.note
+    (human-authored) or knowledge.journal (daily dated log), agent.memory is
+    machine-generated and fact-scoped: one artifact per learning.
+    Promote to note.evergreen when validated across multiple sessions.
+    The content section holds the fact; context holds when/where it was discovered.

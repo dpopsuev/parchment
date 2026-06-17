@@ -1,24 +1,24 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.ctx.turn
+  name: kind.agent.turn
 spec:
   prefix: TRN
   code: trn
-  children: [ctx.tool-call]
+  children: [agent.tool-call]
   lifecycle:
-    defaultStatus: ctx.active
+    defaultStatus: agent.active
     transitions:
-      - from: ctx.active
-        to: [ctx.archived]
-      - from: ctx.archived
+      - from: agent.active
+        to: [agent.archived]
+      - from: agent.archived
         to: []
   sections:
     must: [content]
   whenToCreate: |
-    Create a ctx-turn artifact for each message exchange in an agent session.
+    Create a agent.turn artifact for each message exchange in an agent session.
     One turn = one user message + one assistant response. The role (user or
-    assistant) is a label. Tool calls are child ctx-tool-call artifacts.
+    assistant) is a label. Tool calls are child agent.tool-call artifacts.
   agentNote: |
     Turns are children of their session. They carry the raw content of the
     exchange and link to any tool calls made during that turn via parent_of.

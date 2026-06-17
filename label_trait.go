@@ -306,11 +306,12 @@ var defaultLabelTraits = []struct {
 	{"decision.rejected", LabelTrait{Terminal: true, Readonly: false, EvictionQuality: 0.1}, "", ""},
 	{"decision.deferred", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.3}, "", ""},
 
-	// Context window lifecycle traits.
-	{"ctx.ephemeral", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.1}, "", ""},
-	{"ctx.promoted", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.5}, "", ""},
-	{"ctx.permanent", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.9}, "", ""},
-	{"ctx.active", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.5}, "", ""},
+	// Agent lifecycle traits.
+	{"agent.ephemeral", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.1}, "", ""},
+	{"agent.promoted", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.5}, "", ""},
+	{"agent.permanent", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.9}, "", ""},
+	{"agent.active", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.5}, "", ""},
+	{"agent.archived", LabelTrait{Terminal: true, Readonly: true, EvictionQuality: 0.1}, "", ""},
 
 	// Code intelligence lifecycle traits.
 	{"code.indexed", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.3}, "", ""},

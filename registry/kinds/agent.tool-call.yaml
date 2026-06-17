@@ -1,23 +1,23 @@
 apiVersion: scribe/v1
 kind: Label
 metadata:
-  name: kind.ctx.tool-call
+  name: kind.agent.tool-call
 spec:
   prefix: TCL
   code: tcl
   children: []
   lifecycle:
-    defaultStatus: ctx.active
+    defaultStatus: agent.active
     transitions:
-      - from: ctx.active
-        to: [ctx.archived]
-      - from: ctx.archived
+      - from: agent.active
+        to: [agent.archived]
+      - from: agent.archived
         to: []
   sections:
     must: [input]
     should: [output]
   whenToCreate: |
-    Create a ctx-tool-call artifact for each tool invocation within a session
+    Create a agent.tool-call artifact for each tool invocation within a session
     turn. Carries the tool name, input parameters, and output. Links back to
     artifacts created or modified by the tool call via produced_by edges.
   agentNote: |

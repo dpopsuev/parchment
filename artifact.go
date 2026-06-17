@@ -217,7 +217,7 @@ func labelValue(labels []string, prefix string) string {
 // domainStatusPrefixes lists the dot-notation status domain prefixes.
 // Labels with these prefixes are lifecycle statuses stored as raw labels
 // (no status: wrapper), unlike system statuses (status:retired, status:archived).
-var domainStatusPrefixes = []string{"work.", "note.", "decision.", "ctx.", "code."}
+var domainStatusPrefixes = []string{"work.", "note.", "decision.", "agent.", "code."}
 
 // isDomainStatusLabel reports whether a label is a domain-namespaced lifecycle status.
 func isDomainStatusLabel(label string) bool {

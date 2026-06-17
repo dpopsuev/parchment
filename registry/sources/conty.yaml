@@ -1,0 +1,24 @@
+apiVersion: scribe/v1
+kind: Source
+metadata:
+  name: conty
+  description: CI/CD bridge (Jenkins, GitHub Actions, GitLab CI)
+spec:
+  ttl: 0s
+  extraSchema:
+    ref_backend:
+      type: string
+      const: conty
+      required: true
+    ref_id:
+      type: string
+      required: true
+    status:
+      type: string
+    result:
+      type: string
+      enum: [SUCCESS, FAILURE, ABORTED]
+    duration:
+      type: number
+    started_at:
+      type: string

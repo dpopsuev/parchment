@@ -1,0 +1,24 @@
+apiVersion: scribe/v1
+kind: Source
+metadata:
+  name: emcee
+  description: Issue tracker bridge (Jira, Linear, GitHub, GitLab)
+spec:
+  ttl: 1h
+  extraSchema:
+    ref_backend:
+      type: string
+      const: emcee
+      required: true
+    ref_id:
+      type: string
+      required: true
+    status:
+      type: string
+    priority:
+      type: string
+      enum: [critical, high, medium, low]
+    assignee:
+      type: string
+    issue_type:
+      type: string

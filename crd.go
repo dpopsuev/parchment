@@ -93,6 +93,10 @@ type ResourceSpec struct {
 	DependsOn       []string            `yaml:"dependsOn,omitempty"`
 	Links           map[string][]string `yaml:"links,omitempty"`
 	Extra           map[string]any      `yaml:"extra,omitempty"`
+
+	// Source CRD fields.
+	SourceTTL    string                    `yaml:"ttl,omitempty"`
+	ExtraSchema  map[string]ExtraFieldSpec `yaml:"extraSchema,omitempty"`
 }
 
 type LifecycleSpec struct {

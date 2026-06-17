@@ -1,0 +1,19 @@
+apiVersion: scribe/v1
+kind: Source
+metadata:
+  name: locus
+  description: Architecture scanner (symbol graph, coupling, churn)
+spec:
+  ttl: 24h
+  extraSchema:
+    ref_backend:
+      type: string
+      const: locus
+      required: true
+    ref_id:
+      type: string
+      required: true
+    loc:
+      type: integer
+    churn:
+      type: integer

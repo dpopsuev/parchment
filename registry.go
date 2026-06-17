@@ -17,7 +17,7 @@ const (
 	crdKindLabelLegacy = "LabelDefinition"
 )
 
-//go:embed registry/kinds/*.yaml registry/labels/*.yaml registry/relationships/*.yaml
+//go:embed registry/kinds/*.yaml registry/labels/*.yaml registry/relationships/*.yaml registry/sources/*.yaml
 var registryFS embed.FS
 
 //go:embed registry/rules

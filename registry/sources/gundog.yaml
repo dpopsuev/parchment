@@ -1,0 +1,37 @@
+apiVersion: scribe/v1
+kind: Source
+metadata:
+  name: gundog
+  description: Web crawler/scraper (pages, link graph, content)
+spec:
+  ttl: 168h
+  extraSchema:
+    ref_backend:
+      type: string
+      const: gundog
+      required: true
+    ref_id:
+      type: string
+      required: true
+    url:
+      type: string
+    domain:
+      type: string
+    word_count:
+      type: integer
+    reading_time_min:
+      type: number
+    spidered_at:
+      type: string
+    status_code:
+      type: integer
+    heading_count:
+      type: integer
+    link_count:
+      type: integer
+    chunk_count:
+      type: integer
+    author:
+      type: string
+    canonical_url:
+      type: string

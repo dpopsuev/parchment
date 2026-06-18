@@ -1,8 +1,0 @@
-apiVersion: scribe/v1
-kind: Relationship
-metadata:
-  name: code-function-implements-any
-spec:
-  from: code:function
-  relation: implements
-  to: "*"

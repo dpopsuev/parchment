@@ -1,8 +1,8 @@
 apiVersion: scribe/v1
 kind: Relationship
 metadata:
-  name: bug-implements-any
+  name: any-implements-any
 spec:
-  from: kind:intent.bug
+  from: "*"
   relation: implements
   to: "*"

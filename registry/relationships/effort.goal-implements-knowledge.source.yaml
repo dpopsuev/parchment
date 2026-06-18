@@ -1,8 +1,0 @@
-apiVersion: scribe/v1
-kind: Relationship
-metadata:
-  name: goal-implements-source
-spec:
-  from: kind:effort.goal
-  relation: implements
-  to: kind:knowledge.source

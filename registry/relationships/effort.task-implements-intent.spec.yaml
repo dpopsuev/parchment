@@ -1,8 +1,0 @@
-apiVersion: scribe/v1
-kind: Relationship
-metadata:
-  name: task-implements-spec
-spec:
-  from: kind:effort.task
-  relation: implements
-  to: kind:intent.spec

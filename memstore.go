@@ -88,6 +88,18 @@ func (m *MemoryStore) Put(_ context.Context, art *Artifact) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	now := time.Now().UTC()
+	if art.CreatedAt.IsZero() {
+		art.CreatedAt = now
+	}
+	_, isUpdate := m.artifacts[art.ID]
+	if isUpdate || art.UpdatedAt.IsZero() {
+		art.UpdatedAt = now
+	}
+	if art.InsertedAt.IsZero() {
+		art.InsertedAt = now
+	}
+
 	if old, exists := m.artifacts[art.ID]; exists {
 		m.snapshotIfChanged(old, art)
 	}

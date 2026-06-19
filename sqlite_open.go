@@ -382,6 +382,76 @@ func runSchemaEvolutions(db *sql.DB) { //nolint:cyclop,gocyclo // linear DDL seq
 		exec("PRAGMA foreign_keys = ON")
 		slog.InfoContext(ctx, "schema evolution: recreated artifacts table (dropped uid + alias columns)")
 	}
+
+	// v5.x: artifact revision tracking — automatic snapshots on UPDATE/DELETE.
+	exec(`CREATE TABLE IF NOT EXISTS artifact_revisions (
+		artifact_id TEXT NOT NULL,
+		revision    INTEGER NOT NULL,
+		kind        TEXT NOT NULL,
+		scope       TEXT NOT NULL DEFAULT '',
+		status      TEXT NOT NULL,
+		title       TEXT NOT NULL,
+		goal        TEXT NOT NULL DEFAULT '',
+		labels      TEXT NOT NULL DEFAULT '[]',
+		priority    TEXT NOT NULL DEFAULT '',
+		sprint      TEXT NOT NULL DEFAULT '',
+		sections    TEXT NOT NULL DEFAULT '[]',
+		extra       TEXT NOT NULL DEFAULT '{}',
+		annotations TEXT NOT NULL DEFAULT '[]',
+		created_at  TEXT NOT NULL,
+		updated_at  TEXT NOT NULL,
+		PRIMARY KEY (artifact_id, revision)
+	)`)
+
+	// Snapshot the old row before a content-changing UPDATE.
+	exec(`CREATE TRIGGER IF NOT EXISTS trg_artifact_revision_on_update
+		BEFORE UPDATE ON artifacts
+		WHEN OLD.kind        != NEW.kind
+		  OR OLD.scope       != NEW.scope
+		  OR OLD.status      != NEW.status
+		  OR OLD.title       != NEW.title
+		  OR OLD.goal        != NEW.goal
+		  OR OLD.labels      != NEW.labels
+		  OR OLD.priority    != NEW.priority
+		  OR OLD.sprint      != NEW.sprint
+		  OR OLD.sections    != NEW.sections
+		  OR OLD.extra       != NEW.extra
+		  OR OLD.annotations != NEW.annotations
+		BEGIN
+		  INSERT INTO artifact_revisions (
+			artifact_id, revision,
+			kind, scope, status, title, goal, labels,
+			priority, sprint, sections, extra, annotations,
+			created_at, updated_at
+		  ) VALUES (
+			OLD.id,
+			COALESCE((SELECT MAX(revision) + 1 FROM artifact_revisions WHERE artifact_id = OLD.id), 1),
+			OLD.kind, OLD.scope, OLD.status, OLD.title, OLD.goal, OLD.labels,
+			OLD.priority, OLD.sprint, OLD.sections, OLD.extra, OLD.annotations,
+			OLD.created_at, OLD.updated_at
+		  );
+		  DELETE FROM artifact_revisions
+			WHERE artifact_id = OLD.id
+			  AND revision <= (SELECT MAX(revision) - 50 FROM artifact_revisions WHERE artifact_id = OLD.id);
+		END`)
+
+	// Capture final state before DELETE (audit trail).
+	exec(`CREATE TRIGGER IF NOT EXISTS trg_artifact_revision_on_delete
+		BEFORE DELETE ON artifacts
+		BEGIN
+		  INSERT INTO artifact_revisions (
+			artifact_id, revision,
+			kind, scope, status, title, goal, labels,
+			priority, sprint, sections, extra, annotations,
+			created_at, updated_at
+		  ) VALUES (
+			OLD.id,
+			COALESCE((SELECT MAX(revision) + 1 FROM artifact_revisions WHERE artifact_id = OLD.id), 1),
+			OLD.kind, OLD.scope, OLD.status, OLD.title, OLD.goal, OLD.labels,
+			OLD.priority, OLD.sprint, OLD.sections, OLD.extra, OLD.annotations,
+			OLD.created_at, OLD.updated_at
+		  );
+		END`)
 }
 
 

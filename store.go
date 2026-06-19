@@ -141,6 +141,16 @@ type AttachmentStore interface {
 	DeleteAttachment(ctx context.Context, artifactID, name string) error
 }
 
+// RevisionStore provides read-only access to artifact revision history.
+// Revisions are created automatically by SQLite triggers; no Go code
+// writes them directly.
+type RevisionStore interface {
+	ListRevisions(ctx context.Context, artifactID string, limit int) ([]Revision, error)
+	GetRevision(ctx context.Context, artifactID string, revision int) (*Revision, error)
+	PruneRevisions(ctx context.Context, artifactID string, keepN int) (int, error)
+	PurgeRevisions(ctx context.Context, artifactID string) error
+}
+
 // Store is the full persistence interface, composed from role-specific interfaces.
 type Store interface {
 	ArtifactStore
@@ -148,6 +158,7 @@ type Store interface {
 	ScopeStore
 	EventStore
 	AttachmentStore
+	RevisionStore
 	Close() error
 }
 

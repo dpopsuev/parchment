@@ -26,6 +26,7 @@ type MemoryStore struct {
 	attachments map[string]map[string]Attachment // outer: artifactID, inner: name
 	events      []Event
 	eventID     int64
+	revisions   map[string][]Revision
 }
 
 // Compile-time interface verification.
@@ -42,6 +43,7 @@ func NewMemoryStore() *MemoryStore {
 		embeddingHashes: make(map[string]string),
 		metrics:         make(map[string]ArtifactMetrics),
 		attachments:     make(map[string]map[string]Attachment),
+		revisions:       make(map[string][]Revision),
 	}
 }
 
@@ -86,6 +88,9 @@ func (m *MemoryStore) Put(_ context.Context, art *Artifact) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if old, exists := m.artifacts[art.ID]; exists {
+		m.snapshotIfChanged(old, art)
+	}
 	clone := *art
 	m.artifacts[art.ID] = &clone
 	return nil
@@ -153,9 +158,11 @@ func (m *MemoryStore) Get(_ context.Context, id string) (*Artifact, error) {
 func (m *MemoryStore) Delete(_ context.Context, id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.artifacts[id]; !ok {
+	old, ok := m.artifacts[id]
+	if !ok {
 		return fmt.Errorf("delete %s: %w", id, ErrArtifactNotFound)
 	}
+	m.appendRevision(old)
 	delete(m.artifacts, id)
 	// Remove related edges.
 	for k, e := range m.edges {
@@ -694,6 +701,7 @@ func (m *MemoryStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 	if !existing.UpdatedAt.Equal(expectedUpdatedAt) {
 		return ErrConflict
 	}
+	m.snapshotIfChanged(existing, art)
 	m.putLocked(art)
 	return nil
 }
@@ -705,6 +713,8 @@ func (m *MemoryStore) PatchArtifact(_ context.Context, id string, patch Artifact
 	if !ok {
 		return ErrArtifactNotFound
 	}
+	snap := *art
+	defer func() { m.snapshotIfChanged(&snap, art) }()
 	art.Annotations = append(art.Annotations, patch.AppendAnnotations...)
 	byName := make(map[string]int, len(art.Sections))
 	for i, sec := range art.Sections {
@@ -895,4 +905,141 @@ func (m *MemoryStore) putLocked(art *Artifact) {
 	}
 	cp := *art
 	m.artifacts[art.ID] = &cp
+}
+
+func (m *MemoryStore) snapshotIfChanged(old, updated *Artifact) {
+	if artifactContentEqual(old, updated) {
+		return
+	}
+	m.appendRevision(old)
+}
+
+func (m *MemoryStore) appendRevision(art *Artifact) {
+	revs := m.revisions[art.ID]
+	nextRev := 1
+	if len(revs) > 0 {
+		nextRev = revs[len(revs)-1].Rev + 1
+	}
+	m.revisions[art.ID] = append(revs, Revision{
+		ArtifactID:  art.ID,
+		Rev:         nextRev,
+		Kind:        art.Label(LabelPrefixKind),
+		Scope:       art.Label(LabelPrefixScope),
+		Status:      StatusFromLabels(art.Labels),
+		Title:       art.Title,
+		Goal:        art.Goal(),
+		Labels:      append([]string(nil), art.Labels...),
+		Priority:    art.Label(LabelPrefixPriority),
+		Sprint:      art.Label(LabelPrefixSprint),
+		Sections:    append([]Section(nil), art.Sections...),
+		Extra:       copyExtra(art.Extra),
+		Annotations: append([]Annotation(nil), art.Annotations...),
+		CreatedAt:   art.CreatedAt,
+		UpdatedAt:   art.UpdatedAt,
+	})
+}
+
+func (m *MemoryStore) ListRevisions(_ context.Context, artifactID string, limit int) ([]Revision, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	revs := m.revisions[artifactID]
+	out := make([]Revision, len(revs))
+	for i := range revs {
+		out[len(revs)-1-i] = revs[i]
+	}
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
+func (m *MemoryStore) GetRevision(_ context.Context, artifactID string, revision int) (*Revision, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for i := range m.revisions[artifactID] {
+		if m.revisions[artifactID][i].Rev == revision {
+			r := m.revisions[artifactID][i]
+			return &r, nil
+		}
+	}
+	return nil, fmt.Errorf("revision %d of %s: %w", revision, artifactID, ErrArtifactNotFound)
+}
+
+func (m *MemoryStore) PruneRevisions(_ context.Context, artifactID string, keepN int) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	revs := m.revisions[artifactID]
+	if len(revs) <= keepN {
+		return 0, nil
+	}
+	removed := len(revs) - keepN
+	m.revisions[artifactID] = revs[removed:]
+	return removed, nil
+}
+
+func (m *MemoryStore) PurgeRevisions(_ context.Context, artifactID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.revisions, artifactID)
+	return nil
+}
+
+func copyExtra(src map[string]any) map[string]any {
+	if src == nil {
+		return nil
+	}
+	dst := make(map[string]any, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func artifactContentEqual(a, b *Artifact) bool {
+	if a.Title != b.Title {
+		return false
+	}
+	if a.Goal() != b.Goal() {
+		return false
+	}
+	if !stringSliceEqual(a.Labels, b.Labels) {
+		return false
+	}
+	if len(a.Sections) != len(b.Sections) {
+		return false
+	}
+	for i := range a.Sections {
+		if a.Sections[i].Name != b.Sections[i].Name || a.Sections[i].Text != b.Sections[i].Text {
+			return false
+		}
+	}
+	if len(a.Annotations) != len(b.Annotations) {
+		return false
+	}
+	for i := range a.Annotations {
+		if a.Annotations[i] != b.Annotations[i] {
+			return false
+		}
+	}
+	if len(a.Extra) != len(b.Extra) {
+		return false
+	}
+	for k, va := range a.Extra {
+		if vb, ok := b.Extra[k]; !ok || fmt.Sprintf("%v", va) != fmt.Sprintf("%v", vb) {
+			return false
+		}
+	}
+	return true
+}
+
+func stringSliceEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

@@ -65,10 +65,13 @@ func rebuildFTS5(db *sql.DB) error {
 }
 
 func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
+	writeStart := time.Now()
+	defer func() { s.tripwire.recordWrite(time.Since(writeStart)) }()
+
 	if art.ID == "" {
 		return fmt.Errorf("artifact ID is required") //nolint:err113 // sentinel; no runtime values
 	}
-	now := time.Now().UTC()
+	now := writeStart.UTC()
 	if art.CreatedAt.IsZero() {
 		art.CreatedAt = now
 	}
@@ -135,12 +138,15 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 // artifacts do not abort the batch. FTS5 and label junction are maintained.
 // reconcileEdgesSQL is skipped — callers emit edges via AddEdge separately.
 func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { //nolint:gocyclo,funlen // batch path mirrors Put complexity
+	writeStart := time.Now()
+	defer func() { s.tripwire.recordWrite(time.Since(writeStart)) }()
+
 	errs := make([]error, len(arts))
 	if len(arts) == 0 {
 		return errs
 	}
 
-	now := time.Now().UTC()
+	now := writeStart.UTC()
 	tx, err := s.writer.BeginTx(ctx, nil)
 	if err != nil {
 		for i := range errs {

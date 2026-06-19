@@ -158,6 +158,7 @@ type SQLiteStore struct {
 	stopWAL    context.CancelFunc
 	walStopped sync.WaitGroup
 	vecTables  sync.Map // model → struct{}{}; tracks which vec0 virtual tables exist
+	tripwire   writeTripwire
 }
 
 // Writer returns the writer connection for operations like WAL checkpoint.
@@ -240,11 +241,16 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 		defer st.walStopped.Done()
 		ticker := time.NewTicker(60 * time.Second)
 		defer ticker.Stop()
+		var scaleCheckCount int
 		for {
 			select {
 			case <-ticker.C:
 				if _, err := writer.ExecContext(walCtx, "PRAGMA wal_checkpoint(PASSIVE)"); err != nil {
 					log.DebugContext(walCtx, "WAL checkpoint failed", slog.Any(LogKeyError, err))
+				}
+				scaleCheckCount++
+				if scaleCheckCount%5 == 0 {
+					checkScaleTripwires(walCtx, reader, path)
 				}
 			case <-walCtx.Done():
 				return

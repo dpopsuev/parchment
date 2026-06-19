@@ -10,7 +10,7 @@ spec:
     defaultStatus: work.draft
     transitions:
       - from: work.draft
-        to: [work.active, cancelled]
+        to: [work.active, work.complete, cancelled]
       - from: work.active
         to: [work.complete, work.draft, cancelled]
       - from: work.blocked
@@ -29,7 +29,7 @@ spec:
     could: [current_architecture, desired_architecture]
   requiredFields: [priority]
   relations:
-    outgoing: [implements, depends_on, satisfies]
+    outgoing: [implements, depends_on, satisfies, cites]
     targets:
       implements: [intent.spec, intent.bug]
       satisfies: [support.template]

@@ -106,13 +106,13 @@ func TestTransition_InvalidTransitionBlocked(t *testing.T) {
 		Sections: []parchment.Section{{Name: "context", Text: "c"}},
 		Labels: []string{"kind:effort.task", "priority:medium"},})
 
-	// work.draft → work.complete should be blocked (must go through work.active).
-	results, err := proto.SetField(ctx, []string{art.ID}, "status", "work.complete", parchment.SetFieldOptions{})
+	// work.draft → retired should be blocked (not in transition map).
+	results, err := proto.SetField(ctx, []string{art.ID}, "status", "retired", parchment.SetFieldOptions{})
 	if err != nil {
 		t.Fatalf("SetField error: %v", err)
 	}
 	if len(results) == 0 || results[0].OK {
-		t.Fatal("expected work.draft→work.complete to be blocked by transition map")
+		t.Fatal("expected work.draft→retired to be blocked by transition map")
 	}
 
 	got, _ := store.Get(ctx, art.ID)

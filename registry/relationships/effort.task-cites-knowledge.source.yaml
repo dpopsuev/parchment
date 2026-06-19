@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: task-cites-source
+spec:
+  from: kind:effort.task
+  relation: cites
+  to: kind:knowledge.source

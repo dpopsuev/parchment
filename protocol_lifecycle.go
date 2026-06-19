@@ -43,6 +43,7 @@ func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 {
 	}
 
 	// 2. Children: ratio of terminal to total
+	childComp := -1.0
 	children, err := p.store.Children(ctx, art.ID)
 	if err == nil && len(children) > 0 {
 		done := 0
@@ -51,7 +52,8 @@ func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 {
 				done++
 			}
 		}
-		comps = append(comps, component{float64(done) / float64(len(children)), 0.4})
+		childComp = float64(done) / float64(len(children))
+		comps = append(comps, component{childComp, 0.4})
 	}
 
 	// 3. Sections: filled should-sections
@@ -76,7 +78,6 @@ func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 {
 		return 0.0
 	}
 
-	// Normalize weights and compute
 	var totalWeight float64
 	for _, c := range comps {
 		totalWeight += c.weight
@@ -84,6 +85,12 @@ func (p *Protocol) CompletionScore(ctx context.Context, art *Artifact) float64 {
 	var score float64
 	for _, c := range comps {
 		score += c.score * (c.weight / totalWeight)
+	}
+
+	// Container kinds: child completion is authoritative — if all children
+	// are terminal, score at least the child ratio even if sections are sparse.
+	if childComp >= 0 && childComp > score {
+		score = childComp
 	}
 	return score
 }

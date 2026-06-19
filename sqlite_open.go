@@ -441,6 +441,12 @@ func runSchemaEvolutions(db *sql.DB) { //nolint:cyclop,gocyclo // linear DDL seq
 			  AND revision <= (SELECT MAX(revision) - 50 FROM artifact_revisions WHERE artifact_id = OLD.id);
 		END`)
 
+	// v5.x: partial indexes for active-artifact hot path.
+	exec(`CREATE INDEX IF NOT EXISTS idx_art_active
+		ON artifacts(kind, scope) WHERE status NOT IN ('status:archived', 'status:retired')`)
+	exec(`CREATE INDEX IF NOT EXISTS idx_art_active_updated
+		ON artifacts(updated_at) WHERE status NOT IN ('status:archived', 'status:retired')`)
+
 	// Capture final state before DELETE (audit trail).
 	exec(`CREATE TRIGGER IF NOT EXISTS trg_artifact_revision_on_delete
 		BEFORE DELETE ON artifacts
@@ -480,4 +486,10 @@ func (s *SQLiteStore) DBSizeBytes(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 	return pageCount * pageSize, nil
+}
+
+// IncrementalVacuum reclaims free pages without rewriting the entire DB.
+func (s *SQLiteStore) IncrementalVacuum(ctx context.Context) error {
+	_, err := s.writer.ExecContext(ctx, "PRAGMA incremental_vacuum")
+	return err
 }

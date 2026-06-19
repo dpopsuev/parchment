@@ -167,6 +167,11 @@ type DBSizer interface {
 	DBSizeBytes(ctx context.Context) (int64, error)
 }
 
+// Compactor is an optional interface for stores that can reclaim unused space.
+type Compactor interface {
+	IncrementalVacuum(ctx context.Context) error
+}
+
 // MigrationStore is an optional interface for stores that support migration tracking.
 // Stores that do not implement it (e.g. MemoryStore) run migrations but do not
 // persist the applied set — every run re-executes all migrations (acceptable for tests).

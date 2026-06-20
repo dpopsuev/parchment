@@ -61,7 +61,26 @@ func (p *Protocol) ValidChild(parentKind, childKind string) (string, bool) {
 	if p.isEdgeAllowed([]string{LabelPrefixKind + parentKind}, RelParentOf, []string{LabelPrefixKind + childKind}) {
 		return "", true
 	}
-	return parentKind + " does not allow child of kind " + childKind, false
+	valid := p.ValidRelationsFor(parentKind)
+	var alts []string
+	for _, r := range valid {
+		if r.Relation != RelParentOf {
+			alts = append(alts, r.Relation)
+		}
+	}
+	msg := parentKind + " does not allow child of kind " + childKind
+	if len(alts) > 0 {
+		seen := make(map[string]bool)
+		unique := alts[:0]
+		for _, a := range alts {
+			if !seen[a] {
+				seen[a] = true
+				unique = append(unique, a)
+			}
+		}
+		msg += "; try: " + strings.Join(unique, ", ") + ", or use knowledge.context as a container"
+	}
+	return msg, false
 }
 
 // MustSections returns sections required at creation time for the kind.
@@ -290,8 +309,8 @@ func (p *Protocol) isEdgeAllowedErr(sourceLabels []string, relation string, targ
 			deduped = append(deduped, n)
 		}
 	}
-	return fmt.Errorf("%s→%s is not a valid %s relation; valid for %s: %s", //nolint:err113 // domain constraint
-		srcKind, tgtKind, relation, srcKind, strings.Join(deduped, ", "))
+	return fmt.Errorf("%s→%s is not a valid %s relation; valid for %s: %s. Use schema(kind=%s) for full relation details", //nolint:err113 // domain constraint
+		srcKind, tgtKind, relation, srcKind, strings.Join(deduped, ", "), srcKind)
 }
 
 // isCycleGuarded returns true if any Relationship for this source+relation has CycleGuard set.

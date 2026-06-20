@@ -1,0 +1,30 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.code.file
+spec:
+  prefix: FIL
+  code: fil
+  children: []
+  lifecycle:
+    defaultStatus: code.indexed
+    transitions:
+      - from: code.indexed
+        to: [code.current, code.stale]
+      - from: code.current
+        to: [code.stale, code.outdated]
+      - from: code.stale
+        to: [code.current, code.outdated]
+      - from: code.outdated
+        to: []
+  sections:
+    should: [imports]
+  whenToCreate: |
+    Create a code-file artifact as a pointer to a source file on disk.
+    Files link upward to components via contains edges and downward
+    to symbols via contains edges. No file contents are stored.
+  agentNote: |
+    File artifacts are navigation pointers, not content stores. Use the
+    extra.path field to locate the file on disk. The extra.lines field
+    gives a size hint. Symbols within the file carry file:line pointers
+    for precise navigation.

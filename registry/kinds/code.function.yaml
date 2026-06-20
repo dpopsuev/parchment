@@ -1,0 +1,28 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.code.function
+spec:
+  prefix: FUN
+  code: fun
+  children: []
+  lifecycle:
+    defaultStatus: code.indexed
+    transitions:
+      - from: code.indexed
+        to: [code.current, code.stale]
+      - from: code.current
+        to: [code.stale, code.outdated]
+      - from: code.stale
+        to: [code.current, code.outdated]
+      - from: code.outdated
+        to: []
+  sections:
+    should: [signature]
+  whenToCreate: |
+    Create a code-function artifact for a package-level function (not a method).
+    Use calls edges to link to other functions/methods it invokes.
+  agentNote: |
+    Functions are standalone callable symbols. A code:function with high fan-out
+    (many outgoing calls edges) may be a facade or orchestrator. Functions with
+    no incoming calls edges may be dead code or entry points.

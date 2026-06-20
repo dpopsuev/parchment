@@ -1,0 +1,29 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.code.struct
+spec:
+  prefix: STR
+  code: str
+  children: []
+  lifecycle:
+    defaultStatus: code.indexed
+    transitions:
+      - from: code.indexed
+        to: [code.current, code.stale]
+      - from: code.current
+        to: [code.stale, code.outdated]
+      - from: code.stale
+        to: [code.current, code.outdated]
+      - from: code.outdated
+        to: []
+  sections:
+    should: [fields]
+  whenToCreate: |
+    Create a code-struct artifact for a Go struct, Rust struct, TypeScript class,
+    or Python dataclass. Use embeds edges for embedded types, field_ref edges for
+    field type references, and implements edges for interface satisfaction.
+  agentNote: |
+    Structs are concrete types. A code:struct implementing an interface carries
+    an implements edge to the code:interface artifact. Embedding is captured via
+    embeds edges. Field type references via field_ref edges.

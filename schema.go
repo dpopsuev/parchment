@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // Schema holds the global vocabulary: registered relations and priority levels.
@@ -111,18 +112,41 @@ func (s *Schema) MergeDefaults(defaults *Schema) {
 // DefaultSchema returns the global vocabulary schema.
 // Kind-level data (transitions, sections, flags) is owned by LabelTrait and
 // seeded from registry/kinds/*.yaml via SeedLabelTraits.
+//
+// The relation vocabulary is derived entirely from registry/relationships/*.yaml.
+// To register a new relation, add a relationship YAML file — no Go code changes
+// required. This keeps Parchment domain-agnostic: it provides graph primitives,
+// not domain vocabulary.
 func DefaultSchema() *Schema {
 	return &Schema{
-		Relations: []string{
-			RelParentOf, RelDependsOn, RelFollows, RelJustifies,
-			RelImplements, RelDocuments, RelSatisfies,
-			RelCites, RelElaborates, RelContradicts, RelSynthesises, RelRemembers,
-			RelExplains, RelCauses, RelResolves, RelEvidencedBy,
-			RelBlocks, RelDuplicates, RelRelatesTo, RelClones, RelMentions, RelTestedBy, RelSupersedes,
-		},
+		Relations:       registryRelations(),
 		Priorities:      []string{"critical", "high", "medium", "low", "none"},
 		DefaultPriority: "medium",
 	}
+}
+
+var (
+	registryRelOnce  sync.Once
+	registryRelCache []string
+)
+
+// registryRelations returns unique relation names declared in
+// registry/relationships/*.yaml. Computed once and cached.
+func registryRelations() []string {
+	registryRelOnce.Do(func() {
+		seen := make(map[string]bool)
+		for _, r := range loadRegistryRelationships() {
+			if r.Relation != "" && r.Relation != "*" {
+				seen[r.Relation] = true
+			}
+		}
+		registryRelCache = make([]string, 0, len(seen))
+		for rel := range seen {
+			registryRelCache = append(registryRelCache, rel)
+		}
+		sort.Strings(registryRelCache)
+	})
+	return registryRelCache
 }
 
 // KnowledgeSchema is an alias for DefaultSchema.

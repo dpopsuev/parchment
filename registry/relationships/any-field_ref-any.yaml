@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: any-field_ref-any
+spec:
+  from: "*"
+  relation: field_ref
+  to: "*"

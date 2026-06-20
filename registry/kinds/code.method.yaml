@@ -1,0 +1,29 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.code.method
+spec:
+  prefix: MTD
+  code: mtd
+  children: []
+  lifecycle:
+    defaultStatus: code.indexed
+    transitions:
+      - from: code.indexed
+        to: [code.current, code.stale]
+      - from: code.current
+        to: [code.stale, code.outdated]
+      - from: code.stale
+        to: [code.current, code.outdated]
+      - from: code.outdated
+        to: []
+  sections:
+    should: [signature]
+  whenToCreate: |
+    Create a code-method artifact for a method bound to a receiver type.
+    Use calls edges for invocations and implements edges when the method
+    satisfies an interface contract.
+  agentNote: |
+    Methods belong to a receiver type. The receiver is captured in the symbol
+    FQN as Type.Method. An implements edge from a code:method to a
+    code:interface signals interface satisfaction at method granularity.

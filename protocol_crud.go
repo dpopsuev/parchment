@@ -227,6 +227,9 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		_ = p.store.AddEdge(ctx, Edge{From: in.Parent, To: art.ID, Relation: RelParentOf})
 	}
 	for _, dep := range in.DependsOn {
+		if _, err := p.store.Get(ctx, dep); err != nil {
+			return nil, fmt.Errorf("depends_on target %q not found", dep) //nolint:err113 // agent-facing
+		}
 		_ = p.store.AddEdge(ctx, Edge{From: art.ID, To: dep, Relation: RelDependsOn})
 	}
 	for rel, targets := range in.Links {
@@ -762,6 +765,9 @@ func (p *Protocol) UpsertArtifact(ctx context.Context, in CreateInput) (UpsertRe
 		_ = p.store.AddEdge(ctx, Edge{From: in.Parent, To: existing.ID, Relation: RelParentOf})
 	}
 	for _, dep := range in.DependsOn {
+		if _, err := p.store.Get(ctx, dep); err != nil {
+			return UpsertResult{}, fmt.Errorf("depends_on target %q not found", dep) //nolint:err113 // agent-facing
+		}
 		_ = p.store.AddEdge(ctx, Edge{From: existing.ID, To: dep, Relation: RelDependsOn})
 	}
 	for rel, targets := range in.Links {

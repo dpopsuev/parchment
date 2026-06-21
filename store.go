@@ -112,6 +112,10 @@ type GraphStore interface {
 	Neighbors(ctx context.Context, id, rel string, dir Direction) ([]Edge, error)
 	Walk(ctx context.Context, root string, rel string, dir Direction, maxDepth int, fn WalkFn) error
 	ListEdges(ctx context.Context, ids, relations []string) ([]Edge, error)
+	// ListEdgesFrom returns edges whose from_id is in fromIDs, optionally
+	// filtered by relation. Unlike ListEdges, it does NOT filter to_id,
+	// allowing the caller to batch from_id and filter to_id in memory.
+	ListEdgesFrom(ctx context.Context, fromIDs, relations []string) ([]Edge, error)
 	// ScopeGraph returns artifact counts per scope and cross-scope edge weights.
 	// Used by the graph UI — computed in SQL, not assembled in Go.
 	ScopeGraph(ctx context.Context) ([]ScopeCount, []ScopeEdgeWeight, error)

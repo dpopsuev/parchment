@@ -248,6 +248,45 @@ func (s *SQLiteStore) ListEdges(ctx context.Context, ids, relations []string) ([
 	return edges, nil
 }
 
+// ListEdgesFrom returns edges whose from_id is in fromIDs, optionally
+// filtered by relation. Does NOT filter to_id — callers batch from_id
+// and check to_id membership in memory to avoid O(N²) bind params.
+func (s *SQLiteStore) ListEdgesFrom(ctx context.Context, fromIDs, relations []string) ([]Edge, error) {
+	if len(fromIDs) == 0 {
+		return nil, nil
+	}
+	placeholders := make([]string, len(fromIDs))
+	args := make([]any, len(fromIDs))
+	for i, id := range fromIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	q := "SELECT from_id, relation, to_id, weight, sources FROM edges WHERE from_id IN (" + strings.Join(placeholders, ",") + ")" //nolint:gosec // G202: placeholders are "?", not user data
+	if len(relations) > 0 {
+		rph := make([]string, len(relations))
+		for i, r := range relations {
+			rph[i] = "?"
+			args = append(args, r)
+		}
+		q += " AND relation IN (" + strings.Join(rph, ",") + ")"
+	}
+	rows, err := s.reader.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
+	var edges []Edge
+	for rows.Next() {
+		var e Edge
+		var srcsJSON string
+		if err := rows.Scan(&e.From, &e.Relation, &e.To, &e.Weight, &srcsJSON); err == nil {
+			_ = json.Unmarshal([]byte(srcsJSON), &e.Sources)
+			edges = append(edges, e)
+		}
+	}
+	return edges, nil
+}
+
 func (s *SQLiteStore) ScopeGraph(ctx context.Context) ([]ScopeCount, []ScopeEdgeWeight, error) {
 	rows, err := s.reader.QueryContext(ctx,
 		`SELECT scope, COUNT(*) FROM artifacts

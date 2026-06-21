@@ -483,6 +483,33 @@ func (m *MemoryStore) ListEdges(_ context.Context, ids, relations []string) ([]E
 	return result, nil
 }
 
+func (m *MemoryStore) ListEdgesFrom(_ context.Context, fromIDs, relations []string) ([]Edge, error) {
+	if len(fromIDs) == 0 {
+		return nil, nil
+	}
+	fromSet := make(map[string]bool, len(fromIDs))
+	for _, id := range fromIDs {
+		fromSet[id] = true
+	}
+	relSet := make(map[string]bool, len(relations))
+	for _, r := range relations {
+		relSet[r] = true
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var result []Edge
+	for _, e := range m.edges {
+		if !fromSet[e.From] {
+			continue
+		}
+		if len(relSet) > 0 && !relSet[e.Relation] {
+			continue
+		}
+		result = append(result, e)
+	}
+	return result, nil
+}
+
 func (m *MemoryStore) Walk(_ context.Context, root, rel string, dir Direction, maxDepth int, fn WalkFn) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

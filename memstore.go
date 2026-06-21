@@ -201,6 +201,10 @@ func (m *MemoryStore) List(_ context.Context, f Filter) ([]*Artifact, error) { /
 	return result, nil
 }
 
+func (m *MemoryStore) ListGraphNodes(ctx context.Context, f Filter) ([]*Artifact, error) { //nolint:gocritic // value semantics intentional
+	return m.List(ctx, f)
+}
+
 func (m *MemoryStore) Children(_ context.Context, parentID string) ([]*Artifact, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

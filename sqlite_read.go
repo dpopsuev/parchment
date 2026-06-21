@@ -3,6 +3,7 @@ package parchment
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -238,6 +239,39 @@ func (s *SQLiteStore) List(ctx context.Context, f Filter) ([]*Artifact, error) {
 			continue
 		}
 		results = append(results, art)
+	}
+	return results, rows.Err()
+}
+
+const graphNodeColumns = `id, title, labels, extra`
+
+// ListGraphNodes returns artifacts with only id, title, labels, and extra
+// populated. Skips sections, annotations, and other columns to reduce
+// deserialization overhead for graph building.
+func (s *SQLiteStore) ListGraphNodes(ctx context.Context, f Filter) ([]*Artifact, error) { //nolint:gocritic // hugeParam: value semantics intentional
+	clauses, args := buildWhereClause(f)
+	q := "SELECT " + graphNodeColumns + " FROM artifacts"
+	if len(clauses) > 0 {
+		q += " WHERE " + strings.Join(clauses, " AND ") //nolint:gosec // G202: clauses are hardcoded predicate strings with ? placeholders
+	}
+	q += " ORDER BY id"
+
+	rows, err := s.reader.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
+
+	var results []*Artifact
+	for rows.Next() {
+		var art Artifact
+		var labelsJSON, extraJSON string
+		if err := rows.Scan(&art.ID, &art.Title, &labelsJSON, &extraJSON); err != nil {
+			continue
+		}
+		_ = json.Unmarshal([]byte(labelsJSON), &art.Labels)
+		_ = json.Unmarshal([]byte(extraJSON), &art.Extra)
+		results = append(results, &art)
 	}
 	return results, rows.Err()
 }

@@ -394,6 +394,27 @@ func (p *Protocol) ListArtifacts(ctx context.Context, in ListInput) ([]*Artifact
 	return filterByTitleContains(arts, in.TitleContains), nil
 }
 
+// ListGraphNodes returns lightweight artifact stubs (id, title, labels, extra
+// only) matching the same filters as ListArtifacts. Skips sections and annotations
+// deserialization for graph-building performance.
+func (p *Protocol) ListGraphNodes(ctx context.Context, in ListInput) ([]*Artifact, error) { //nolint:gocritic // hugeParam: value semantics match ListArtifacts
+	f := Filter{
+		KindPrefix:    in.KindPrefix,
+		IDPrefix:      in.IDPrefix,
+		Labels:        in.Labels,
+		LabelsOr:      in.LabelsOr,
+		ExcludeLabels: append(in.ExcludeLabels, LabelPrefixScope+SchemaScope),
+	}
+	if labelValue(f.Labels, LabelPrefixScope) == "" && len(p.scopeLabels) > 0 {
+		rawScopes := make([]string, len(p.scopeLabels))
+		for i, sl := range p.scopeLabels {
+			rawScopes[i] = strings.TrimPrefix(sl, LabelPrefixScope)
+		}
+		f.ScopesOr = rawScopes
+	}
+	return p.store.ListGraphNodes(ctx, f)
+}
+
 // ListPage returns a cursor-paginated page of artifacts. It applies the same
 // scope defaults and filter resolution as ListArtifacts. Limit=0 with no Cursor
 // returns all artifacts in one page (backward-compatible with ListArtifacts).

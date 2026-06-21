@@ -39,6 +39,10 @@ type ArtifactStore interface {
 	GetByAlias(ctx context.Context, alias string) (*Artifact, error)
 	Delete(ctx context.Context, id string) error
 	List(ctx context.Context, f Filter) ([]*Artifact, error)
+	// ListGraphNodes returns artifacts with only id, title, labels, and extra
+	// populated — skipping sections, annotations, and other heavy JSON columns.
+	// Intended for graph building where full artifact content is not needed.
+	ListGraphNodes(ctx context.Context, f Filter) ([]*Artifact, error)
 	// ListPage returns a single page of artifacts using cursor-based pagination.
 	// Filter.Cursor and Filter.Limit control the page. Filter.Limit=0 with no
 	// Cursor falls back to returning all results (same as List). The returned

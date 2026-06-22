@@ -57,6 +57,7 @@ type Protocol struct {
 	store            Store
 	schema           *Schema
 	registry         *ComponentRegistry    // reloadable trait + rule store (Step 9)
+	pluginReg        *PluginRegistry       // domain plugin dispatch
 	traits           *TraitStore           // deprecated: use registry.Traits()
 	labelTraits      map[string]LabelTrait // deprecated: use registry.Traits().LabelMap()
 	relationships    []RelationshipTrait   // first-class edge permission model
@@ -81,7 +82,7 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 	for i, sc := range scopes {
 		scopeLabels[i] = LabelPrefixScope + sc
 	}
-	p := &Protocol{store: s, schema: schema, scopeLabels: scopeLabels}
+	p := &Protocol{store: s, schema: schema, scopeLabels: scopeLabels, pluginReg: newPluginRegistry()}
 	if s != nil {
 		SeedLabelTraits(context.Background(), s)
 		SeedRules(context.Background(), s)
@@ -107,6 +108,8 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 		p.rules = rules
 		// ComponentRegistry wraps the trait store and rules for hot-reload (Step 9).
 		p.registry = newComponentRegistry(s, p.traits, p.rules)
+		p.pluginReg = newPluginRegistry()
+		p.pluginReg.Register(newCorePlugin(p))
 	}
 	p.mutableCreatedAt = idc.MutableCreatedAt
 	if idc.Defaults != nil {
@@ -123,8 +126,9 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 	return p
 }
 
-func (p *Protocol) Schema() *Schema { return p.schema }
-func (p *Protocol) Store() Store    { return p.store }
+func (p *Protocol) Schema() *Schema          { return p.schema }
+func (p *Protocol) Store() Store              { return p.store }
+func (p *Protocol) RegisterPlugin(pl Plugin)  { p.pluginReg.Register(pl) }
 
 // LabelTrait returns the merged trait profile for the given label set.
 func (p *Protocol) LabelTrait(labels []string) LabelTrait {

@@ -397,16 +397,7 @@ func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status str
 	if len(followsWarnings) > 0 {
 		info = append(info, fmt.Sprintf("warning: activating before followed artifacts complete: %s", strings.Join(followsWarnings, ", ")))
 	}
-	if p.IsTerminal(status) {
-		if extra := p.autoCompleteParent(ctx, art); extra != "" {
-			info = append(info, extra)
-		}
-	}
-	if p.IsTerminal(status) {
-		if extra := p.completionRollup(ctx, art); extra != "" {
-			info = append(info, extra)
-		}
-	}
+	info = append(info, p.pluginReg.RunReconcilers(ctx, art, oldStatus, status)...)
 	if len(info) > 0 {
 		r.Error = strings.Join(info, "\n")
 	}

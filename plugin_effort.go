@@ -55,6 +55,20 @@ func (ep *effortPlugin) CheckViolations(_ context.Context, scope CheckScope) []C
 	return violations
 }
 
+func (ep *effortPlugin) AfterTransition(ctx context.Context, art *Artifact, _, newStatus string) []string {
+	if !ep.proto.IsTerminal(newStatus) {
+		return nil
+	}
+	var msgs []string
+	if extra := ep.proto.autoCompleteParent(ctx, art); extra != "" {
+		msgs = append(msgs, extra)
+	}
+	if extra := ep.proto.completionRollup(ctx, art); extra != "" {
+		msgs = append(msgs, extra)
+	}
+	return msgs
+}
+
 func (ep *effortPlugin) EvaluateCheck(ctx context.Context, rule *RuleDef, art *Artifact) *RuleResult {
 	switch rule.Check {
 	case CheckChildrenComplete:

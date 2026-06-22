@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -119,6 +120,27 @@ func ParseMDFile(path string) (*Artifact, error) { //nolint:gosec,gocyclo,cyclop
 							art.Labels = append(art.Labels, l)
 						}
 					}
+				case "tags":
+					val = strings.Trim(val, "[]")
+					for _, t := range strings.Split(val, ",") {
+						if t = strings.TrimSpace(strings.Trim(t, `"'`)); t != "" {
+							art.Labels = appendIfMissing(art.Labels, t)
+						}
+					}
+				case "aliases":
+					val = strings.Trim(val, "[]")
+					var aliases []string
+					for _, a := range strings.Split(val, ",") {
+						if a = strings.TrimSpace(strings.Trim(a, `"'`)); a != "" {
+							aliases = append(aliases, a)
+						}
+					}
+					if len(aliases) > 0 {
+						if art.Extra == nil {
+							art.Extra = make(map[string]any)
+						}
+						art.Extra["aliases"] = aliases
+					}
 			}
 			}
 		}
@@ -142,7 +164,18 @@ func ParseMDFile(path string) (*Artifact, error) { //nolint:gosec,gocyclo,cyclop
 			}
 			currentSection = strings.ToLower(strings.ReplaceAll(strings.TrimPrefix(line, "## "), " ", "_"))
 			currentText.Reset()
-		} else if currentSection != "" {
+			continue
+		}
+		if m := dataviewFieldRe.FindStringSubmatch(line); m != nil {
+			if art.Extra == nil {
+				art.Extra = make(map[string]any)
+			}
+			art.Extra[m[1]] = strings.TrimSpace(m[2])
+		}
+		for _, m := range hashTagRe.FindAllStringSubmatch(line, -1) {
+			art.Labels = appendIfMissing(art.Labels, m[1])
+		}
+		if currentSection != "" {
 			currentText.WriteString(line)
 			currentText.WriteString("\n")
 		}
@@ -155,6 +188,18 @@ func ParseMDFile(path string) (*Artifact, error) { //nolint:gosec,gocyclo,cyclop
 	}
 
 	return art, nil
+}
+
+var dataviewFieldRe = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*):: (.+)$`)
+var hashTagRe = regexp.MustCompile(`(?:^|\s)#([A-Za-z][A-Za-z0-9_/-]+)`)
+
+func appendIfMissing(labels []string, label string) []string {
+	for _, l := range labels {
+		if l == label {
+			return labels
+		}
+	}
+	return append(labels, label)
 }
 
 // parseTemplateFile wraps ParseMDFile for backward compatibility within seed.go.

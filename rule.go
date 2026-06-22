@@ -267,28 +267,10 @@ func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResul
 			msg := rule.Message + " (expected: " + strings.Join(mustMissing, ", ") + ")"
 			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: msg}
 		}
-	case CheckChildrenComplete:
-		if err := p.guardChildrenComplete(context.Background(), art); err != nil {
-			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: rule.Message + ": " + err.Error()}
-		}
 	case CheckDependsOnComplete:
 		if err := p.guardDependsOnComplete(context.Background(), art); err != nil {
 			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: rule.Message + ": " + err.Error()}
 		}
-	case CheckWorkerIDRequired:
-		if art.Extra == nil {
-			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: rule.Message}
-		}
-		if _, ok := art.Extra["worker_id"]; !ok {
-			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: rule.Message}
-		}
-	case CheckStampsRequired:
-		for _, sec := range art.Sections {
-			if sec.Name == "stamps" {
-				return nil
-			}
-		}
-		return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: rule.Message}
 	default:
 		return p.pluginReg.RunRuleHandler(context.Background(), rule, art)
 	}

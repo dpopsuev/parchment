@@ -10,7 +10,6 @@ import (
 	"slices"
 	"sort"
 	"strings"
-	"time"
 )
 
 type BulkMutationInput struct {
@@ -407,7 +406,7 @@ type CheckReport struct {
 }
 
 // Check walks all artifacts and validates each against the resolved schema.
-func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error) { //nolint:gocyclo,funlen // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol.go
+func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error) {
 	f := Filter{ExcludeLabels: []string{LabelPrefixScope + SchemaScope}}
 	if scope != "" {
 		f.Labels = append(f.Labels, LabelPrefixScope+scope)
@@ -429,217 +428,24 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 		checkIDs[i] = a.ID
 	}
 	checkEdges, _ := p.store.ListEdges(ctx, checkIDs, nil)
-	checkOutgoing := make(map[string][]Edge, len(checkIDs))
-	checkIncoming := make(map[string][]Edge, len(checkIDs))
+	outgoing := make(map[string][]Edge, len(checkIDs))
+	incoming := make(map[string][]Edge, len(checkIDs))
 	for _, e := range checkEdges {
-		checkOutgoing[e.From] = append(checkOutgoing[e.From], e)
-		checkIncoming[e.To] = append(checkIncoming[e.To], e)
+		outgoing[e.From] = append(outgoing[e.From], e)
+		incoming[e.To] = append(incoming[e.To], e)
 	}
-	checkArtByID := make(map[string]*Artifact, len(arts))
+	artByID := make(map[string]*Artifact, len(arts))
 	for _, a := range arts {
-		checkArtByID[a.ID] = a
+		artByID[a.ID] = a
 	}
 
 	report := &CheckReport{TotalScanned: len(arts)}
-
-	for _, art := range arts {
-		if !p.IsKnownKind(labelValue(art.Labels, LabelPrefixKind)) {
-			report.Violations = append(report.Violations, CheckViolation{
-				ID: art.ID, Labels: art.Labels, Title: art.Title,
-				Category: "unknown_kind",
-				Detail:   fmt.Sprintf("kind %q not registered", labelValue(art.Labels, LabelPrefixKind)),
-			})
-			continue
-		}
-
-		parentEdges, _ := p.store.Neighbors(ctx, art.ID, RelParentOf, Incoming)
-		if len(parentEdges) > 0 {
-			parent, err := p.store.Get(ctx, parentEdges[0].From)
-			if err == nil {
-				if reason, ok := p.ValidChild(labelValue(parent.Labels, LabelPrefixKind), labelValue(art.Labels, LabelPrefixKind)); !ok {
-					report.Violations = append(report.Violations, CheckViolation{
-						ID: art.ID, Labels: art.Labels, Title: art.Title,
-						Category: "invalid_parent",
-						Detail:   reason,
-					})
-				}
-			}
-		}
-
-		for _, e := range checkOutgoing[art.ID] {
-			if e.Relation == RelParentOf {
-				continue
-			}
-			target, err := p.store.Get(ctx, e.To)
-			if err != nil {
-				continue
-			}
-			if !p.isEdgeAllowed(art.Labels, e.Relation, target.Labels) {
-				report.Violations = append(report.Violations, CheckViolation{
-					ID: art.ID, Labels: art.Labels, Title: art.Title,
-					Category: "invalid_relation",
-					Detail:   fmt.Sprintf("edge %s→%s(%s) is not a registered relationship", art.ID, e.To, e.Relation),
-				})
-			}
-		}
-
-	}
-
-	// Plugin-contributed violations (e.g. missing_template_section from templatePlugin).
-	report.Violations = append(report.Violations, p.pluginReg.RunCheckers(ctx, CheckScope{
+	report.Violations = p.pluginReg.RunCheckers(ctx, CheckScope{
 		Arts:     arts,
-		ArtByID:  checkArtByID,
-		Outgoing: checkOutgoing,
-		Incoming: checkIncoming,
-	})...)
-
-	// --- Additional detection categories ---
-
-	// Circular parent chains
-	for _, art := range arts {
-		visited := map[string]bool{art.ID: true}
-		initEdges, _ := p.store.Neighbors(ctx, art.ID, RelParentOf, Incoming)
-		cur := ""
-		if len(initEdges) > 0 {
-			cur = initEdges[0].From
-		}
-		for cur != "" {
-			if visited[cur] {
-				report.Violations = append(report.Violations, CheckViolation{
-					ID: art.ID, Labels: art.Labels, Title: art.Title,
-					Category: "parent_cycle",
-					Detail:   fmt.Sprintf("circular parent chain detected at %s", cur),
-				})
-				break
-			}
-			visited[cur] = true
-			nextEdges, _ := p.store.Neighbors(ctx, cur, RelParentOf, Incoming)
-			if len(nextEdges) == 0 {
-				break
-			}
-			cur = nextEdges[0].From
-		}
-	}
-
-	// Stale drafts (non-terminal, not updated in 7+ days)
-	staleCutoff := time.Now().Add(-7 * 24 * time.Hour)
-	for _, art := range arts {
-		if p.IsTerminal(statusFromLabels(art.Labels)) {
-			continue
-		}
-		if !art.UpdatedAt.IsZero() && art.UpdatedAt.Before(staleCutoff) {
-			report.Violations = append(report.Violations, CheckViolation{
-				ID: art.ID, Labels: art.Labels, Title: art.Title,
-				Category: "stale_draft",
-				Detail:   fmt.Sprintf("last updated %s", art.UpdatedAt.Format("2006-01-02")),
-			})
-		}
-	}
-
-	// Blocked campaigns/goals: all children terminal but parent not terminal
-	for _, art := range arts {
-		if p.IsTerminal(statusFromLabels(art.Labels)) {
-			continue
-		}
-		if !p.IsContainerKind(labelValue(art.Labels, LabelPrefixKind)) {
-			continue
-		}
-		var children []*Artifact
-		for _, e := range checkOutgoing[art.ID] {
-			if e.Relation == RelParentOf {
-				if ch, ok := checkArtByID[e.To]; ok {
-					children = append(children, ch)
-				}
-			}
-		}
-		if len(children) == 0 {
-			continue
-		}
-		allTerminal := true
-		for _, ch := range children {
-			if !p.IsTerminal(statusFromLabels(ch.Labels)) {
-				allTerminal = false
-				break
-			}
-		}
-		if allTerminal {
-			report.Violations = append(report.Violations, CheckViolation{
-				ID: art.ID, Labels: art.Labels, Title: art.Title,
-				Category: "completable",
-				Detail:   fmt.Sprintf("all %d children are terminal but %s is %s", len(children), art.ID, statusFromLabels(art.Labels)),
-			})
-		}
-	}
-
-	// Spec/task mismatch
-	for _, art := range arts {
-		if p.IsTerminal(statusFromLabels(art.Labels)) {
-			continue
-		}
-		if p.RequiresImplementation(labelValue(art.Labels, LabelPrefixKind)) {
-			hasImpl := false
-			for _, e := range checkIncoming[art.ID] {
-				if e.Relation == RelImplements {
-					hasImpl = true
-					break
-				}
-			}
-			if !hasImpl {
-				report.Violations = append(report.Violations, CheckViolation{
-					ID: art.ID, Labels: art.Labels, Title: art.Title,
-					Category: "unimplemented_spec",
-					Detail:   fmt.Sprintf("no task implements this %s", labelValue(art.Labels, LabelPrefixKind)),
-				})
-			}
-		}
-	}
-
-	// Duplicate titles within scope+kind
-	type scopeKindTitle struct{ scope, kind, title string }
-	titleGroups := make(map[scopeKindTitle][]string)
-	titleGroupLabels := make(map[scopeKindTitle][]string)
-	for _, art := range arts {
-		if p.IsTerminal(labelValue(art.Labels, LabelPrefixStatus)) {
-			continue
-		}
-		key := scopeKindTitle{labelValue(art.Labels, LabelPrefixScope), labelValue(art.Labels, LabelPrefixKind), art.Title}
-		titleGroups[key] = append(titleGroups[key], art.ID)
-		if titleGroupLabels[key] == nil {
-			titleGroupLabels[key] = art.Labels
-		}
-	}
-	for key, ids := range titleGroups {
-		if len(ids) > 1 {
-			report.Violations = append(report.Violations, CheckViolation{
-				ID: ids[0], Labels: titleGroupLabels[key], Title: key.title,
-				Category: "duplicate_title",
-				Detail:   fmt.Sprintf("%d artifacts with identical title in scope %q: %s", len(ids), key.scope, strings.Join(ids, ", ")),
-			})
-		}
-	}
-
-	// Empty artifacts
-	for _, art := range arts {
-		if statusFromLabels(art.Labels) != "work.draft" { //nolint:goconst // status literals are vocabulary data, not compiled constants
-			continue
-		}
-		if p.SkipEmptyCheck(labelValue(art.Labels, LabelPrefixKind)) {
-			continue
-		}
-		if !p.IsKnownKind(labelValue(art.Labels, LabelPrefixKind)) {
-			continue // already flagged as unknown_kind
-		}
-		emptyParentEdges, _ := p.store.Neighbors(ctx, art.ID, RelParentOf, Incoming)
-		if art.Goal() == "" && len(art.Sections) == 0 && len(emptyParentEdges) == 0 {
-			if len(checkOutgoing[art.ID]) == 0 {
-				report.Violations = append(report.Violations, CheckViolation{
-					ID: art.ID, Labels: art.Labels, Title: art.Title,
-					Category: "empty_artifact",
-					Detail:   "no goal, no sections, no parent, no outgoing edges",
-				})
-			}
-		}
-	}
+		ArtByID:  artByID,
+		Outgoing: outgoing,
+		Incoming: incoming,
+	})
 
 	sort.Slice(report.Violations, func(i, j int) bool {
 		return report.Violations[i].ID < report.Violations[j].ID

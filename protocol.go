@@ -111,6 +111,8 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 		p.pluginReg = newPluginRegistry()
 		p.pluginReg.Register(newCorePlugin(p))
 		p.pluginReg.Register(newTemplatePlugin(p))
+		p.pluginReg.Register(newEffortPlugin(p))
+		p.pluginReg.Register(newIntentPlugin(p))
 	}
 	p.mutableCreatedAt = idc.MutableCreatedAt
 	if idc.Defaults != nil {

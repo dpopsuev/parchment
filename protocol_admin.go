@@ -483,23 +483,15 @@ func (p *Protocol) Check(ctx context.Context, scope string) (*CheckReport, error
 			}
 		}
 
-		if tpl := p.resolveTemplate(ctx, art); tpl != nil {
-			expected := templateSections(tpl)
-			have := make(map[string]bool, len(art.Sections))
-			for _, sec := range art.Sections {
-				have[sec.Name] = true
-			}
-			for secName, guidance := range expected {
-				if !have[secName] {
-					report.Violations = append(report.Violations, CheckViolation{
-						ID: art.ID, Labels: art.Labels, Title: art.Title,
-						Category: "missing_template_section",
-						Detail:   fmt.Sprintf("missing section %q required by template %s: %s", secName, tpl.ID, guidance),
-					})
-				}
-			}
-		}
 	}
+
+	// Plugin-contributed violations (e.g. missing_template_section from templatePlugin).
+	report.Violations = append(report.Violations, p.pluginReg.RunCheckers(ctx, CheckScope{
+		Arts:     arts,
+		ArtByID:  checkArtByID,
+		Outgoing: checkOutgoing,
+		Incoming: checkIncoming,
+	})...)
 
 	// --- Additional detection categories ---
 

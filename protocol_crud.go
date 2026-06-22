@@ -255,9 +255,9 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 		}
 	}
 
-	// Execute template hooks (prefix/suffix auto-generation)
-	if !skipGuards && !in.SkipHooks {
-		p.executeTemplateHooks(ctx, art)
+	// Plugin post-create hooks (template hooks, etc.)
+	if !skipGuards {
+		p.pluginReg.RunInitializers(ctx, art, in)
 	}
 
 	p.emitEvent(ctx, EventCreated, art.ID, labelValue(art.Labels, LabelPrefixScope), nil)

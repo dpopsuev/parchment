@@ -110,6 +110,7 @@ func New(s Store, schema *Schema, scopes, vocab []string, idc ProtocolConfig) *P
 		p.registry = newComponentRegistry(s, p.traits, p.rules)
 		p.pluginReg = newPluginRegistry()
 		p.pluginReg.Register(newCorePlugin(p))
+		p.pluginReg.Register(newTemplatePlugin(p))
 	}
 	p.mutableCreatedAt = idc.MutableCreatedAt
 	if idc.Defaults != nil {

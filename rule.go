@@ -267,14 +267,6 @@ func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResul
 			msg := rule.Message + " (expected: " + strings.Join(mustMissing, ", ") + ")"
 			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: msg}
 		}
-	case CheckTemplateConformancePromote:
-		if err := p.checkTemplateConformancePromote(context.Background(), art); err != nil {
-			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: err.Error()}
-		}
-	case CheckTemplateConformanceComplete:
-		if err := p.checkTemplateConformance(context.Background(), art, false); err != nil {
-			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: err.Error()}
-		}
 	case CheckChildrenComplete:
 		if err := p.guardChildrenComplete(context.Background(), art); err != nil {
 			return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: rule.Message + ": " + err.Error()}
@@ -297,8 +289,10 @@ func (p *Protocol) evaluateBuiltinCheck(rule *RuleDef, art *Artifact) *RuleResul
 			}
 		}
 		return &RuleResult{RuleID: rule.ID, Action: RuleActionBlock, Message: rule.Message}
+	default:
+		return p.pluginReg.RunRuleHandler(context.Background(), rule, art)
 	}
-	return nil // unknown or passing check
+	return nil // passing check
 }
 
 // fieldValue maps a predicate field name to its value on the artifact or context.

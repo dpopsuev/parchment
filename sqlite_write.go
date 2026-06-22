@@ -17,7 +17,10 @@ import (
 //
 // old is the pre-update snapshot (nil on insert). We delete old tokens before
 // inserting new ones so stale entries never linger.
-func syncFTSInTx(ctx context.Context, tx *sql.Tx, old, cur *Artifact) error {
+func (s *SQLiteStore) syncFTSInTx(ctx context.Context, tx *sql.Tx, old, cur *Artifact) error {
+	if !s.hasFTS5 {
+		return nil
+	}
 	var rowid int64
 	if err := tx.QueryRowContext(ctx,
 		"SELECT rowid FROM artifacts WHERE id = ?", cur.ID).Scan(&rowid); err != nil {
@@ -38,7 +41,10 @@ func syncFTSInTx(ctx context.Context, tx *sql.Tx, old, cur *Artifact) error {
 
 // deleteFTSInTx removes an artifact's tokens from the FTS5 index inside
 // the caller's DELETE transaction.
-func deleteFTSInTx(ctx context.Context, tx *sql.Tx, rowid int64, art *Artifact) {
+func (s *SQLiteStore) deleteFTSInTx(ctx context.Context, tx *sql.Tx, rowid int64, art *Artifact) {
+	if !s.hasFTS5 {
+		return
+	}
 	sectionsJSON, _ := json.Marshal(art.Sections)
 	_, _ = tx.ExecContext(ctx, // best-effort; FTS5 rebuilt on next startup if stale
 		"INSERT INTO artifacts_fts(artifacts_fts, rowid, id, title, goal, sections) VALUES ('delete', ?, ?, ?, ?, ?)",
@@ -123,7 +129,7 @@ func (s *SQLiteStore) Put(ctx context.Context, art *Artifact) error {
 	if err := syncLabelsInTx(ctx, tx, art.ID, art.Labels); err != nil {
 		slog.WarnContext(ctx, "label junction sync failed (non-fatal)", slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, err))
 	}
-	if err := syncFTSInTx(ctx, tx, old, art); err != nil {
+	if err := s.syncFTSInTx(ctx, tx, old, art); err != nil {
 		slog.WarnContext(ctx, "FTS5 sync failed (non-fatal)", slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, err))
 	}
 	return tx.Commit()
@@ -217,7 +223,7 @@ func (s *SQLiteStore) BulkPut(ctx context.Context, arts []*Artifact) []error { /
 			slog.WarnContext(ctx, "BulkPut: label sync failed (non-fatal)",
 				slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, labelErr))
 		}
-		if ftsErr := syncFTSInTx(ctx, tx, nil, art); ftsErr != nil {
+		if ftsErr := s.syncFTSInTx(ctx, tx, nil, art); ftsErr != nil {
 			slog.WarnContext(ctx, "BulkPut: FTS5 sync failed (non-fatal)",
 				slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, ftsErr))
 		}
@@ -300,7 +306,7 @@ func (s *SQLiteStore) PutIfVersion(ctx context.Context, art *Artifact, expectedU
 	if err := syncLabelsInTx(ctx, tx, art.ID, art.Labels); err != nil {
 		slog.WarnContext(ctx, "label junction sync failed (non-fatal)", slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, err))
 	}
-	if err := syncFTSInTx(ctx, tx, old, art); err != nil {
+	if err := s.syncFTSInTx(ctx, tx, old, art); err != nil {
 		slog.WarnContext(ctx, "FTS5 sync failed (non-fatal)", slog.String(LogKeyID, art.ID), slog.Any(LogKeyError, err))
 	}
 	return tx.Commit()
@@ -377,7 +383,7 @@ func (s *SQLiteStore) PatchArtifact(ctx context.Context, id string, patch Artifa
 		return fmt.Errorf("patch update %s: %w", id, err)
 	}
 
-	if err := syncFTSInTx(ctx, tx, &old, art); err != nil {
+	if err := s.syncFTSInTx(ctx, tx, &old, art); err != nil {
 		slog.WarnContext(ctx, "FTS5 sync failed (non-fatal)", slog.String(LogKeyID, id), slog.Any(LogKeyError, err))
 	}
 	return tx.Commit()

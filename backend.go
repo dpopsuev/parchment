@@ -26,7 +26,7 @@ func NewSQLiteBackend(cfg SQLiteConfig) (*SQLiteBackend, error) {
 		return nil, err
 	}
 	var snapshotter *Snapshotter
-	if cfg.Path != "" && cfg.Path != ":memory:" {
+	if cfg.Path != "" && cfg.Path != dbPathMemory {
 		snapshotBackend := NewLocalSnapshotBackend(cfg.Path, s.Writer())
 		snapshotter = NewSnapshotter(snapshotBackend, s)
 		snapshotter.AutoSnapshot(context.Background(), cfg.Snapshots)

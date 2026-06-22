@@ -38,6 +38,8 @@ const (
 	FieldLabels    = "labels"
 )
 
+const dbPathMemory = ":memory:"
+
 // Structured log keys.
 const (
 	LogKeyID       = "id"

@@ -117,3 +117,17 @@ func TestMemoryStore_MetricsContract(t *testing.T) {
 		return parchment.NewMemoryStore()
 	})
 }
+
+// TestTursoStore_MetricsContract runs the same contract against TursoStore.
+func TestTursoStore_MetricsContract(t *testing.T) {
+	metricsStoreContract(t, func(t *testing.T) parchment.MetricsStore {
+		t.Helper()
+		path := t.TempDir() + "/metrics.db"
+		s, err := parchment.OpenTursoConfig(parchment.TursoConfig{Path: path})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { s.Close() })
+		return s
+	})
+}

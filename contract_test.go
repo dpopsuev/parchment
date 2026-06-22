@@ -332,6 +332,20 @@ func TestMemoryStore_Contract(t *testing.T) {
 	})
 }
 
+// TestTursoStore_Contract runs the full Store contract against TursoStore.
+func TestTursoStore_Contract(t *testing.T) {
+	storeContract(t, func(t *testing.T) Store {
+		t.Helper()
+		path := t.TempDir() + "/contract.db"
+		s, err := OpenTursoConfig(TursoConfig{Path: path})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { s.Close() })
+		return s
+	})
+}
+
 // TestSQLiteStore_MigrationCompat verifies that a database created with the
 // old schema (without components/annotations columns) works after migration.
 // Regression test for SELECT * column ordering bug.

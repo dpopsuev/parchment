@@ -174,6 +174,9 @@ func (s *SQLiteStore) hasVecTable(model string) bool {
 }
 
 func (s *SQLiteStore) ensureVecTable(ctx context.Context, model string, dims int) error {
+	if s.driver != driverSQLite {
+		return nil
+	}
 	if _, ok := s.vecTables.Load(model); ok {
 		return nil
 	}

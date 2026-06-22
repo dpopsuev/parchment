@@ -72,13 +72,35 @@ func (s *SQLiteStore) ListAliases(ctx context.Context, artifactID string) ([]str
 }
 
 func (s *SQLiteStore) Search(ctx context.Context, query string) ([]string, error) {
+	if !s.hasFTS5 {
+		return s.searchLike(ctx, query)
+	}
 	rows, err := s.reader.QueryContext(ctx,
 		"SELECT id FROM artifacts_fts WHERE artifacts_fts MATCH ? ORDER BY rank",
 		query)
 	if err != nil {
 		return nil, fmt.Errorf("fts5 search: %w", err)
 	}
-	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed //nolint:errcheck // rows.Close only fails when already closed
+	defer rows.Close() //nolint:errcheck // rows.Close only fails when already closed
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
+
+func (s *SQLiteStore) searchLike(ctx context.Context, query string) ([]string, error) {
+	like := "%" + query + "%"
+	rows, err := s.reader.QueryContext(ctx,
+		`SELECT id FROM artifacts WHERE title LIKE ? OR goal LIKE ? OR sections LIKE ? ORDER BY updated_at DESC`,
+		like, like, like)
+	if err != nil {
+		return nil, fmt.Errorf("like search: %w", err)
+	}
+	defer rows.Close() //nolint:errcheck // best-effort close
 	var ids []string
 	for rows.Next() {
 		var id string
@@ -119,7 +141,7 @@ func (s *SQLiteStore) Delete(ctx context.Context, id string) error {
 	}
 
 	if art != nil && rowid > 0 {
-		deleteFTSInTx(ctx, tx, rowid, art)
+		s.deleteFTSInTx(ctx, tx, rowid, art)
 	}
 	return tx.Commit()
 }

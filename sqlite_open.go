@@ -14,6 +14,13 @@ import (
 	_ "modernc.org/sqlite/vec" // sqlite-vec extension for KNN vector search
 )
 
+type driverKind int
+
+const (
+	driverSQLite driverKind = iota
+	driverTurso
+)
+
 const schema = `
 CREATE TABLE IF NOT EXISTS artifacts (
 	id          TEXT PRIMARY KEY,
@@ -86,15 +93,17 @@ CREATE TABLE IF NOT EXISTS artifact_properties (
 );
 CREATE INDEX IF NOT EXISTS idx_artifact_properties_key ON artifact_properties(key, value_text);
 
+CREATE TABLE IF NOT EXISTS migrations (
+	id         TEXT PRIMARY KEY,
+	applied_at TEXT NOT NULL
+);
+`
+
+const schemaFTS5 = `
 CREATE VIRTUAL TABLE IF NOT EXISTS artifacts_fts USING fts5(
 	id, title, goal, sections,
 	content='artifacts',
 	content_rowid='rowid'
-);
-
-CREATE TABLE IF NOT EXISTS migrations (
-	id         TEXT PRIMARY KEY,
-	applied_at TEXT NOT NULL
 );
 `
 
@@ -151,10 +160,13 @@ func (c SQLiteConfig) journalMode() string {
 }
 
 // SQLiteStore implements Store on top of SQLite with WAL mode.
+// It also serves as the backing store for Turso via the driver field.
 type SQLiteStore struct {
 	writer     *sql.DB
 	reader     *sql.DB
 	dbPath     string
+	driver     driverKind
+	hasFTS5    bool
 	stopWAL    context.CancelFunc
 	walStopped sync.WaitGroup
 	vecTables  sync.Map // model → struct{}{}; tracks which vec0 virtual tables exist
@@ -202,6 +214,11 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 		slog.ErrorContext(context.Background(), "schema creation failed", slog.Any(LogKeyError, err))
 		return nil, fmt.Errorf("create schema: %w", err)
 	}
+	if _, err := writer.Exec(schemaFTS5); err != nil {
+		_ = writer.Close()
+		slog.ErrorContext(context.Background(), "FTS5 schema creation failed", slog.Any(LogKeyError, err))
+		return nil, fmt.Errorf("create FTS5 schema: %w", err)
+	}
 
 	// Pre-framework schema evolutions: idempotent DDL that extends the base
 	// schema for existing databases. All statements use IF NOT EXISTS / IF EXISTS
@@ -232,7 +249,7 @@ func OpenSQLiteConfig(cfg SQLiteConfig) (*SQLiteStore, error) {
 	log.InfoContext(context.Background(), "database opened")
 
 	walCtx, stopWAL := context.WithCancel(context.Background())
-	st := &SQLiteStore{writer: writer, reader: reader, dbPath: path, stopWAL: stopWAL}
+	st := &SQLiteStore{writer: writer, reader: reader, dbPath: path, hasFTS5: true, stopWAL: stopWAL}
 
 	// Periodic WAL checkpoint every 60s to prevent WAL contention under batch writes.
 	// The goroutine is stopped by Close() via walCtx cancellation.
@@ -468,10 +485,13 @@ func runSchemaEvolutions(db *sql.DB) { //nolint:cyclop,gocyclo // linear DDL seq
 
 
 func (s *SQLiteStore) Close() error {
-	s.stopWAL()
-	s.walStopped.Wait()
-	// Flush WAL so the -wal/-shm files are removed and temp dirs can be cleaned up.
-	_, _ = s.writer.ExecContext(context.Background(), "PRAGMA wal_checkpoint(TRUNCATE)")
+	if s.stopWAL != nil {
+		s.stopWAL()
+		s.walStopped.Wait()
+	}
+	if s.driver == driverSQLite {
+		_, _ = s.writer.ExecContext(context.Background(), "PRAGMA wal_checkpoint(TRUNCATE)")
+	}
 	_ = s.reader.Close()
 	return s.writer.Close()
 }

@@ -6,17 +6,26 @@ import (
 	"testing"
 )
 
-func benchStore(b *testing.B) (store *SQLiteStore, cleanup func()) {
+type storeOpener func(path string) (Store, error)
+
+func sqliteOpener(path string) (Store, error) { return OpenSQLite(path) }
+func tursoOpener(path string) (Store, error)  { return OpenTursoConfig(TursoConfig{Path: path}) }
+
+func benchStore(b *testing.B, openers ...storeOpener) (store Store, cleanup func()) {
 	b.Helper()
+	open := sqliteOpener
+	if len(openers) > 0 {
+		open = openers[0]
+	}
 	path := b.TempDir() + "/bench.db"
-	s, err := OpenSQLite(path)
+	s, err := open(path)
 	if err != nil {
 		b.Fatal(err)
 	}
 	return s, func() { s.Close() }
 }
 
-func benchProto(b *testing.B, store *SQLiteStore) *Protocol {
+func benchProto(b *testing.B, store Store) *Protocol {
 	b.Helper()
 	return New(store, DefaultSchema(), []string{"bench"}, nil, ProtocolConfig{})
 }
@@ -39,9 +48,9 @@ func seedArtifacts(b *testing.B, p *Protocol, n int) []string {
 	return ids
 }
 
-// BenchmarkCreateArtifact — budget: p99 < 5ms
-func BenchmarkCreateArtifact(b *testing.B) {
-	s, cleanup := benchStore(b)
+func benchCreateArtifact(b *testing.B, open storeOpener) {
+	b.Helper()
+	s, cleanup := benchStore(b, open)
 	defer cleanup()
 	p := benchProto(b, s)
 	ctx := context.Background()
@@ -57,6 +66,12 @@ func BenchmarkCreateArtifact(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+// BenchmarkCreateArtifact — budget: p99 < 5ms
+func BenchmarkCreateArtifact(b *testing.B) {
+	b.Run("sqlite", func(b *testing.B) { benchCreateArtifact(b, sqliteOpener) })
+	b.Run("turso", func(b *testing.B) { benchCreateArtifact(b, tursoOpener) })
 }
 
 // BenchmarkListArtifacts — budget: p99 < 10ms for 1000 artifacts

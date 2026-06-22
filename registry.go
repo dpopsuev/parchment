@@ -4,7 +4,9 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"io/fs"
 	"log/slog"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -17,10 +19,10 @@ const (
 	crdKindLabelLegacy = "LabelDefinition"
 )
 
-//go:embed registry/kinds/*.yaml registry/labels/*.yaml registry/relationships/*.yaml registry/sources/*.yaml
+//go:embed registry/domains/*/kinds/*.yaml registry/core/labels/*.yaml registry/domains/*/relationships/*.yaml registry/core/relationships/*.yaml registry/sources/*.yaml
 var registryFS embed.FS
 
-//go:embed registry/rules
+//go:embed registry/domains/*/rules/*.yaml registry/core/rules/*.yaml
 var rulesFS embed.FS
 
 func crdResourceToKindYAML(r *Resource) kindYAML {
@@ -142,24 +144,21 @@ type labelYAML struct {
 }
 
 // loadRegistryKinds parses all kind CRD files from the embedded registry.
+// Walks registry/domains/*/kinds/ to find YAML files across all domain packs.
 func loadRegistryKinds() []kindYAML {
-	entries, err := registryFS.ReadDir("registry/kinds")
-	if err != nil {
-		return nil
-	}
 	var kinds []kindYAML
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".yaml") {
-			continue
+	_ = fs.WalkDir(registryFS, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".yaml") || path.Base(path.Dir(p)) != "kinds" {
+			return nil
 		}
-		data, err := registryFS.ReadFile("registry/kinds/" + e.Name())
+		data, err := registryFS.ReadFile(p)
 		if err != nil {
-			continue
+			return nil
 		}
 		resources, err := ParseResourceFile(data)
 		if err != nil {
-			slog.WarnContext(context.Background(), "registry: parse kind CRD failed", slog.String("file", e.Name()), slog.Any(LogKeyError, err)) //nolint:sloglint // "file" has no LogKey constant
-			continue
+			slog.WarnContext(context.Background(), "registry: parse kind CRD failed", slog.String("file", p), slog.Any(LogKeyError, err)) //nolint:sloglint // "file" has no LogKey constant
+			return nil
 		}
 		for _, r := range resources {
 			if r.Kind != crdKindLabel && r.Kind != crdKindLabelLegacy {
@@ -167,32 +166,30 @@ func loadRegistryKinds() []kindYAML {
 			}
 			k := crdResourceToKindYAML(r)
 			if k.Name == "" {
-				k.Name = strings.TrimSuffix(e.Name(), ".yaml")
+				k.Name = strings.TrimSuffix(d.Name(), ".yaml")
 			}
 			kinds = append(kinds, k)
 		}
-	}
+		return nil
+	})
 	return kinds
 }
 
 // loadRegistryLabels parses all label CRD files from the embedded registry.
-func loadRegistryLabels() []labelYAML { //nolint:dupl // parallel to loadRegistryEdgeTypes; generic helper would obscure embed path
-	entries, err := registryFS.ReadDir("registry/labels")
-	if err != nil {
-		return nil
-	}
+// Walks registry/core/labels/ to find YAML files.
+func loadRegistryLabels() []labelYAML {
 	var labels []labelYAML
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".yaml") {
-			continue
+	_ = fs.WalkDir(registryFS, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".yaml") || path.Base(path.Dir(p)) != "labels" {
+			return nil
 		}
-		data, err := registryFS.ReadFile("registry/labels/" + e.Name())
+		data, err := registryFS.ReadFile(p)
 		if err != nil {
-			continue
+			return nil
 		}
 		resources, err := ParseResourceFile(data)
 		if err != nil {
-			continue
+			return nil
 		}
 		for _, r := range resources {
 			if r.Kind != crdKindLabel && r.Kind != crdKindLabelLegacy {
@@ -200,11 +197,12 @@ func loadRegistryLabels() []labelYAML { //nolint:dupl // parallel to loadRegistr
 			}
 			l := crdResourceToLabelYAML(r)
 			if l.Name == "" {
-				l.Name = strings.TrimSuffix(e.Name(), ".yaml")
+				l.Name = strings.TrimSuffix(d.Name(), ".yaml")
 			}
 			labels = append(labels, l)
 		}
-	}
+		return nil
+	})
 	return labels
 }
 
@@ -326,52 +324,48 @@ type ruleYAML struct {
 }
 
 // loadRegistryRules parses all rule YAML files from the embedded registry.
-func loadRegistryRules() []ruleYAML { //nolint:dupl // parallel to other loadRegistry* funcs; generic helper would obscure embed path
-	entries, err := rulesFS.ReadDir("registry/rules")
-	if err != nil {
-		return nil
-	}
+// loadRegistryRules parses all rule YAML files from the embedded registry.
+// Walks registry/domains/*/rules/ and registry/core/rules/.
+func loadRegistryRules() []ruleYAML {
 	var rules []ruleYAML
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".yaml") {
-			continue
+	_ = fs.WalkDir(rulesFS, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".yaml") || path.Base(path.Dir(p)) != "rules" {
+			return nil
 		}
-		data, err := rulesFS.ReadFile("registry/rules/" + e.Name())
+		data, err := rulesFS.ReadFile(p)
 		if err != nil {
-			continue
+			return nil
 		}
 		var r ruleYAML
 		if err := yaml.Unmarshal(data, &r); err != nil {
-			continue
+			return nil
 		}
 		if r.Name == "" {
-			r.Name = strings.TrimSuffix(filepath.Base(e.Name()), ".yaml")
+			r.Name = strings.TrimSuffix(filepath.Base(d.Name()), ".yaml")
 		}
 		rules = append(rules, r)
-	}
+		return nil
+	})
 	return rules
 }
 
 // loadRegistryRelationships parses all relationship CRD files from the embedded registry.
+// Walks registry/domains/*/relationships/ and registry/core/relationships/.
 func loadRegistryRelationships() []RelationshipTrait {
-	entries, err := registryFS.ReadDir("registry/relationships")
-	if err != nil {
-		return nil
-	}
 	var rels []RelationshipTrait
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".yaml") {
-			continue
+	_ = fs.WalkDir(registryFS, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".yaml") || path.Base(path.Dir(p)) != "relationships" {
+			return nil
 		}
-		data, err := registryFS.ReadFile("registry/relationships/" + e.Name())
+		data, err := registryFS.ReadFile(p)
 		if err != nil {
-			continue
+			return nil
 		}
 		resources, err := ParseResourceFile(data)
 		if err != nil {
 			slog.WarnContext(context.Background(), "registry: parse relationship CRD failed",
-				slog.String("file", e.Name()), slog.Any(LogKeyError, err)) //nolint:sloglint // "file" has no LogKey constant
-			continue
+				slog.String("file", p), slog.Any(LogKeyError, err)) //nolint:sloglint // "file" has no LogKey constant
+			return nil
 		}
 		for _, r := range resources {
 			if r.Kind != "Relationship" {
@@ -386,7 +380,8 @@ func loadRegistryRelationships() []RelationshipTrait {
 				ConformanceCheck: r.Spec.RelConformanceCheck,
 			})
 		}
-	}
+		return nil
+	})
 	return rels
 }
 

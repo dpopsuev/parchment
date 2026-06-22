@@ -1,3 +1,0 @@
-# Rule YAML files are added here when the corresponding Go transitionGuard is deleted.
-# One rule per file. Pattern: <guard_name>.yaml
-# Each migration: seed YAML → verify tests green → delete Go guard → verify tests green → commit.

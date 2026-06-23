@@ -67,10 +67,14 @@ func UniqueWikilinks(text string) []string {
 	return out
 }
 
-// resolveTitle resolves a title string to an artifact ID via FTS search.
-// Prefers exact title match; falls back to first search hit.
-func (p *Protocol) resolveTitle(ctx context.Context, title string) string {
-	arts, err := p.store.Search(ctx, title)
+// resolveTitle resolves a wikilink target to an artifact ID.
+// Resolution order: exact ID match, then exact title match via FTS,
+// then first FTS hit as fallback.
+func (p *Protocol) resolveTitle(ctx context.Context, target string) string {
+	if _, err := p.store.Get(ctx, target); err == nil {
+		return target
+	}
+	arts, err := p.store.Search(ctx, target)
 	if err != nil || len(arts) == 0 {
 		return ""
 	}
@@ -79,7 +83,7 @@ func (p *Protocol) resolveTitle(ctx context.Context, title string) string {
 		if err != nil {
 			continue
 		}
-		if strings.EqualFold(art.Title, title) {
+		if strings.EqualFold(art.Title, target) {
 			return id
 		}
 	}

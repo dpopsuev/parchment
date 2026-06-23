@@ -271,3 +271,74 @@ func TestSyncWikilinks_SkipsSelfReference(t *testing.T) {
 		t.Errorf("no edges should be created for self-references, got %d", len(edges))
 	}
 }
+
+func TestSyncWikilinks_ResolvesById(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	p := New(store, nil, []string{"test"}, nil, ProtocolConfig{})
+
+	// Create a target with a known explicit ID
+	target, err := p.CreateArtifact(ctx, CreateInput{
+		ExplicitID: "KRN-test-target",
+		Title:      "Some Kernel Title That Differs From ID",
+		Labels:     []string{"kind:knowledge.note"},
+	})
+	if err != nil {
+		t.Fatalf("create target: %v", err)
+	}
+
+	// Create a note that references the target by ID, not title
+	note, err := p.CreateArtifact(ctx, CreateInput{
+		Title:  "Referencing Note",
+		Labels: []string{"kind:knowledge.note"},
+		Sections: []Section{
+			{Name: "body", Text: "See [[KRN-test-target]] for details."},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	// The wikilink should have resolved by ID and created a mentions edge
+	edges, _ := store.Neighbors(ctx, note.ID, RelMentions, Outgoing)
+	if len(edges) != 1 {
+		t.Fatalf("expected 1 mentions edge, got %d", len(edges))
+	}
+	if edges[0].To != target.ID {
+		t.Errorf("edge target = %q, want %q", edges[0].To, target.ID)
+	}
+}
+
+func TestSyncWikilinks_PrefersIdOverTitle(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	p := New(store, nil, []string{"test"}, nil, ProtocolConfig{})
+
+	// Create two artifacts: one whose title matches "Alpha", one whose ID is "Alpha"
+	byTitle, _ := p.CreateArtifact(ctx, CreateInput{
+		Title:  "Alpha",
+		Labels: []string{"kind:knowledge.note"},
+	})
+	byID, _ := p.CreateArtifact(ctx, CreateInput{
+		ExplicitID: "Alpha",
+		Title:      "Something Else Entirely",
+		Labels:     []string{"kind:knowledge.note"},
+	})
+
+	note, _ := p.CreateArtifact(ctx, CreateInput{
+		Title:  "Test Priority",
+		Labels: []string{"kind:knowledge.note"},
+		Sections: []Section{
+			{Name: "body", Text: "Reference [[Alpha]] here."},
+		},
+	})
+
+	edges, _ := store.Neighbors(ctx, note.ID, RelMentions, Outgoing)
+	if len(edges) != 1 {
+		t.Fatalf("expected 1 edge, got %d", len(edges))
+	}
+	// ID match should win over title match
+	if edges[0].To != byID.ID {
+		t.Errorf("expected ID-match %q to win, got %q (title-match was %q)", byID.ID, edges[0].To, byTitle.ID)
+	}
+}

@@ -1,0 +1,19 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.delivery.commit
+spec:
+  prefix: CMT
+  code: cmt
+  children: []
+  lifecycle:
+    defaultStatus: work.active
+  relations:
+    outgoing: [implements, traces_to]
+  whenToCreate: |
+    Materialized from git log — one artifact per commit. Carries hash,
+    author, and extracted ticket references for cross-layer linking.
+  agentNote: |
+    Commits are the bridge between code and planning. Use implements edges
+    to link to intent.bug or intent.spec via extracted ticket refs.
+    commit_hash and ticket_refs live in Extra.

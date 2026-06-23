@@ -1,0 +1,23 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.test.run
+spec:
+  prefix: RUN
+  code: run
+  isContainerKind: true
+  children: [test.suite]
+  lifecycle:
+    defaultStatus: work.active
+  sections:
+    should: [summary]
+  relations:
+    outgoing: [parent_of, traces_to]
+    targets:
+      parent_of: [test.suite]
+  whenToCreate: |
+    One test run per CI execution or Report Portal launch. Contains suites
+    which contain individual results.
+  agentNote: |
+    A test run maps to a Report Portal launch or a CI test phase.
+    Use traces_to to link to the delivery.build that triggered this run.

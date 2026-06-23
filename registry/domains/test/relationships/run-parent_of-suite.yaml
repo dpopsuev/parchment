@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: run-parent_of-suite
+spec:
+  from: kind:test.run
+  relation: parent_of
+  to: kind:test.suite

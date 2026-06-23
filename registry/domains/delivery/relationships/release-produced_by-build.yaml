@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: release-produced_by-build
+spec:
+  from: kind:delivery.release
+  relation: produced_by
+  to: kind:delivery.build

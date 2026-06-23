@@ -1,0 +1,22 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.test.result
+spec:
+  prefix: TRS
+  code: trs
+  children: []
+  lifecycle:
+    defaultStatus: work.active
+  sections:
+    should: [output, failure-message]
+  relations:
+    incoming: [parent_of]
+    outgoing: [tested_by, traces_to]
+  whenToCreate: |
+    Materialized from CI or Report Portal — one artifact per test item
+    (PASSED, FAILED, SKIPPED). Carries defect classification and duration.
+  agentNote: |
+    Test results are immutable observations. Status data (PASSED/FAILED/SKIPPED)
+    lives in Extra, not in the artifact status field. Use tested_by to link to
+    the delivery.build that executed this test.

@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: commit-traces_to-any
+spec:
+  from: kind:delivery.commit
+  relation: traces_to
+  to: "*"

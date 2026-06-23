@@ -1,0 +1,24 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.test.suite
+spec:
+  prefix: TSU
+  code: tsu
+  isContainerKind: true
+  children: [test.result]
+  lifecycle:
+    defaultStatus: work.active
+  sections:
+    should: [summary]
+  relations:
+    incoming: [parent_of]
+    outgoing: [parent_of]
+    targets:
+      parent_of: [test.result]
+  whenToCreate: |
+    Create a suite to group related test results — typically one suite per
+    test class or functional area within a test run.
+  agentNote: |
+    Suites are containers for test.result artifacts. They are materialized from
+    CI data and carry aggregate pass/fail counts in Extra.

@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: run-traces_to-build
+spec:
+  from: kind:test.run
+  relation: traces_to
+  to: kind:delivery.build

@@ -1,0 +1,21 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.delivery.build
+spec:
+  prefix: BLD
+  code: bld
+  children: []
+  lifecycle:
+    defaultStatus: work.active
+  sections:
+    should: [log-excerpt]
+  relations:
+    incoming: [tested_by, produced_by]
+    outgoing: [traces_to]
+  whenToCreate: |
+    Materialized from Jenkins or GitHub Actions — one artifact per CI build.
+    Carries job name, result (SUCCESS/FAILURE/UNSTABLE/ABORTED), and duration.
+  agentNote: |
+    Builds anchor the CI phase. Test results link here via tested_by.
+    Releases link here via produced_by. ci_result and duration_sec live in Extra.

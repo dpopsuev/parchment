@@ -1,0 +1,18 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.delivery.release
+spec:
+  prefix: REL
+  code: rel
+  children: []
+  lifecycle:
+    defaultStatus: work.active
+  relations:
+    outgoing: [produced_by]
+  whenToCreate: |
+    Materialized from release tags or artifact registries — one per versioned
+    release. Carries version string, artifact count, and changelog URL.
+  agentNote: |
+    Releases mark the handoff from build to deploy. Use produced_by to link
+    to the delivery.build that created this release. version lives in Extra.

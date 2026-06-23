@@ -1,0 +1,20 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.delivery.deployment
+spec:
+  prefix: DEP
+  code: dep
+  children: []
+  lifecycle:
+    defaultStatus: work.active
+  relations:
+    incoming: [traces_to]
+    outgoing: [traces_to]
+  whenToCreate: |
+    Materialized from K8s or deployment automation — one per deployment event.
+    Carries environment, image, replica count, and deployment status.
+  agentNote: |
+    Deployments bridge release artifacts to the runtime environment.
+    Use traces_to to link back to the delivery.release that was deployed.
+    environment and dep_status live in Extra.

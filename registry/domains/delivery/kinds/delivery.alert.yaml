@@ -1,0 +1,19 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.delivery.alert
+spec:
+  prefix: ALT
+  code: alt
+  children: []
+  lifecycle:
+    defaultStatus: work.active
+  relations:
+    outgoing: [relates_to, evidenced_by]
+  whenToCreate: |
+    Materialized from Prometheus or Grafana alerting — one artifact per alert
+    firing. Carries metric name, threshold, observed value, and alert state.
+  agentNote: |
+    Alerts are the monitor phase signal. metric, threshold, value, and state
+    live in Extra. Use relates_to to correlate with delivery.event artifacts.
+    Use evidenced_by to link to support.ref when attaching external evidence.

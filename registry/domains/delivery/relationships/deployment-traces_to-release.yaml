@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: deployment-traces_to-release
+spec:
+  from: kind:delivery.deployment
+  relation: traces_to
+  to: kind:delivery.release

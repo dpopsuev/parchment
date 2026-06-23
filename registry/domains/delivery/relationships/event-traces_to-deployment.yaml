@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: event-traces_to-deployment
+spec:
+  from: kind:delivery.event
+  relation: traces_to
+  to: kind:delivery.deployment

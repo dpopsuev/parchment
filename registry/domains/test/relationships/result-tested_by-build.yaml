@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: result-tested_by-build
+spec:
+  from: kind:test.result
+  relation: tested_by
+  to: kind:delivery.build

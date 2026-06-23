@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: alert-relates_to-event
+spec:
+  from: kind:delivery.alert
+  relation: relates_to
+  to: kind:delivery.event

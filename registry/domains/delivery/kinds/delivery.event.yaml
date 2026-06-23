@@ -1,0 +1,20 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.delivery.event
+spec:
+  prefix: EVT
+  code: evt
+  children: []
+  lifecycle:
+    defaultStatus: work.active
+  relations:
+    incoming: [relates_to]
+    outgoing: [traces_to]
+  whenToCreate: |
+    Materialized from runtime telemetry — PTP sync state changes, DPLL lock
+    events, holdover transitions, SyncE status. One artifact per discrete event.
+  agentNote: |
+    Operational events are the observe phase of the delivery loop.
+    severity, service, and message live in Extra. Use traces_to to link
+    to the delivery.deployment where the event occurred.

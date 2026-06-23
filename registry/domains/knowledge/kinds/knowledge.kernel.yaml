@@ -1,0 +1,33 @@
+apiVersion: scribe/v1
+kind: Label
+metadata:
+  name: kind.knowledge.kernel
+spec:
+  prefix: KRN
+  code: krn
+  children: []
+  lifecycle:
+    defaultStatus: kernel.pending
+    transitions:
+      - from: kernel.pending
+        to: [kernel.confirmed, kernel.rejected]
+      - from: kernel.confirmed
+        to: [kernel.pending, archived]
+      - from: kernel.rejected
+        to: [kernel.pending, archived]
+  sections:
+    must: [content]
+    should: [provenance]
+  relations:
+    incoming: [parent_of, produces]
+    outgoing: [traces_to, cites]
+  whenToCreate: |
+    A kernel is extracted knowledge from one or more pointers (materialized
+    sources). Created automatically during materialization when content is
+    distilled from external artifacts. Kernels carry a selector that anchors
+    them to a specific location in the source pointer.
+  agentNote: |
+    Kernels start as kernel.pending — unreviewed extracted content. Move to
+    kernel.confirmed after validation, or kernel.rejected if inaccurate.
+    The traces_to edge links back to the source pointer, with a selector
+    in Extra specifying the exact source location. content section is required.

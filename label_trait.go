@@ -295,6 +295,11 @@ var defaultLabelTraits = []struct {
 	{"work.blocked", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.3}, "", ""},
 	{"work.complete", LabelTrait{Terminal: true, Readonly: false, EvictionQuality: 0.6}, "", ""},
 
+	// System statuses (stored with status: prefix).
+	{"status:retired", LabelTrait{Terminal: true, Readonly: true, EvictionQuality: 0.0}, "", ""},
+	{"status:archived", LabelTrait{Terminal: true, Readonly: true, EvictionQuality: 0.1}, "", ""},
+	{"cancelled", LabelTrait{Terminal: true, Readonly: false, EvictionQuality: 0.2}, "", ""}, //nolint:misspell // British spelling is the stored value in CRDs
+
 	// Knowledge lifecycle traits.
 	{"note.fleeting", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.2}, "", ""},
 	{"note.mature", LabelTrait{Terminal: false, Readonly: false, EvictionQuality: 0.7}, "", ""},

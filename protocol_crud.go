@@ -134,6 +134,8 @@ func (p *Protocol) CreateArtifact(ctx context.Context, in CreateInput) (*Artifac
 	status := statusFromLabels(in.Labels)
 	if status == "" {
 		status = p.DefaultStatus(kind)
+	} else if !p.IsKnownStatus(status) {
+		return nil, fmt.Errorf("unknown status %q — valid statuses: %s", status, strings.Join(p.AllStatuses(), ", ")) //nolint:err113 // user-facing validation
 	}
 	// Seed labels with system mirrors (scope, kind, status, priority, sprint)
 	// so label-based queries work without reading individual fields.

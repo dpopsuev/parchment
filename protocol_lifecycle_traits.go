@@ -223,6 +223,17 @@ func (p *Protocol) RegisteredRelations() []string {
 	return out
 }
 
+// IsKnownStatus reports whether status is a registered lifecycle status.
+func (p *Protocol) IsKnownStatus(status string) bool {
+	if _, ok := p.labelTraits[status]; ok {
+		return isDomainStatusLabel(status) || strings.HasPrefix(status, LabelPrefixStatus)
+	}
+	if _, ok := p.labelTraits["status:"+status]; ok {
+		return true
+	}
+	return false
+}
+
 // AllStatuses returns all registered lifecycle status labels, sorted.
 // Status labels are identified by containing a dot (work.active, note.fleeting)
 // or having the status: prefix (status:retired). All other labelTrait keys

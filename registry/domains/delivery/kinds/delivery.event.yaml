@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.delivery.event
 spec:
-  prefix: EVT
-  code: evt
   children: []
   lifecycle:
     defaultStatus: work.active

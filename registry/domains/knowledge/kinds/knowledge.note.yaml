@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.knowledge.note
 spec:
-  prefix: NOT
-  code: "n"
   children: []
   lifecycle:
     defaultStatus: note.fleeting

@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.investigation.cause
 spec:
-  prefix: CSE
-  code: cse
   children: []
   lifecycle:
     defaultStatus: cause.proposed

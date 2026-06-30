@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.agent.tool-call
 spec:
-  prefix: TCL
-  code: tcl
   children: []
   lifecycle:
     defaultStatus: agent.active

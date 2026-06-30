@@ -29,8 +29,6 @@ func crdResourceToKindYAML(r *Resource) kindYAML {
 	name := strings.TrimPrefix(r.Metadata.Name, "kind.")
 	k := kindYAML{
 		Name:                      name,
-		Prefix:                    r.Spec.Prefix,
-		Code:                      r.Spec.Code,
 		Protected:                 r.Spec.Protected,
 		SkipGuards:                r.Spec.SkipGuards,
 		IsGoalKind:                r.Spec.IsGoalKind,
@@ -79,8 +77,6 @@ func crdResourceToLabelYAML(r *Resource) labelYAML {
 // All fields map directly to LabelTrait; no KindDef conversion needed.
 type kindYAML struct {
 	Name                      string
-	Prefix                    string
-	Code                      string
 	DefaultStatus             string
 	ActiveStatus              string
 	Protected                 bool
@@ -110,8 +106,6 @@ func (k *kindYAML) toLabelTrait() LabelTrait {
 		}
 	}
 	return LabelTrait{
-		Prefix:                    k.Prefix,
-		Code:                      k.Code,
 		DefaultStatus:             k.DefaultStatus,
 		ActiveStatus:              k.ActiveStatus,
 		Protected:                 k.Protected,

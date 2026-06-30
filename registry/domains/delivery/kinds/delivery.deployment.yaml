@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.delivery.deployment
 spec:
-  prefix: DEP
-  code: dep
   children: []
   lifecycle:
     defaultStatus: work.active

@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.investigation.observation
 spec:
-  prefix: OBS
-  code: obs
   children: []
   lifecycle:
     defaultStatus: obs.open

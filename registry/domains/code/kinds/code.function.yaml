@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.code.function
 spec:
-  prefix: FUN
-  code: fun
   children: []
   lifecycle:
     defaultStatus: code.indexed

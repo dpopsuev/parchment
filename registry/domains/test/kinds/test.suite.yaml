@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.test.suite
 spec:
-  prefix: TSU
-  code: tsu
   isContainerKind: true
   children: [test.result]
   lifecycle:

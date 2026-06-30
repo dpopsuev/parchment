@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.test.run
 spec:
-  prefix: RUN
-  code: run
   isContainerKind: true
   children: [test.suite]
   lifecycle:

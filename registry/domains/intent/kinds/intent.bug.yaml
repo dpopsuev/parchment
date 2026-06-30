@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.intent.bug
 spec:
-  prefix: BUG
-  code: BUG
   protected: true
   requiresImplementation: true
   children: []

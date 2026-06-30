@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.delivery.commit
 spec:
-  prefix: CMT
-  code: cmt
   children: []
   lifecycle:
     defaultStatus: work.active

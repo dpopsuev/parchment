@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.intent.spec
 spec:
-  prefix: SPEC
-  code: SPC
   protected: true
   requiresImplementation: true
   children: []

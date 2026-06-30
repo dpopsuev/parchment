@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.support.mirror
 spec:
-  prefix: MIR
-  code: MIR
   protected: true
   skipGuards: true
   children: []

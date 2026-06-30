@@ -42,8 +42,6 @@ type LabelTrait struct {
 	EvictionQuality float64 `json:"eviction_quality,omitempty"`
 
 	// Kind fields — for kind:X label definitions.
-	Prefix                    string   `json:"prefix,omitempty"`
-	Code                      string   `json:"code,omitempty"`
 	DefaultStatus             string   `json:"default_status,omitempty"`
 	ActiveStatus              string   `json:"active_status,omitempty"`
 	Transitions               []string `json:"trait_transitions,omitempty"`

@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.support.paragraph
 spec:
-  prefix: PAR
-  code: PAR
   children: []
   lifecycle:
     defaultStatus: work.active

@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.support.ref
 spec:
-  prefix: REF
-  code: REF
   protected: true
   skipEmptyCheck: true
   children: []

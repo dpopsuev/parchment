@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.code.struct
 spec:
-  prefix: STR
-  code: str
   children: []
   lifecycle:
     defaultStatus: code.indexed

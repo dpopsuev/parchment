@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.knowledge.source
 spec:
-  prefix: SRC
-  code: "s"
   children: []
   lifecycle:
     defaultStatus: work.active

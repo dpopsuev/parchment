@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.support.doc
 spec:
-  prefix: DOC
-  code: DOC
   protected: true
   skipEmptyCheck: true
   children: []

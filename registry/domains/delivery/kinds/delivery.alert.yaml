@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.delivery.alert
 spec:
-  prefix: ALT
-  code: alt
   children: []
   lifecycle:
     defaultStatus: work.active

@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.effort.goal
 spec:
-  prefix: GOAL
-  code: GOL
   protected: true
   isContainerKind: true
   skipEmptyCheck: true

@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.code.test
 spec:
-  prefix: TST
-  code: tst
   children: []
   lifecycle:
     defaultStatus: code.indexed

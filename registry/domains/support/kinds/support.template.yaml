@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.support.template
 spec:
-  prefix: TPL
-  code: TPL
   protected: true
   skipEmptyCheck: true
   isTemplate: true

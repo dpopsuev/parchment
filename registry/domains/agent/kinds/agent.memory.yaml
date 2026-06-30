@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.agent.memory
 spec:
-  prefix: AME
-  code: ame
   children: []
   lifecycle:
     defaultStatus: note.fleeting

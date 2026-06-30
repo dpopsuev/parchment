@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.agent.turn
 spec:
-  prefix: TRN
-  code: trn
   children: [agent.tool-call]
   lifecycle:
     defaultStatus: agent.active

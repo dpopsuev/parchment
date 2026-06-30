@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.investigation.case
 spec:
-  prefix: INV
-  code: inv
   children: [investigation.observation, investigation.cause]
   lifecycle:
     defaultStatus: inv.open

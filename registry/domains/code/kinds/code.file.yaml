@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.code.file
 spec:
-  prefix: FIL
-  code: fil
   children: []
   lifecycle:
     defaultStatus: code.indexed

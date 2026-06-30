@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.support.config
 spec:
-  prefix: CFG
-  code: CFG
   isConfig: true
   protected: true
   skipEmptyCheck: true

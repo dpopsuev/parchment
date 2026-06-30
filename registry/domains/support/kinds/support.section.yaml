@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.support.section
 spec:
-  prefix: SEC
-  code: SEC
   skipEmptyCheck: true
   children: ["*"]
   lifecycle:

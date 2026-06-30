@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.code.method
 spec:
-  prefix: MTD
-  code: mtd
   children: []
   lifecycle:
     defaultStatus: code.indexed

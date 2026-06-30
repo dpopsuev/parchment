@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.effort.task
 spec:
-  prefix: TASK
-  code: TSK
   children: []
   lifecycle:
     defaultStatus: work.draft

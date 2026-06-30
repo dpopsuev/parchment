@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.delivery.release
 spec:
-  prefix: REL
-  code: rel
   children: []
   lifecycle:
     defaultStatus: work.active

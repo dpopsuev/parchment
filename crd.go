@@ -44,8 +44,6 @@ type ResourceSpec struct {
 	Implies          string          `yaml:"implies,omitempty"`
 
 	// Kind identity fields.
-	Prefix     string `yaml:"prefix,omitempty"`
-	Code       string `yaml:"code,omitempty"`
 	Protected  bool   `yaml:"protected,omitempty"`
 	SkipGuards bool   `yaml:"skipGuards,omitempty"`
 

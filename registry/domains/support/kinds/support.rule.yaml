@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.support.rule
 spec:
-  prefix: RULE
-  code: RUL
   isRule: true
   protected: true
   skipGuards: true

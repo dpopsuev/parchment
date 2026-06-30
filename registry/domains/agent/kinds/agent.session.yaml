@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.agent.session
 spec:
-  prefix: SES
-  code: ses
   children: [agent.turn]
   lifecycle:
     defaultStatus: agent.active

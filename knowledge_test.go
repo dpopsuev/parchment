@@ -12,20 +12,16 @@ func TestKnowledgeSchema_HasKnowledgeKinds(t *testing.T) {
 
 	cases := []struct {
 		kind        string
-		wantPrefix  string
 		wantDefault string
 	}{
-		{"knowledge.note", "NOT", "note.fleeting"},
-		{"knowledge.journal", "JRN", "work.active"},
-		{"knowledge.source", "SRC", "work.active"},
-		{"knowledge.concept", "CON", "work.active"},
-		{"knowledge.context", "CTX", "work.active"},
+		{"knowledge.note", "note.fleeting"},
+		{"knowledge.journal", "work.active"},
+		{"knowledge.source", "work.active"},
+		{"knowledge.concept", "work.active"},
+		{"knowledge.context", "work.active"},
 	}
 
 	for _, tc := range cases {
-		if got := p.labelTraits["kind:"+tc.kind].Prefix; got != tc.wantPrefix {
-			t.Errorf("kind %q: prefix = %q, want %q", tc.kind, got, tc.wantPrefix)
-		}
 		if got := p.DefaultStatus(tc.kind); got != tc.wantDefault {
 			t.Errorf("kind %q: default status = %q, want %q", tc.kind, got, tc.wantDefault)
 		}

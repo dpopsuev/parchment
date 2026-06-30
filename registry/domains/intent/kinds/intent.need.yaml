@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.intent.need
 spec:
-  prefix: NEED
-  code: NED
   protected: true
   children: []
   lifecycle:

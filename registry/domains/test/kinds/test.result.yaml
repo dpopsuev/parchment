@@ -3,8 +3,6 @@ kind: Label
 metadata:
   name: kind.test.result
 spec:
-  prefix: TRS
-  code: trs
   children: []
   lifecycle:
     defaultStatus: work.active

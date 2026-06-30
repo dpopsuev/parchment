@@ -308,9 +308,17 @@ func (p *Protocol) isEdgeAllowedErr(sourceLabels []string, relation string, targ
 	srcKind := labelValue(sourceLabels, LabelPrefixKind)
 	tgtKind := labelValue(targetLabels, LabelPrefixKind)
 	valid := p.ValidRelationsFor(srcKind)
+	var validTargets []string
 	validNames := make([]string, 0, len(valid))
 	for _, r := range valid {
 		validNames = append(validNames, r.Relation)
+		if r.Relation == relation {
+			validTargets = append(validTargets, r.Target)
+		}
+	}
+	if len(validTargets) > 0 {
+		return fmt.Errorf("%s -[%s]-> %s: target kind %q not allowed; valid targets for %s.%s: %s", //nolint:err113 // domain constraint
+			srcKind, relation, tgtKind, tgtKind, srcKind, relation, strings.Join(validTargets, ", "))
 	}
 	seen := make(map[string]bool)
 	deduped := validNames[:0]
@@ -320,7 +328,7 @@ func (p *Protocol) isEdgeAllowedErr(sourceLabels []string, relation string, targ
 			deduped = append(deduped, n)
 		}
 	}
-	return fmt.Errorf("%s→%s is not a valid %s relation; valid for %s: %s. Use schema(kind=%s) for full relation details", //nolint:err113 // domain constraint
+	return fmt.Errorf("%s→%s: unknown relation %q; valid for %s: %s. Use schema(kind=%s) for full relation details", //nolint:err113 // domain constraint
 		srcKind, tgtKind, relation, srcKind, strings.Join(deduped, ", "), srcKind)
 }
 

@@ -105,7 +105,7 @@ func TestScenario_A_Hierarchy(t *testing.T) {
 
 	// AllowedOutbound on kind:task rejects task→parent_of→campaign (task can't parent things).
 	errMsg := slinkFails(t, proto, task1.ID, parchment.RelParentOf, campaign.ID)
-	if !strings.Contains(errMsg, "not a valid") {
+	if !strings.Contains(errMsg, "unknown relation") {
 		t.Errorf("expected AllowedOutbound rejection, got: %q", errMsg)
 	}
 
@@ -271,7 +271,7 @@ func TestScenario_D_Wiki(t *testing.T) {
 
 	// note→concept (kind=concept, not source) is rejected by AllowedOutbound.
 	errMsg := slinkFails(t, proto, note.ID, "cites", concept.ID)
-	if !strings.Contains(errMsg, "not a valid") {
+	if !strings.Contains(errMsg, "not allowed") {
 		t.Errorf("expected AllowedOutbound rejection for note→concept, got: %q", errMsg)
 	}
 

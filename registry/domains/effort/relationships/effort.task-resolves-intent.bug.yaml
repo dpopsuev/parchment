@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: task-resolves-bug
+spec:
+  from: kind:effort.task
+  relation: resolves
+  to: kind:intent.bug

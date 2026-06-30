@@ -1,0 +1,8 @@
+apiVersion: scribe/v1
+kind: Relationship
+metadata:
+  name: task-traces-to-commit
+spec:
+  from: kind:effort.task
+  relation: traces_to
+  to: kind:delivery.commit

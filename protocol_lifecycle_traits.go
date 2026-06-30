@@ -350,6 +350,17 @@ func (p *Protocol) ValidTransition(kind, from, to string) (string, bool) {
 	return reason, valid
 }
 
+// KindLifecycle returns the lifecycle metadata for a kind: default status,
+// active status, and the full transition list (each entry is "from→to").
+// Returns nil transitions when the kind has no declared lifecycle (open state machine).
+func (p *Protocol) KindLifecycle(kind string) (defaultStatus, activeStatus string, transitions []string) {
+	trait, ok := p.labelTraits[LabelPrefixKind+kind]
+	if !ok {
+		return "", "", nil
+	}
+	return trait.DefaultStatus, trait.ActiveStatus, trait.Transitions
+}
+
 // Registry returns the ComponentRegistry for hot-reload of traits and rules.
 func (p *Protocol) Registry() *ComponentRegistry { return p.registry }
 

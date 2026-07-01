@@ -863,3 +863,50 @@ func (p *Protocol) MigrateID(ctx context.Context, oldID, newID string) error {
 	}
 	return p.store.RenameID(ctx, oldID, newID)
 }
+
+// --- Thin Store delegates (CRUD / aliases / revisions) ---
+// These methods expose raw Store operations at the Protocol level so
+// callers don't reach through Proto.Store().
+
+// Get returns an artifact by ID without alias fallback or access recording.
+// Use GetArtifact when alias resolution and access tracking are desired.
+func (p *Protocol) Get(ctx context.Context, id string) (*Artifact, error) {
+	return p.store.Get(ctx, id)
+}
+
+// List returns artifacts matching a raw Filter without config-driven defaults.
+// Use ListArtifacts when scope/status/sort defaults from config are desired.
+func (p *Protocol) List(ctx context.Context, f Filter) ([]*Artifact, error) { //nolint:gocritic // hugeParam: value semantics intentional, matching Store.List
+	return p.store.List(ctx, f)
+}
+
+// Children returns the direct children of parentID (via the parent_of relation).
+func (p *Protocol) Children(ctx context.Context, parentID string) ([]*Artifact, error) {
+	return p.store.Children(ctx, parentID)
+}
+
+// AddAlias registers an additional alias for an artifact.
+func (p *Protocol) AddAlias(ctx context.Context, artifactID, alias string) error {
+	return p.store.AddAlias(ctx, artifactID, alias)
+}
+
+// RemoveAlias removes an alias from an artifact.
+func (p *Protocol) RemoveAlias(ctx context.Context, artifactID, alias string) error {
+	return p.store.RemoveAlias(ctx, artifactID, alias)
+}
+
+// ListAliases returns all aliases registered for an artifact.
+func (p *Protocol) ListAliases(ctx context.Context, artifactID string) ([]string, error) {
+	return p.store.ListAliases(ctx, artifactID)
+}
+
+// ListRevisions returns the revision history for an artifact, newest first.
+func (p *Protocol) ListRevisions(ctx context.Context, artifactID string, limit int) ([]Revision, error) {
+	return p.store.ListRevisions(ctx, artifactID, limit)
+}
+
+// PruneRevisions removes old revisions beyond keepN for an artifact, returning
+// the number of revisions deleted.
+func (p *Protocol) PruneRevisions(ctx context.Context, artifactID string, keepN int) (int, error) {
+	return p.store.PruneRevisions(ctx, artifactID, keepN)
+}

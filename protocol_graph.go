@@ -452,3 +452,46 @@ func (p *Protocol) GetArtifactEdges(ctx context.Context, id string) ([]EdgeSumma
 	}
 	return summaries, nil
 }
+
+// --- Thin Store delegates (graph) ---
+// These methods expose raw Store graph operations at the Protocol level so
+// callers don't reach through Proto.Store().
+
+// Neighbors returns the raw edges for id, optionally filtered by relation and direction.
+func (p *Protocol) Neighbors(ctx context.Context, id, rel string, dir Direction) ([]Edge, error) {
+	return p.store.Neighbors(ctx, id, rel, dir)
+}
+
+// AddEdge creates a single edge without Protocol-level validation (cycle check,
+// allowed-outbound, max-parents). Use LinkArtifacts when validation is desired.
+func (p *Protocol) AddEdge(ctx context.Context, e Edge) error {
+	return p.store.AddEdge(ctx, e)
+}
+
+// RemoveEdge removes a single edge by from/to/relation.
+func (p *Protocol) RemoveEdge(ctx context.Context, e Edge) error {
+	return p.store.RemoveEdge(ctx, e)
+}
+
+// AddEdgeSource creates an edge (if absent) with the given source tag, or adds
+// the source to an existing edge's source set. Idempotent.
+func (p *Protocol) AddEdgeSource(ctx context.Context, from, relation, to, source string) error {
+	return p.store.AddEdgeSource(ctx, from, relation, to, source)
+}
+
+// Walk traverses the graph from root along relation/direction up to maxDepth,
+// calling fn for each edge. maxDepth 0 means unlimited.
+func (p *Protocol) Walk(ctx context.Context, root, rel string, dir Direction, maxDepth int, fn WalkFn) error {
+	return p.store.Walk(ctx, root, rel, dir, maxDepth, fn)
+}
+
+// ScopeGraph returns artifact counts per scope and cross-scope edge weights.
+func (p *Protocol) ScopeGraph(ctx context.Context) ([]ScopeCount, []ScopeEdgeWeight, error) {
+	return p.store.ScopeGraph(ctx)
+}
+
+// KindGraph returns artifact counts per kind within a scope, and cross-kind
+// edge weights, optionally filtered by status labels and relation types.
+func (p *Protocol) KindGraph(ctx context.Context, scope string, statusLabels, relations []string) ([]ScopeCount, []ScopeEdgeWeight, error) {
+	return p.store.KindGraph(ctx, scope, statusLabels, relations)
+}

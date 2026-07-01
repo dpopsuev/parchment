@@ -6,6 +6,8 @@ spec:
   protected: true
   requiresImplementation: true
   children: []
+  recallable: true
+  recallWeight: 1.2
   lifecycle:
     defaultStatus: work.draft
     transitions:

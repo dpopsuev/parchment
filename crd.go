@@ -58,6 +58,12 @@ type ResourceSpec struct {
 	IsRule                     bool   `yaml:"isRule,omitempty"`
 	IsConfig                   bool   `yaml:"isConfig,omitempty"`
 
+	// Behavioral fields — drive service logic from CRD data.
+	Recallable      bool    `yaml:"recallable,omitempty"`
+	RecallWeight    float64 `yaml:"recallWeight,omitempty"`
+	RelevanceBoost  float64 `yaml:"relevanceBoost,omitempty"`
+	AuditRetain     bool    `yaml:"auditRetain,omitempty"`
+
 	// Kind structure — children handled via Relationship CRDs.
 	Relations *RelationsSpec `yaml:"relations,omitempty"`
 

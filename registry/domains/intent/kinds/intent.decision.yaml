@@ -5,6 +5,8 @@ metadata:
 spec:
   protected: true
   children: []
+  recallable: true
+  recallWeight: 1.3
   lifecycle:
     defaultStatus: decision.proposed
     transitions:

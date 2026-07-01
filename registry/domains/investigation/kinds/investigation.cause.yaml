@@ -4,6 +4,7 @@ metadata:
   name: kind.investigation.cause
 spec:
   children: []
+  auditRetain: true
   lifecycle:
     defaultStatus: cause.proposed
     transitions:

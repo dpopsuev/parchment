@@ -40,6 +40,10 @@ func crdResourceToKindYAML(r *Resource) kindYAML {
 		IsTemplate:                r.Spec.IsTemplate,
 		IsRule:                    r.Spec.IsRule,
 		IsConfig:                  r.Spec.IsConfig,
+		Recallable:                r.Spec.Recallable,
+		RecallWeight:              r.Spec.RecallWeight,
+		RelevanceBoost:            r.Spec.RelevanceBoost,
+		AuditRetain:               r.Spec.AuditRetain,
 		WhenToCreate:              r.Spec.WhenToCreate,
 		AgentNote:                 r.Spec.AgentNote,
 	}
@@ -90,6 +94,10 @@ type kindYAML struct {
 	IsTemplate                bool
 	IsRule                    bool
 	IsConfig                  bool
+	Recallable                bool
+	RecallWeight              float64
+	RelevanceBoost            float64
+	AuditRetain               bool
 	Transitions               map[string][]string
 	MustSections              []string
 	ShouldSections            []string
@@ -119,6 +127,10 @@ func (k *kindYAML) toLabelTrait() LabelTrait {
 		IsTemplate:                k.IsTemplate,
 		IsRule:                    k.IsRule,
 		IsConfig:                  k.IsConfig,
+		Recallable:                k.Recallable,
+		RecallWeight:              k.RecallWeight,
+		RelevanceBoost:            k.RelevanceBoost,
+		AuditRetain:               k.AuditRetain,
 		Transitions:               transitions,
 		MustSections:              k.MustSections,
 		ShouldSections:            k.ShouldSections,

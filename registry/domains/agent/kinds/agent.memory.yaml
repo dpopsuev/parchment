@@ -4,6 +4,8 @@ metadata:
   name: kind.agent.memory
 spec:
   children: []
+  recallable: true
+  recallWeight: 1.3
   lifecycle:
     defaultStatus: note.fleeting
     transitions:

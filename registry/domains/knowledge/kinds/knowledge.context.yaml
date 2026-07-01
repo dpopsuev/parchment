@@ -5,6 +5,8 @@ metadata:
 spec:
   protected: true
   children: []
+  recallable: true
+  recallWeight: 1.0
   lifecycle:
     defaultStatus: work.active
   sections:

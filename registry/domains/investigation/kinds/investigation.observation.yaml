@@ -4,6 +4,7 @@ metadata:
   name: kind.investigation.observation
 spec:
   children: []
+  auditRetain: true
   lifecycle:
     defaultStatus: obs.open
     transitions:

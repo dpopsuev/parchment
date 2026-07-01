@@ -223,6 +223,38 @@ func (p *Protocol) RegisteredRelations() []string {
 	return out
 }
 
+// IsRecallable reports whether a kind should be included in recall queries.
+func (p *Protocol) IsRecallable(kind string) bool {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
+		return trait.Recallable
+	}
+	return false
+}
+
+// RecallWeight returns the recall ranking weight for a kind (0 = use default).
+func (p *Protocol) RecallWeight(kind string) float64 {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok && trait.RecallWeight > 0 {
+		return trait.RecallWeight
+	}
+	return 0
+}
+
+// RelevanceBoost returns the relevance boost for a kind (0 = use default).
+func (p *Protocol) RelevanceBoost(kind string) float64 {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok && trait.RelevanceBoost > 0 {
+		return trait.RelevanceBoost
+	}
+	return 0
+}
+
+// IsAuditRetain reports whether artifacts of this kind should be retained by hygiene.
+func (p *Protocol) IsAuditRetain(kind string) bool {
+	if trait, ok := p.labelTraits[LabelPrefixKind+kind]; ok {
+		return trait.AuditRetain
+	}
+	return false
+}
+
 // IsKnownStatus reports whether status is a registered lifecycle status.
 func (p *Protocol) IsKnownStatus(status string) bool {
 	if _, ok := p.labelTraits[status]; ok {

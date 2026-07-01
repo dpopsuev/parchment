@@ -4,6 +4,8 @@ metadata:
   name: kind.knowledge.source
 spec:
   children: []
+  recallable: true
+  recallWeight: 1.1
   lifecycle:
     defaultStatus: work.active
   sections:

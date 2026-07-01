@@ -57,9 +57,15 @@ type LabelTrait struct {
 	IsGoalKind                bool     `json:"is_goal_kind,omitempty"`
 	TrackInBrief              bool     `json:"track_in_brief,omitempty"`
 	ActivationRequiresSections bool    `json:"activation_requires_sections,omitempty"`
-	IsTemplate                 bool    `json:"is_template,omitempty"`   // artifacts of this kind auto-link to new artifacts via satisfies
-	IsRule                     bool    `json:"is_rule,omitempty"`       // artifacts of this kind are evaluated by the rules engine on status transitions
-	IsConfig                   bool    `json:"is_config,omitempty"`     // artifacts of this kind serve as key-value config stores (GetConfig)
+	IsTemplate                 bool    `json:"is_template,omitempty"`
+	IsRule                     bool    `json:"is_rule,omitempty"`
+	IsConfig                   bool    `json:"is_config,omitempty"`
+
+	// Behavioral fields — drive service layer logic from CRD data.
+	Recallable      bool    `json:"recallable,omitempty"`
+	RecallWeight    float64 `json:"recall_weight,omitempty"`
+	RelevanceBoost  float64 `json:"relevance_boost,omitempty"`
+	AuditRetain     bool    `json:"audit_retain,omitempty"`
 
 }
 

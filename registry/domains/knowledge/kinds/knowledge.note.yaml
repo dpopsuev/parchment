@@ -4,6 +4,8 @@ metadata:
   name: kind.knowledge.note
 spec:
   children: []
+  recallable: true
+  recallWeight: 1.0
   lifecycle:
     defaultStatus: note.fleeting
     transitions:

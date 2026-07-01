@@ -4,6 +4,7 @@ metadata:
   name: kind.investigation.case
 spec:
   children: [investigation.observation, investigation.cause]
+  auditRetain: true
   lifecycle:
     defaultStatus: inv.open
     transitions:

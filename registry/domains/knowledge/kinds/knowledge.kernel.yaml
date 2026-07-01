@@ -4,6 +4,8 @@ metadata:
   name: kind.knowledge.kernel
 spec:
   children: []
+  recallable: true
+  recallWeight: 0.9
   lifecycle:
     defaultStatus: kernel.pending
     transitions:

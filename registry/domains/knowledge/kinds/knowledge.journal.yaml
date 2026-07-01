@@ -4,6 +4,8 @@ metadata:
   name: kind.knowledge.journal
 spec:
   children: []
+  recallable: true
+  recallWeight: 0.8
   lifecycle:
     defaultStatus: work.active
   sections:

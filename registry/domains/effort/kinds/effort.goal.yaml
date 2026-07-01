@@ -7,6 +7,8 @@ spec:
   isContainerKind: true
   skipEmptyCheck: true
   children: [effort.task, intent.spec, intent.bug, intent.need, support.ref, support.doc, intent.decision]
+  recallable: true
+  recallWeight: 1.4
   lifecycle:
     defaultStatus: work.draft
   isGoalKind: true

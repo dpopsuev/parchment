@@ -7,6 +7,8 @@ spec:
   isContainerKind: true
   skipEmptyCheck: true
   children: [effort.goal]
+  recallable: true
+  recallWeight: 1.5
   lifecycle:
     defaultStatus: work.draft
   activeStatus: work.active

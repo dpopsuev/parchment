@@ -511,6 +511,37 @@ func (p *Protocol) autoCompleteParent(ctx context.Context, art *Artifact) string
 }
 
 
+func (p *Protocol) reopenAncestors(ctx context.Context, art *Artifact) string {
+	var msgs []string
+	cur := art.ID
+	for {
+		parentEdges, _ := p.store.Neighbors(ctx, cur, RelParentOf, Incoming)
+		if len(parentEdges) == 0 {
+			break
+		}
+		parent, err := p.store.Get(ctx, parentEdges[0].From)
+		if err != nil {
+			break
+		}
+		if !p.IsTerminal(statusFromLabels(parent.Labels)) {
+			break
+		}
+		activeStatus := p.ActiveStatus(labelValue(parent.Labels, LabelPrefixKind))
+		if activeStatus == "" {
+			activeStatus = statusWorkActive
+		}
+		r := p.setStatusForce(ctx, parent, activeStatus, true)
+		if r.OK {
+			msgs = append(msgs, fmt.Sprintf("reopened %s: %s", parent.ID, parent.Title))
+		}
+		cur = parent.ID
+	}
+	if len(msgs) > 0 {
+		return strings.Join(msgs, "\n")
+	}
+	return ""
+}
+
 // GateSeverity indicates how a gate failure affects the lifecycle transition.
 type GateSeverity string
 

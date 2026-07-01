@@ -513,9 +513,18 @@ func (p *Protocol) autoCompleteParent(ctx context.Context, art *Artifact) string
 
 func (p *Protocol) reopenAncestors(ctx context.Context, art *Artifact) string {
 	var msgs []string
-	cur := art.ID
+	node := art
 	for {
-		parentEdges, _ := p.store.Neighbors(ctx, cur, RelParentOf, Incoming)
+		if p.IsTerminal(statusFromLabels(node.Labels)) {
+			activeStatus := p.ActiveStatus(labelValue(node.Labels, LabelPrefixKind))
+			if activeStatus == "" {
+				activeStatus = statusWorkActive
+			}
+			if r := p.setStatusForce(ctx, node, activeStatus, true); r.OK {
+				msgs = append(msgs, fmt.Sprintf("reopened %s: %s", node.ID, node.Title))
+			}
+		}
+		parentEdges, _ := p.store.Neighbors(ctx, node.ID, RelParentOf, Incoming)
 		if len(parentEdges) == 0 {
 			break
 		}
@@ -523,18 +532,7 @@ func (p *Protocol) reopenAncestors(ctx context.Context, art *Artifact) string {
 		if err != nil {
 			break
 		}
-		if !p.IsTerminal(statusFromLabels(parent.Labels)) {
-			break
-		}
-		activeStatus := p.ActiveStatus(labelValue(parent.Labels, LabelPrefixKind))
-		if activeStatus == "" {
-			activeStatus = statusWorkActive
-		}
-		r := p.setStatusForce(ctx, parent, activeStatus, true)
-		if r.OK {
-			msgs = append(msgs, fmt.Sprintf("reopened %s: %s", parent.ID, parent.Title))
-		}
-		cur = parent.ID
+		node = parent
 	}
 	if len(msgs) > 0 {
 		return strings.Join(msgs, "\n")

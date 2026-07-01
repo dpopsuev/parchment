@@ -177,19 +177,16 @@ func (p *Protocol) LinkArtifacts(ctx context.Context, sourceID, relation string,
 		slog.Int(LogKeyCount, len(targetIDs)))
 	p.emitEvent(ctx, EventLinked, sourceID, labelValue(art.Labels, LabelPrefixScope), map[string]any{"relation": relation, "targets": targetIDs})
 
-	if relation == RelParentOf && p.IsTerminal(statusFromLabels(art.Labels)) {
+	if relation == RelParentOf {
+		hasNonTerminalChild := false
 		for _, target := range targets {
-			if p.IsTerminal(statusFromLabels(target.Labels)) {
-				continue
+			if !p.IsTerminal(statusFromLabels(target.Labels)) {
+				hasNonTerminalChild = true
+				break
 			}
-			activeStatus := p.ActiveStatus(labelValue(art.Labels, LabelPrefixKind))
-			if activeStatus == "" {
-				activeStatus = statusWorkActive
-			}
-			p.setStatusForce(ctx, art, activeStatus, true)
-			slog.InfoContext(ctx, "reopened terminal parent after adding non-terminal child",
-				slog.String(LogKeyID, sourceID))
-			break
+		}
+		if hasNonTerminalChild {
+			p.reopenAncestors(ctx, art)
 		}
 	}
 

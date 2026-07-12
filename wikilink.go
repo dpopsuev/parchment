@@ -68,11 +68,16 @@ func UniqueWikilinks(text string) []string {
 }
 
 // resolveTitle resolves a wikilink target to an artifact ID.
-// Resolution order: exact ID match, then exact title match via FTS,
-// then first FTS hit as fallback.
+// Resolution order: exact ID, Extra.ref_id for backend:key targets,
+// exact title via FTS, then first FTS hit as fallback.
 func (p *Protocol) resolveTitle(ctx context.Context, target string) string {
 	if _, err := p.store.Get(ctx, target); err == nil {
 		return target
+	}
+	if strings.Contains(target, ":") {
+		if id := p.resolveByRefID(ctx, target); id != "" {
+			return id
+		}
 	}
 	arts, err := p.store.Search(ctx, target)
 	if err != nil || len(arts) == 0 {
@@ -88,6 +93,32 @@ func (p *Protocol) resolveTitle(ctx context.Context, target string) string {
 		}
 	}
 	return arts[0]
+}
+
+const (
+	kindSupportRef      = "support.ref"
+	kindKnowledgeSource = "knowledge.source"
+)
+
+// resolveByRefID finds an artifact whose Extra["ref_id"] equals target.
+// Prefers support.ref, then knowledge.source; first match wins within each kind.
+func (p *Protocol) resolveByRefID(ctx context.Context, refID string) string {
+	for _, kind := range []string{kindSupportRef, kindKnowledgeSource} {
+		arts, err := p.store.ListByLabel(ctx, LabelPrefixKind+kind)
+		if err != nil {
+			continue
+		}
+		for _, art := range arts {
+			if art == nil || art.Extra == nil {
+				continue
+			}
+			got, _ := art.Extra["ref_id"].(string)
+			if got == refID {
+				return art.ID
+			}
+		}
+	}
+	return ""
 }
 
 type resolvedLink struct {

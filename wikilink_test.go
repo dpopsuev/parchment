@@ -342,3 +342,59 @@ func TestSyncWikilinks_PrefersIdOverTitle(t *testing.T) {
 		t.Errorf("expected ID-match %q to win, got %q (title-match was %q)", byID.ID, edges[0].To, byTitle.ID)
 	}
 }
+
+func TestSyncWikilinks_ResolvesByRefID(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	p := New(store, nil, []string{"test"}, nil, ProtocolConfig{})
+
+	ref, err := p.CreateArtifact(ctx, CreateInput{
+		Title:  "OCPBUGS-1",
+		Labels: []string{"kind:support.ref"},
+		Extra: map[string]any{
+			"ref_backend": "emcee",
+			"ref_id":      "jira:OCPBUGS-1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create ref: %v", err)
+	}
+
+	note, err := p.CreateArtifact(ctx, CreateInput{
+		Title:  "Triage note",
+		Labels: []string{"kind:knowledge.note"},
+		Sections: []Section{
+			{Name: "body", Text: "See [[jira:OCPBUGS-1]] for details."},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	edges, _ := store.Neighbors(ctx, note.ID, RelMentions, Outgoing)
+	if len(edges) != 1 || edges[0].To != ref.ID {
+		t.Fatalf("expected mentions edge to ref %s, got %v", ref.ID, edges)
+	}
+}
+
+func TestSyncWikilinks_UnknownRefIDNoEdge(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	p := New(store, nil, []string{"test"}, nil, ProtocolConfig{})
+
+	note, err := p.CreateArtifact(ctx, CreateInput{
+		Title:  "Orphan link note",
+		Labels: []string{"kind:knowledge.note"},
+		Sections: []Section{
+			{Name: "body", Text: "Missing [[jira:DOES-NOT-EXIST]]."},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	edges, _ := store.Neighbors(ctx, note.ID, RelMentions, Outgoing)
+	if len(edges) != 0 {
+		t.Fatalf("expected no edges for unknown ref_id, got %v", edges)
+	}
+}

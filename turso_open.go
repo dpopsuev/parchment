@@ -73,7 +73,9 @@ func OpenTursoConfig(cfg TursoConfig) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("create schema: %w", err)
 	}
 
-	runSchemaEvolutions(writer)
+	if err := runSchemaEvolutions(writer); err != nil {
+		return nil, fmt.Errorf("schema evolution: %w", err)
+	}
 	ensureEventSchema(writer)
 
 	log.InfoContext(context.Background(), "database opened")

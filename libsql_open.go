@@ -104,7 +104,9 @@ func OpenLibSQLConfig(cfg LibSQLConfig) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("create FTS5 schema: %w", err)
 	}
 
-	runSchemaEvolutions(writer)
+	if err := runSchemaEvolutions(writer); err != nil {
+		return nil, fmt.Errorf("schema evolution: %w", err)
+	}
 	ensureEventSchema(writer)
 
 	if _, err := writer.Exec("INSERT INTO artifacts_fts(artifacts_fts) VALUES('rebuild')"); err != nil {

@@ -48,6 +48,7 @@ const (
 	LogKeyTo       = "to"
 	LogKeyReason   = "reason"
 	LogKeyError    = "error"
+	LogKeyQuery    = "query"
 	LogKeyScope    = "scope"
 	LogKeyCount    = "count"
 	LogKeyField    = "field"

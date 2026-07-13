@@ -203,15 +203,30 @@ func (p *Protocol) setFieldSingle(ctx context.Context, id, field, value string, 
 		if err := ValidateKind(value, p.vocab); err != nil {
 			return Result{ID: id, Error: err.Error()}
 		}
+		status := statusFromLabels(art.Labels)
+		if status != "" {
+			if reason, ok := p.ValidateStatus(value, "", status); !ok {
+				return Result{ID: id, Error: fmt.Sprintf("kind change rejected: %s", reason)}
+			}
+		}
 		art.Labels = mirrorLabel(art.Labels, LabelPrefixKind, value)
 	case FieldDependsOn:
 		return p.setFieldDependsOn(ctx, id, value)
 	case FieldLabels:
-		if value == "" {
-			art.Labels = nil
-		} else {
-			art.Labels = strings.Split(value, ",")
+		var labels []string
+		if value != "" {
+			for _, l := range strings.Split(value, ",") {
+				l = strings.TrimSpace(l)
+				if l == "" {
+					continue
+				}
+				if isDomainStatusLabel(l) || strings.HasPrefix(l, LabelPrefixStatus) {
+					return Result{ID: id, Error: "labels cannot set status — use field=status"}
+				}
+				labels = append(labels, l)
+			}
 		}
+		art.Labels = labels
 	default:
 		return Result{ID: id, Error: fmt.Sprintf(
 			"unknown field %q — valid fields: alias, status, title, goal, scope, parent, priority, sprint, kind, depends_on, labels; "+
@@ -315,15 +330,16 @@ func (p *Protocol) validNextStatuses(kind, from string) []string {
 }
 
 func (p *Protocol) setStatusForce(ctx context.Context, art *Artifact, status string, force bool) Result { //nolint:gocyclo,funlen // inherent complexity; splitting would reduce clarity or add call overhead complexity, moved from protocol.go
-	valid, reason := p.isValidTransition(labelValue(art.Labels, LabelPrefixKind), statusFromLabels(art.Labels), status)
-	if !valid {
+	kind := labelValue(art.Labels, LabelPrefixKind)
+	from := statusFromLabels(art.Labels)
+	if reason, ok := p.ValidateStatus(kind, from, status); !ok {
 		if !force {
 			return Result{ID: art.ID, Error: reason}
 		}
 		slog.WarnContext(ctx, "forced status transition bypasses lifecycle model",
 			slog.String(LogKeyID, art.ID),
-			slog.String(LogKeyKind, labelValue(art.Labels, LabelPrefixKind)),
-			slog.String(LogKeyFrom, statusFromLabels(art.Labels)),
+			slog.String(LogKeyKind, kind),
+			slog.String(LogKeyFrom, from),
 			slog.String(LogKeyTo, status),
 			slog.String(LogKeyReason, reason))
 	}

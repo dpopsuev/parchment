@@ -394,6 +394,67 @@ func (p *Protocol) maxParentsFor(labels []string) int {
 	return 0
 }
 
+// AllowedStatuses returns every status that appears in kind's lifecycle
+// (default plus all transition endpoints), sorted.
+// Returns nil when the kind declares no transitions (open state machine).
+func (p *Protocol) AllowedStatuses(kind string) []string {
+	def, active, transitions := p.KindLifecycle(kind)
+	if len(transitions) == 0 {
+		return nil
+	}
+	set := make(map[string]struct{})
+	if def != "" {
+		set[def] = struct{}{}
+	}
+	if active != "" {
+		set[active] = struct{}{}
+	}
+	for _, t := range transitions {
+		parts := strings.SplitN(t, "→", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		set[parts[0]] = struct{}{}
+		set[parts[1]] = struct{}{}
+	}
+	out := make([]string, 0, len(set))
+	for s := range set {
+		out = append(out, s)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// ValidateStatus reports whether status to is legal for kind.
+// When from is non-empty and the kind declares transitions, the transition map
+// is also enforced. Kinds with no transitions are open: only IsKnownStatus applies.
+func (p *Protocol) ValidateStatus(kind, from, to string) (string, bool) {
+	if to == "" {
+		return "status is required", false
+	}
+	allowed := p.AllowedStatuses(kind)
+	if len(allowed) > 0 {
+		found := false
+		for _, s := range allowed {
+			if s == to {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Sprintf("status %q not allowed for %s; valid: %v", to, kind, allowed), false
+		}
+		if from != "" && from != to {
+			return p.ValidTransition(kind, from, to)
+		}
+		return "", true
+	}
+	if !p.IsKnownStatus(to) {
+		return fmt.Sprintf("unknown status %q — valid statuses: %s", to, strings.Join(p.AllStatuses(), ", ")), false
+	}
+	return "", true
+}
+
 // ValidTransition reports whether transitioning kind from→to is allowed.
 // Returns ("", true) if allowed; (reason, false) if rejected.
 func (p *Protocol) ValidTransition(kind, from, to string) (string, bool) {

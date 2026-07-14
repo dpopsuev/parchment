@@ -98,6 +98,7 @@ const (
 	RelRelatesTo  = "relates_to" // generic symmetric relationship
 	RelClones     = "clones"     // X is a structural copy of Y
 	RelMentions   = "mentions"   // X weakly references Y (softer than cites)
+	RelDiscusses  = "discusses"  // X (message/comment) discusses Y (issue/code/ref)
 	RelTestedBy   = "tested_by"  // code:function → code:test
 	RelSupersedes = "supersedes" // X replaces Y (ADR evolution, decision history)
 )
